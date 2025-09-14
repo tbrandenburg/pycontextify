@@ -1,0 +1,83 @@
+[project]
+name = "pycontextify"
+version = "0.1.0"
+description = "A Python-based MCP server for semantic search over codebases, documents, and webpages with lightweight knowledge graph capabilities"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["mcp", "semantic-search", "embeddings", "faiss", "rag", "knowledge-graph"]
+
+dependencies = [
+    "fastmcp>=1.0.0",
+    "faiss-cpu>=1.7.0",
+    "sentence-transformers>=2.2.0",
+    "PyPDF2>=3.0.0",
+    "pdfplumber>=0.9.0",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.31.0",
+    "psutil>=5.9.0",
+    "numpy>=1.24.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+# Future embedding providers
+ollama = ["ollama>=0.1.0"]
+openai = ["openai>=1.0.0"]
+# Development dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+# GPU support
+gpu = ["faiss-gpu>=1.7.0"]
+
+[project.scripts]
+pycontextify = "pycontextify.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/pycontextify"
+Repository = "https://github.com/yourusername/pycontextify"
+Issues = "https://github.com/yourusername/pycontextify/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pycontextify"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --cov=pycontextify"
+testpaths = ["tests"]
