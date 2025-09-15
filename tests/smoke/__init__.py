@@ -6,7 +6,7 @@ and functionality without requiring heavy dependencies.
 Smoke tests are designed to:
 - Test basic import functionality
 - Verify configuration system works
-- Test MCP server initialization 
+- Test MCP server initialization
 - Validate core system components work together
 - Provide quick feedback on system health
 

@@ -8,4 +8,4 @@ from .base import BaseEmbedder
 from .factory import EmbedderFactory
 from .sentence_transformers_embedder import SentenceTransformersEmbedder
 
-__all__ = ['BaseEmbedder', 'EmbedderFactory', 'SentenceTransformersEmbedder']
+__all__ = ["BaseEmbedder", "EmbedderFactory", "SentenceTransformersEmbedder"]

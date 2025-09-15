@@ -81,3 +81,9 @@ disallow_untyped_defs = true
 minversion = "7.0"
 addopts = "-ra -q --cov=pycontextify"
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "types-psutil>=7.0.0.20250822",
+    "types-requests>=2.32.4.20250913",
+]

@@ -1,7 +1,8 @@
 """Basic tests for PyContextify package."""
 
-import pytest
-from pycontextify import __version__, IndexManager, Config
+# import pytest  # Not currently used
+
+from pycontextify import Config, IndexManager, __version__
 
 
 def test_version():
@@ -35,6 +36,7 @@ def test_index_manager_creation():
 def test_relationship_store_import():
     """Test that RelationshipStore can be imported."""
     from pycontextify.index import RelationshipStore
+
     assert RelationshipStore is not None
 
 

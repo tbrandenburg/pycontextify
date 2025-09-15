@@ -9,8 +9,9 @@ __version__ = "0.1.0"
 __author__ = "Your Name"
 __email__ = "your.email@example.com"
 
+from .index.config import Config
+
 # Main exports
 from .index.manager import IndexManager
-from .index.config import Config
 
 __all__ = ["IndexManager", "Config", "__version__"]
