@@ -36,12 +36,18 @@ class IndexManager:
         self.relationship_store = RelationshipStore()
         self.embedder = None
         self.vector_store = None
+        self.hybrid_search = None
+        self.reranker = None
 
         # Initialize embedder
         self._initialize_embedder()
 
         # Initialize vector store
         self._initialize_vector_store()
+        
+        # Initialize enhanced search components
+        self._initialize_hybrid_search()
+        self._initialize_reranker()
 
         # Auto-load existing index if enabled
         if self.config.auto_load:
@@ -71,6 +77,39 @@ class IndexManager:
             dimension = self.embedder.get_dimension()
             self.vector_store = VectorStore(dimension, self.config)
             logger.info(f"Initialized vector store with dimension {dimension}")
+    
+    def _initialize_hybrid_search(self) -> None:
+        """Initialize hybrid search engine if enabled."""
+        if not self.config.use_hybrid_search:
+            logger.info("Hybrid search disabled by configuration")
+            return
+            
+        try:
+            from .hybrid_search import HybridSearchEngine
+            self.hybrid_search = HybridSearchEngine(keyword_weight=self.config.keyword_weight)
+            logger.info(f"Initialized hybrid search with keyword weight: {self.config.keyword_weight}")
+        except ImportError as e:
+            logger.warning(f"Could not initialize hybrid search: {e}")
+            self.hybrid_search = None
+    
+    def _initialize_reranker(self) -> None:
+        """Initialize cross-encoder reranker if enabled."""
+        if not self.config.use_reranking:
+            logger.info("Reranking disabled by configuration")
+            return
+            
+        try:
+            from .reranker import CrossEncoderReranker
+            self.reranker = CrossEncoderReranker(model_name=self.config.reranking_model)
+            
+            # Warm up the model
+            if self.reranker.is_available:
+                self.reranker.warmup()
+                
+            logger.info(f"Initialized reranker with model: {self.config.reranking_model}")
+        except ImportError as e:
+            logger.warning(f"Could not initialize reranker: {e}")
+            self.reranker = None
 
     def _auto_load(self) -> None:
         """Automatically load existing index if available."""
@@ -195,8 +234,11 @@ class IndexManager:
         logger.info(f"Starting document indexing: {path}")
 
         try:
-            # Load content
-            loader = LoaderFactory.get_loader(SourceType.DOCUMENT)
+            # Load content with PDF engine configuration
+            loader = LoaderFactory.get_loader(
+                SourceType.DOCUMENT, 
+                pdf_engine=self.config.pdf_engine
+            )
             files = loader.load(path)
 
             if not files:
@@ -325,9 +367,32 @@ class IndexManager:
             self.relationship_store.build_relationships_from_chunks(chunks)
 
         return len(chunks)
+    
+    def _ensure_hybrid_search_index(self) -> None:
+        """Ensure hybrid search index is built from current chunks."""
+        if not self.hybrid_search:
+            return
+            
+        # Check if index needs to be built/updated
+        current_chunk_count = self.metadata_store.get_stats()["total_chunks"]
+        hybrid_stats = self.hybrid_search.get_stats()
+        
+        if hybrid_stats["indexed_documents"] != current_chunk_count:
+            logger.info("Building hybrid search index...")
+            
+            # Get all chunks
+            all_chunks = self.metadata_store.get_all_chunks()
+            
+            if all_chunks:
+                chunk_ids = [chunk.chunk_id for chunk in all_chunks]
+                texts = [chunk.chunk_text for chunk in all_chunks]
+                
+                # Build keyword search index
+                self.hybrid_search.add_documents(chunk_ids, texts)
+                logger.info(f"Built hybrid search index with {len(texts)} documents")
 
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        """Perform basic semantic search.
+        """Perform semantic search with optional hybrid search and reranking.
 
         Args:
             query: Search query
@@ -343,27 +408,79 @@ class IndexManager:
             # Embed query
             query_vector = self.embedder.embed_single(query)
 
-            # Search vector store
-            distances, indices = self.vector_store.search(query_vector, top_k)
+            # Search vector store (get more candidates for reranking)
+            search_top_k = top_k * 3 if self.config.use_reranking else top_k
+            distances, indices = self.vector_store.search(query_vector, search_top_k)
 
-            # Format results
-            results = []
-            for distance, faiss_id in zip(distances, indices):
-                chunk = self.metadata_store.get_chunk(faiss_id)
-                if chunk:
-                    results.append(
-                        {
+            # Use hybrid search if enabled
+            if self.hybrid_search and self.config.use_hybrid_search:
+                # Build keyword index if not already done
+                self._ensure_hybrid_search_index()
+                
+                # Prepare vector scores for hybrid search
+                vector_scores = [(int(faiss_id), float(distance)) for distance, faiss_id in zip(distances, indices)]
+                
+                # Perform hybrid search
+                hybrid_results = self.hybrid_search.search(
+                    query=query,
+                    vector_scores=vector_scores,
+                    metadata_store=self.metadata_store,
+                    top_k=top_k
+                )
+                
+                # Convert hybrid results to standard format
+                results = []
+                for result in hybrid_results:
+                    results.append({
+                        "score": result.combined_score,
+                        "vector_score": result.vector_score,
+                        "keyword_score": result.keyword_score,
+                        "source_path": result.source_path,
+                        "source_type": result.source_type,
+                        "chunk_text": result.text,
+                        "chunk_id": result.chunk_id,
+                        "metadata": result.metadata
+                    })
+            else:
+                # Standard vector search
+                results = []
+                for distance, faiss_id in zip(distances, indices):
+                    chunk = self.metadata_store.get_chunk(faiss_id)
+                    if chunk:
+                        results.append({
                             "score": float(distance),
                             "source_path": chunk.source_path,
                             "source_type": chunk.source_type.value,
                             "chunk_text": chunk.chunk_text,
+                            "chunk_id": chunk.chunk_id,
                             "start_char": chunk.start_char,
                             "end_char": chunk.end_char,
                             "created_at": chunk.created_at.isoformat(),
-                        }
-                    )
+                        })
 
-            return results
+            # Apply reranking if enabled
+            if self.reranker and self.config.use_reranking and results:
+                reranked = self.reranker.rerank(
+                    query=query,
+                    search_results=results,
+                    top_k=top_k
+                )
+                
+                # Convert reranked results back to standard format
+                results = []
+                for result in reranked:
+                    results.append({
+                        "score": result.final_score,
+                        "original_score": result.original_score,
+                        "rerank_score": result.rerank_score,
+                        "source_path": result.source_path,
+                        "source_type": result.source_type,
+                        "chunk_text": result.text,
+                        "chunk_id": result.chunk_id,
+                        "metadata": result.metadata
+                    })
+
+            return results[:top_k]  # Ensure we don't exceed requested count
 
         except Exception as e:
             logger.error(f"Search failed: {e}")
@@ -484,6 +601,30 @@ class IndexManager:
             for name, path in paths.items():
                 if path.exists():
                     persistence_info["last_modified"][name] = path.stat().st_mtime
+            
+            # Enhanced search components info
+            hybrid_search_info = {}
+            if self.hybrid_search:
+                hybrid_search_info = self.hybrid_search.get_stats()
+            
+            reranking_info = {}
+            if self.reranker:
+                reranking_info = self.reranker.get_stats()
+            
+            # System performance metrics
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            memory_info = psutil.virtual_memory()
+            disk_usage = psutil.disk_usage('/')
+            
+            performance_info = {
+                "cpu_usage_percent": cpu_percent,
+                "memory_usage_mb": memory_mb,
+                "memory_total_mb": memory_info.total / (1024 * 1024),
+                "memory_available_mb": memory_info.available / (1024 * 1024),
+                "memory_usage_percent": memory_info.percent,
+                "disk_usage_percent": disk_usage.percent,
+                "disk_free_gb": disk_usage.free / (1024 * 1024 * 1024)
+            }
 
             return {
                 "status": "healthy",
@@ -491,7 +632,9 @@ class IndexManager:
                 "relationships": relationship_stats,
                 "vector_store": vector_stats,
                 "embedding": embedding_info,
-                "memory_usage_mb": memory_mb,
+                "hybrid_search": hybrid_search_info,
+                "reranking": reranking_info,
+                "performance": performance_info,
                 "persistence": persistence_info,
                 "configuration": self.config.get_config_summary(),
             }

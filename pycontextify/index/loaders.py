@@ -177,6 +177,18 @@ class CodeLoader(BaseLoader):
 
 class DocumentLoader(BaseLoader):
     """Loader for individual documents with structure extraction."""
+    
+    def __init__(self, pdf_engine: str = "pymupdf"):
+        """Initialize document loader.
+        
+        Args:
+            pdf_engine: PDF processing engine to use
+        """
+        self.pdf_engine = pdf_engine
+        self.pdf_loader = None
+        
+        # Initialize PDF loader if PDF support is available
+        self._initialize_pdf_loader()
 
     def load(self, file_path: str) -> List[Tuple[str, str]]:
         """Load single document.
@@ -208,43 +220,28 @@ class DocumentLoader(BaseLoader):
             logger.warning(f"Unsupported document type: {extension}")
             return None
 
-    def _load_pdf(self, path: Path) -> Optional[str]:
-        """Load PDF file content."""
+    def _initialize_pdf_loader(self):
+        """Initialize PDF loader with configured engine."""
         try:
-            import PyPDF2
-
-            with open(path, "rb") as file:
-                reader = PyPDF2.PdfReader(file)
-                text = ""
-
-                for page in reader.pages:
-                    text += page.extract_text() + "\n"
-
-                return text.strip()
-
-        except ImportError:
-            logger.error("PyPDF2 not available for PDF processing")
+            from .pdf_loader import PDFLoader
+            self.pdf_loader = PDFLoader(preferred_engine=self.pdf_engine)
+            logger.info(f"PDF loader initialized with engine: {self.pdf_engine}")
+        except ImportError as e:
+            logger.warning(f"Could not initialize PDF loader: {e}")
+            self.pdf_loader = None
+    
+    def _load_pdf(self, path: Path) -> Optional[str]:
+        """Load PDF file content using enhanced PDF loader."""
+        if not self.pdf_loader:
+            logger.error("PDF loader not available")
             return None
+            
+        try:
+            text = self.pdf_loader.load_pdf(str(path))
+            logger.info(f"Successfully loaded PDF: {path.name}")
+            return text
         except Exception as e:
-            logger.warning(f"Failed to load PDF {path}: {e}")
-
-            # Try pdfplumber as fallback
-            try:
-                import pdfplumber
-
-                with pdfplumber.open(path) as pdf:
-                    text = ""
-                    for page in pdf.pages:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text += page_text + "\n"
-                    return text.strip()
-
-            except ImportError:
-                logger.error("Neither PyPDF2 nor pdfplumber available")
-            except Exception as e2:
-                logger.error(f"Both PDF readers failed for {path}: {e2}")
-
+            logger.error(f"Failed to load PDF {path}: {e}")
             return None
 
     def _load_text_file(self, path: Path) -> Optional[str]:

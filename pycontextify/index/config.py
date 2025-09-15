@@ -75,6 +75,23 @@ class Config:
         self.max_relationships_per_chunk = self._get_int_config(
             "PYCONTEXTIFY_MAX_RELATIONSHIPS_PER_CHUNK", 10
         )
+        
+        # Advanced search settings
+        self.use_hybrid_search = self._get_bool_config(
+            "PYCONTEXTIFY_USE_HYBRID_SEARCH", True
+        )
+        self.use_reranking = self._get_bool_config(
+            "PYCONTEXTIFY_USE_RERANKING", True
+        )
+        self.keyword_weight = self._get_float_config(
+            "PYCONTEXTIFY_KEYWORD_WEIGHT", 0.3
+        )
+        self.reranking_model = os.getenv(
+            "PYCONTEXTIFY_RERANKING_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+        
+        # PDF processing settings
+        self.pdf_engine = os.getenv("PYCONTEXTIFY_PDF_ENGINE", "pymupdf")
 
         # Performance settings (optional)
         self.max_file_size_mb = self._get_int_config(
@@ -105,6 +122,16 @@ class Config:
         except ValueError:
             return default
 
+    def _get_float_config(self, key: str, default: float) -> float:
+        """Get float configuration value from environment."""
+        value = os.getenv(key)
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    
     def _get_path_config(self, key: str, default: str) -> Path:
         """Get path configuration value from environment."""
         value = os.getenv(key, default)
@@ -136,6 +163,15 @@ class Config:
         # Validate relationship settings
         if self.max_relationships_per_chunk <= 0:
             raise ValueError("Max relationships per chunk must be positive")
+
+        # Validate advanced search settings
+        if not (0.0 <= self.keyword_weight <= 1.0):
+            raise ValueError("Keyword weight must be between 0.0 and 1.0")
+        
+        # Validate PDF engine
+        supported_pdf_engines = ["pymupdf", "pypdf2", "pdfplumber"]
+        if self.pdf_engine not in supported_pdf_engines:
+            raise ValueError(f"Unsupported PDF engine: {self.pdf_engine}")
 
         # Validate performance settings
         if self.max_file_size_mb <= 0:
@@ -184,6 +220,11 @@ class Config:
             "max_relationships_per_chunk": self.max_relationships_per_chunk,
             "backup_indices": self.backup_indices,
             "max_backups": self.max_backups,
+            "use_hybrid_search": self.use_hybrid_search,
+            "use_reranking": self.use_reranking,
+            "keyword_weight": self.keyword_weight,
+            "reranking_model": self.reranking_model,
+            "pdf_engine": self.pdf_engine,
         }
 
     def is_provider_available(self, provider: str) -> bool:
