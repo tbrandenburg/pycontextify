@@ -50,7 +50,17 @@ class SentenceTransformersEmbedder(BaseEmbedder):
         """
         super().__init__(model_name, **kwargs)
 
-        self.device = kwargs.get("device", "auto")
+        # Handle device selection - convert "auto" to appropriate device
+        device_param = kwargs.get("device", "auto")
+        if device_param == "auto":
+            # Auto-detect best available device
+            try:
+                import torch
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            except ImportError:
+                self.device = "cpu"  # Fallback if torch not available
+        else:
+            self.device = device_param
         self.batch_size = kwargs.get("batch_size", 32)
         self.show_progress = kwargs.get("show_progress", False)
         self.normalize_embeddings = kwargs.get("normalize_embeddings", True)
