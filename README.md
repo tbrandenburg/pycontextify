@@ -12,6 +12,8 @@ A Python-based MCP (Model Context Protocol) server for semantic search over code
 - **Extensible Embedding System**: Support for sentence-transformers with plans for Ollama and OpenAI
 - **Modern UV Project**: Fast dependency management and reproducible builds
 - **Simplified MCP Interface**: Essential functions only for ease of use
+- **CLI Configuration**: Command-line arguments for server startup with initial document/codebase indexing
+- **Flexible Configuration**: CLI arguments override environment variables for easy project-specific setups
 
 ## Installation
 
@@ -54,6 +56,7 @@ cp .env.example .env
 
 ### Start the MCP Server
 
+**Basic startup:**
 ```bash
 # Production mode
 uv run pycontextify
@@ -63,6 +66,33 @@ uv run fastmcp run pycontextify/mcp_server.py
 
 # Development mode with tools
 uv run --extra dev fastmcp run pycontextify/mcp_server.py
+```
+
+**CLI Arguments (New!):**
+```bash
+# Start with custom index path
+uv run pycontextify --index-path ./my_project_index
+
+# Start with custom index name
+uv run pycontextify --index-name project_search
+
+# Start and index initial documents
+uv run pycontextify --initial-documents README.md docs/api.md
+
+# Start and index initial codebase
+uv run pycontextify --initial-codebase src tests
+
+# Full example with multiple options
+uv run pycontextify \
+  --index-path ./project_index \
+  --index-name my_search \
+  --initial-documents README.md \
+  --initial-codebase src tests \
+  --embedding-provider sentence_transformers \
+  --verbose
+
+# Show all available options
+uv run pycontextify --help
 ```
 
 ### Example Usage
@@ -76,7 +106,91 @@ The server provides 6 MCP functions:
 5. **`status()`** - Get system status and statistics
 6. **`search_with_context(query, top_k=5, include_related=False)`** - Enhanced search with relationship context
 
+### CLI Usage Examples
+
+```bash
+# Quick setup for a Python project
+uv run pycontextify \
+  --index-name python_project \
+  --initial-codebase ./src ./tests \
+  --initial-documents README.md docs/
+
+# Documentation-focused setup
+uv run pycontextify \
+  --index-path ./docs_index \
+  --initial-documents *.md docs/ \
+  --no-auto-persist \
+  --verbose
+
+# Multi-language codebase
+uv run pycontextify \
+  --initial-codebase frontend/ backend/ mobile/ \
+  --embedding-provider sentence_transformers \
+  --embedding-model all-mpnet-base-v2
+
+# Research paper analysis with related websites
+uv run pycontextify \
+  --index-name research \
+  --initial-documents papers/*.pdf references.md \
+  --initial-webpages https://arxiv.org/abs/1234.5678 \
+  --index-path ./research_index
+
+# Documentation site with recursive crawling
+uv run pycontextify \
+  --index-name docs_site \
+  --initial-webpages https://docs.myproject.com \
+  --recursive-crawling --max-crawl-depth 2 \
+  --crawl-delay 2
+
+# Comprehensive knowledge base
+uv run pycontextify \
+  --index-name knowledge_base \
+  --initial-documents ./knowledge/*.md \
+  --initial-codebase ./examples \
+  --initial-webpages https://api-docs.com https://tutorials.com \
+  --recursive-crawling --max-crawl-depth 1
+```
+
 ## Configuration
+
+### CLI Arguments (New!)
+
+The MCP server now supports command-line arguments for easy startup configuration:
+
+```bash
+# Index configuration
+--index-path DIR        # Directory for vector storage (default: ./index_data)
+--index-name NAME       # Custom index name (default: semantic_index)
+
+# Initial indexing
+--initial-documents FILES...  # Documents to index at startup
+--initial-codebase DIRS...    # Codebases to index at startup
+--initial-webpages URLS...    # Webpages to index at startup (http/https only)
+
+# Webpage crawling options
+--recursive-crawling    # Enable recursive crawling for webpages
+--max-crawl-depth N     # Maximum crawl depth (1-3, default: 1)
+--crawl-delay N         # Delay between requests in seconds (default: 1)
+
+# Server options  
+--no-auto-persist       # Disable automatic persistence
+--no-auto-load         # Disable automatic index loading
+
+# Embedding configuration
+--embedding-provider PROVIDER  # Provider: sentence_transformers, ollama, openai
+--embedding-model MODEL        # Model name for the provider
+
+# Logging
+--verbose, -v          # Enable verbose logging (DEBUG level)
+--quiet               # Minimize logging (WARNING level only)
+
+# Help
+--help, -h            # Show all options with examples
+```
+
+**Configuration Priority:** CLI arguments > Environment variables > Defaults
+
+### Environment Variables
 
 Copy `.env.example` to `.env` and customize:
 
@@ -144,14 +258,34 @@ PYCONTEXTIFY_ENABLE_RELATIONSHIPS=true
 
 ### Claude Desktop Configuration
 
-Add to your Claude Desktop config:
-
+**Basic configuration:**
 ```json
 {
   "mcpServers": {
     "pycontextify": {
       "command": "uv",
       "args": ["run", "pycontextify"],
+      "cwd": "/path/to/pycontextify"
+    }
+  }
+}
+```
+
+**With CLI arguments for project-specific setup:**
+```json
+{
+  "mcpServers": {
+    "my-project-search": {
+      "command": "uv",
+      "args": [
+        "run", "pycontextify",
+        "--index-path", "./project_index",
+        "--index-name", "my_project",
+        "--initial-codebase", "src", "tests",
+        "--initial-documents", "README.md",
+        "--initial-webpages", "https://docs.myproject.com",
+        "--recursive-crawling"
+      ],
       "cwd": "/path/to/pycontextify"
     }
   }
@@ -243,7 +377,9 @@ uv add --optional embedding-provider package-name
 - Text files (`.txt`)
 
 ### Web Content
-- HTML pages with optional recursive crawling
+- HTML pages with optional recursive crawling (CLI: `--recursive-crawling`)
+- Configurable crawl depth (CLI: `--max-crawl-depth`, max: 3 for safety)
+- Respectful crawling with delays (CLI: `--crawl-delay`, min: 1 second)
 - Automatic content filtering and structure extraction
 
 ## Performance Considerations

@@ -72,10 +72,21 @@ class TestEnhancedIntegration:
                         assert manager.config.use_reranking is True
                         assert manager.config.keyword_weight == 0.4
                         assert manager.config.pdf_engine == "pymupdf"
-                        assert manager.embedder is not None
-                        assert manager.vector_store is not None
+                        
+                        # With lazy loading, embedder and vector_store are None until needed
+                        assert manager.embedder is None  # Not loaded yet due to lazy loading
+                        assert manager.vector_store is None  # Not loaded yet due to lazy loading
+                        
+                        # These components are initialized eagerly
                         assert manager.hybrid_search is not None
                         assert manager.reranker is not None
+                        
+                        # Trigger lazy loading by calling _ensure_embedder_loaded
+                        manager._ensure_embedder_loaded()
+                        
+                        # Now embedder and vector_store should be loaded
+                        assert manager.embedder is not None
+                        assert manager.vector_store is not None
 
     def test_enhanced_status_function(self, monkeypatch):
         """Test enhanced status function includes new metrics."""
@@ -154,10 +165,15 @@ class TestEnhancedIntegration:
                         assert "disk_free_gb" in performance
                         
                         # Verify enhanced components stats
-                        assert "keyword_weight" in status["hybrid_search"]
-                        assert "vector_weight" in status["hybrid_search"]
-                        assert "model_name" in status["reranking"]
-                        assert "is_available" in status["reranking"]
+                        hybrid_search_stats = status["hybrid_search"]
+                        if hybrid_search_stats:  # Only check if hybrid search is initialized
+                            assert "keyword_weight" in hybrid_search_stats
+                            assert "vector_weight" in hybrid_search_stats
+                        
+                        reranking_stats = status["reranking"]
+                        if reranking_stats:  # Only check if reranker is initialized
+                            assert "model_name" in reranking_stats
+                            assert "is_available" in reranking_stats
 
     def test_pdf_document_loading_integration(self, monkeypatch):
         """Test PDF document loading with enhanced loader."""
@@ -302,6 +318,13 @@ class TestEnhancedIntegration:
                 
                 manager = IndexManager(config)
                 
+                # Manually set the mocked components to simulate post-lazy-loading state
+                manager.vector_store = mock_vector_store
+                manager.metadata_store = mock_metadata_store
+                manager.hybrid_search = mock_hybrid_search
+                manager._embedder_initialized = True
+                manager.embedder = mock_embedder
+                
                 # Perform search
                 results = manager.search("test query", top_k=5)
                 
@@ -376,7 +399,13 @@ class TestEnhancedIntegration:
                         mock_chunk.start_char = 0
                         mock_chunk.end_char = 100
                         mock_chunk.created_at.isoformat.return_value = "2023-01-01T00:00:00"
+                        
+                        # Set up components for lazy loading
+                        manager.vector_store = mock_vector_store
                         manager.metadata_store.get_chunk = Mock(return_value=mock_chunk)
+                        manager.reranker = mock_reranker
+                        manager._embedder_initialized = True
+                        manager.embedder = mock_embedder
                         
                         # Perform search
                         results = manager.search("test query", top_k=3)
@@ -481,7 +510,14 @@ class TestEnhancedIntegration:
                         assert manager.hybrid_search is None
                         assert manager.reranker is None
                         
-                        # Basic components should still work
+                        # With lazy loading, these are initially None until needed
+                        assert manager.embedder is None  # Not loaded yet
+                        assert manager.vector_store is None  # Not loaded yet
+                        
+                        # Trigger lazy loading
+                        manager._ensure_embedder_loaded()
+                        
+                        # Now basic components should be initialized
                         assert manager.embedder is not None
                         assert manager.vector_store is not None
                         

@@ -38,14 +38,12 @@ class IndexManager:
         self.vector_store = None
         self.hybrid_search = None
         self.reranker = None
-
-        # Initialize embedder
-        self._initialize_embedder()
-
-        # Initialize vector store
-        self._initialize_vector_store()
         
-        # Initialize enhanced search components
+        # Store embedder configuration for lazy loading
+        self._embedder_config = None
+        self._embedder_initialized = False
+        
+        # Initialize enhanced search components (these are lightweight)
         self._initialize_hybrid_search()
         self._initialize_reranker()
 
@@ -53,10 +51,15 @@ class IndexManager:
         if self.config.auto_load:
             self._auto_load()
 
-    def _initialize_embedder(self) -> None:
-        """Initialize embedding provider."""
+    def _ensure_embedder_loaded(self) -> None:
+        """Ensure embedder is loaded (lazy loading)."""
+        if self._embedder_initialized:
+            return
+            
         try:
             embedding_config = self.config.get_embedding_config()
+            logger.info(f"Lazy loading embedder: {embedding_config['provider']} with model {embedding_config['model']}")
+            
             self.embedder = EmbedderFactory.create_embedder(
                 provider=embedding_config["provider"],
                 model_name=embedding_config["model"],
@@ -66,14 +69,23 @@ class IndexManager:
                     if k not in ["provider", "model"]
                 },
             )
-            logger.info(f"Initialized embedder: {self.embedder.get_provider_name()}")
+            
+            # Mark as initialized before initializing vector store
+            self._embedder_initialized = True
+            
+            # Initialize vector store now that we have embedder
+            self._initialize_vector_store()
+            
+            logger.info(f"Successfully loaded embedder: {self.embedder.get_provider_name()}")
+            
         except Exception as e:
             logger.error(f"Failed to initialize embedder: {e}")
             raise
 
     def _initialize_vector_store(self) -> None:
-        """Initialize FAISS vector store."""
-        if self.embedder:
+        """Initialize FAISS vector store (lazy)."""
+        # Only initialize if embedder is already loaded and vector store doesn't exist
+        if self._embedder_initialized and self.embedder and self.vector_store is None:
             dimension = self.embedder.get_dimension()
             self.vector_store = VectorStore(dimension, self.config)
             logger.info(f"Initialized vector store with dimension {dimension}")
@@ -144,6 +156,8 @@ class IndexManager:
         if self.metadata_store.get_stats()["total_chunks"] == 0:
             return True
 
+        # Need embedder to validate compatibility
+        self._ensure_embedder_loaded()
         return self.metadata_store.validate_embedding_compatibility(
             self.embedder.get_provider_name(), self.embedder.get_model_name()
         )
@@ -206,6 +220,8 @@ class IndexManager:
             # Auto-save after successful indexing
             self._auto_save()
 
+            # Ensure embedder loaded before accessing provider/model info
+            self._ensure_embedder_loaded()
             stats = {
                 "files_processed": len(files),
                 "chunks_added": chunks_added,
@@ -253,6 +269,8 @@ class IndexManager:
             # Auto-save after successful indexing
             self._auto_save()
 
+            # Ensure embedder loaded before accessing provider/model info
+            self._ensure_embedder_loaded()
             stats = {
                 "file_processed": file_path,
                 "chunks_added": chunks_added,
@@ -306,6 +324,8 @@ class IndexManager:
             # Auto-save after successful indexing
             self._auto_save()
 
+            # Ensure embedder loaded before accessing provider/model info
+            self._ensure_embedder_loaded()
             stats = {
                 "pages_processed": len(pages),
                 "chunks_added": chunks_added,
@@ -340,6 +360,9 @@ class IndexManager:
         # Get appropriate chunker
         chunker = ChunkerFactory.get_chunker(source_type, self.config)
 
+        # Ensure embedder is loaded before chunking (we pass provider/model info)
+        self._ensure_embedder_loaded()
+        
         # Chunk content
         chunks = chunker.chunk_text(
             content,
@@ -353,9 +376,12 @@ class IndexManager:
 
         # Generate embeddings
         texts = [chunk.chunk_text for chunk in chunks]
+        self._ensure_embedder_loaded()
         embeddings = self.embedder.embed_texts(texts)
 
         # Add to vector store
+        if self.vector_store is None:
+            self._initialize_vector_store()
         faiss_ids = self.vector_store.add_vectors(embeddings)
 
         # Add metadata
@@ -402,9 +428,13 @@ class IndexManager:
             List of search results
         """
         try:
-            if self.vector_store.is_empty():
+            # Check if we have any indexed content
+            if self.vector_store is None or self.vector_store.is_empty():
                 return []
 
+            # Ensure embedder is loaded for query embedding
+            self._ensure_embedder_loaded()
+            
             # Embed query
             query_vector = self.embedder.embed_single(query)
 
@@ -574,19 +604,27 @@ class IndexManager:
             # Basic stats
             metadata_stats = self.metadata_store.get_stats()
             relationship_stats = self.relationship_store.get_stats()
-            vector_stats = self.vector_store.get_index_info()
+            vector_stats = self.vector_store.get_index_info() if self.vector_store else {"total_vectors": 0, "dimension": None}
 
             # Memory usage
             process = psutil.Process()
             memory_mb = process.memory_info().rss / (1024 * 1024)
 
-            # Embedding info
-            embedding_info = {
-                "provider": self.embedder.get_provider_name(),
-                "model": self.embedder.get_model_name(),
-                "dimension": self.embedder.get_dimension(),
-                "is_available": self.embedder.is_available(),
-            }
+            # Embedding info (handle lazy state)
+            if not self._embedder_initialized or self.embedder is None:
+                embedding_info = {
+                    "provider": self.config.embedding_provider,
+                    "model": self.config.embedding_model,
+                    "dimension": None,
+                    "is_available": False,
+                }
+            else:
+                embedding_info = {
+                    "provider": self.embedder.get_provider_name(),
+                    "model": self.embedder.get_model_name(),
+                    "dimension": self.embedder.get_dimension(),
+                    "is_available": self.embedder.is_available(),
+                }
 
             # Persistence info
             paths = self.config.get_index_paths()
@@ -640,7 +678,25 @@ class IndexManager:
             }
 
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            # Return error status with basic structure to prevent KeyErrors
+            return {
+                "status": "error",
+                "error": str(e),
+                "metadata": {},
+                "relationships": {},
+                "vector_store": {},
+                "embedding": {
+                    "provider": getattr(self.config, 'embedding_provider', 'unknown'),
+                    "model": getattr(self.config, 'embedding_model', 'unknown'),
+                    "dimension": None,
+                    "is_available": False,
+                },
+                "hybrid_search": {},
+                "reranking": {},
+                "performance": {},
+                "persistence": {},
+                "configuration": {},
+            }
 
     def clear_index(self, remove_files: bool = False) -> Dict[str, Any]:
         """Clear all indexed data.
@@ -655,7 +711,8 @@ class IndexManager:
             # Clear in-memory data
             self.metadata_store.clear()
             self.relationship_store.clear()
-            self.vector_store.clear()
+            if self.vector_store is not None:
+                self.vector_store.clear()
 
             # Remove files if requested
             if remove_files:
@@ -693,5 +750,5 @@ class IndexManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit with cleanup."""
-        if self.embedder:
+        if self.embedder is not None:
             self.embedder.cleanup()

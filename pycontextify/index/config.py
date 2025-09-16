@@ -20,12 +20,14 @@ class Config:
     extraction configuration.
     """
 
-    def __init__(self, env_file: Optional[str] = None) -> None:
-        """Initialize configuration from environment variables.
+    def __init__(self, env_file: Optional[str] = None, config_overrides: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize configuration from environment variables with optional CLI overrides.
 
         Args:
             env_file: Optional path to .env file to load
+            config_overrides: Optional dictionary of configuration overrides from CLI arguments
         """
+        self.config_overrides = config_overrides or {}
         # Load environment variables from .env file if it exists
         if env_file:
             load_dotenv(env_file)
@@ -35,13 +37,29 @@ class Config:
             if env_path.exists():
                 load_dotenv(env_path)
 
-        # Index storage configuration
-        self.index_dir = self._get_path_config("PYCONTEXTIFY_INDEX_DIR", "./index_data")
-        self.index_name = os.getenv("PYCONTEXTIFY_INDEX_NAME", "semantic_index")
+        # Index storage configuration (CLI overrides have priority)
+        self.index_dir = self._get_path_config(
+            "PYCONTEXTIFY_INDEX_DIR", 
+            "./index_data", 
+            override_key="index_dir"
+        )
+        self.index_name = self._get_config(
+            "PYCONTEXTIFY_INDEX_NAME", 
+            "semantic_index", 
+            override_key="index_name"
+        )
 
-        # Persistence settings
-        self.auto_persist = self._get_bool_config("PYCONTEXTIFY_AUTO_PERSIST", True)
-        self.auto_load = self._get_bool_config("PYCONTEXTIFY_AUTO_LOAD", True)
+        # Persistence settings (CLI overrides have priority)
+        self.auto_persist = self._get_bool_config(
+            "PYCONTEXTIFY_AUTO_PERSIST", 
+            True, 
+            override_key="auto_persist"
+        )
+        self.auto_load = self._get_bool_config(
+            "PYCONTEXTIFY_AUTO_LOAD", 
+            True, 
+            override_key="auto_load"
+        )
         self.compress_metadata = self._get_bool_config(
             "PYCONTEXTIFY_COMPRESS_METADATA", True
         )
@@ -50,12 +68,16 @@ class Config:
         )
         self.max_backups = self._get_int_config("PYCONTEXTIFY_MAX_BACKUPS", 3)
 
-        # Embedding provider configuration
-        self.embedding_provider = os.getenv(
-            "PYCONTEXTIFY_EMBEDDING_PROVIDER", "sentence_transformers"
+        # Embedding provider configuration (CLI overrides have priority)
+        self.embedding_provider = self._get_config(
+            "PYCONTEXTIFY_EMBEDDING_PROVIDER", 
+            "sentence_transformers",
+            override_key="embedding_provider"
         )
-        self.embedding_model = os.getenv(
-            "PYCONTEXTIFY_EMBEDDING_MODEL", "all-mpnet-base-v2"
+        self.embedding_model = self._get_config(
+            "PYCONTEXTIFY_EMBEDDING_MODEL", 
+            "all-MiniLM-L6-v2",
+            override_key="embedding_model"
         )
 
         # Provider-specific settings
@@ -99,21 +121,56 @@ class Config:
         )
         self.batch_size = self._get_int_config("PYCONTEXTIFY_BATCH_SIZE", 32)
         self.crawl_delay_seconds = self._get_int_config(
-            "PYCONTEXTIFY_CRAWL_DELAY_SECONDS", 1
+            "PYCONTEXTIFY_CRAWL_DELAY_SECONDS", 
+            1,
+            override_key="crawl_delay_seconds"
         )
 
         # Validate configuration
         self._validate_config()
 
-    def _get_bool_config(self, key: str, default: bool) -> bool:
-        """Get boolean configuration value from environment."""
+    def _get_config(self, env_key: str, default: Any, override_key: Optional[str] = None) -> Any:
+        """Get configuration value with CLI override priority.
+        
+        Priority: CLI override > Environment variable > Default
+        
+        Args:
+            env_key: Environment variable key
+            default: Default value if neither override nor env var is set
+            override_key: Key in config_overrides dictionary
+            
+        Returns:
+            Configuration value with proper priority
+        """
+        # Check CLI override first
+        if override_key and override_key in self.config_overrides:
+            return self.config_overrides[override_key]
+        
+        # Fall back to environment variable or default
+        return os.getenv(env_key, default)
+
+    def _get_bool_config(self, key: str, default: bool, override_key: Optional[str] = None) -> bool:
+        """Get boolean configuration value with CLI override priority."""
+        # Check CLI override first
+        if override_key and override_key in self.config_overrides:
+            return bool(self.config_overrides[override_key])
+        
+        # Fall back to environment variable
         value = os.getenv(key)
         if value is None:
             return default
         return value.lower() in ("true", "1", "yes", "on")
 
-    def _get_int_config(self, key: str, default: int) -> int:
-        """Get integer configuration value from environment."""
+    def _get_int_config(self, key: str, default: int, override_key: Optional[str] = None) -> int:
+        """Get integer configuration value with CLI override priority."""
+        # Check CLI override first
+        if override_key and override_key in self.config_overrides:
+            try:
+                return int(self.config_overrides[override_key])
+            except (ValueError, TypeError):
+                return default
+        
+        # Fall back to environment variable
         value = os.getenv(key)
         if value is None:
             return default
@@ -122,8 +179,16 @@ class Config:
         except ValueError:
             return default
 
-    def _get_float_config(self, key: str, default: float) -> float:
-        """Get float configuration value from environment."""
+    def _get_float_config(self, key: str, default: float, override_key: Optional[str] = None) -> float:
+        """Get float configuration value with CLI override priority."""
+        # Check CLI override first
+        if override_key and override_key in self.config_overrides:
+            try:
+                return float(self.config_overrides[override_key])
+            except (ValueError, TypeError):
+                return default
+        
+        # Fall back to environment variable
         value = os.getenv(key)
         if value is None:
             return default
@@ -132,9 +197,15 @@ class Config:
         except ValueError:
             return default
     
-    def _get_path_config(self, key: str, default: str) -> Path:
-        """Get path configuration value from environment."""
-        value = os.getenv(key, default)
+    def _get_path_config(self, key: str, default: str, override_key: Optional[str] = None) -> Path:
+        """Get path configuration value with CLI override priority."""
+        # Check CLI override first
+        if override_key and override_key in self.config_overrides:
+            value = str(self.config_overrides[override_key])
+        else:
+            # Fall back to environment variable or default
+            value = os.getenv(key, default)
+        
         path = Path(value)
         # Convert to absolute path
         return path.resolve()
@@ -178,8 +249,8 @@ class Config:
             raise ValueError("Max file size must be positive")
         if self.batch_size <= 0:
             raise ValueError("Batch size must be positive")
-        if self.crawl_delay_seconds < 0:
-            raise ValueError("Crawl delay cannot be negative")
+        if self.crawl_delay_seconds < 1:
+            raise ValueError("Crawl delay must be at least 1 second for respectful crawling")
 
     def validate_provider_config(self) -> bool:
         """Validate provider-specific configuration."""

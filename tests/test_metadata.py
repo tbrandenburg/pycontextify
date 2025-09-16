@@ -1,5 +1,6 @@
 """Tests for metadata and relationship systems."""
 
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -295,13 +296,16 @@ class TestMetadataStore:
         store.add_chunk(chunk1)
         store.add_chunk(chunk2)
 
-        with tempfile.NamedTemporaryFile(suffix=".pkl") as f:
+        # Use tempfile.mktemp to avoid Windows permission issues
+        import tempfile
+        temp_file = tempfile.mktemp(suffix=".pkl")
+        try:
             # Save
-            store.save_to_file(f.name)
+            store.save_to_file(temp_file)
 
             # Create new store and load
             new_store = MetadataStore()
-            new_store.load_from_file(f.name)
+            new_store.load_from_file(temp_file)
 
             # Verify data was loaded
             assert len(new_store.get_all_chunks()) == 2
@@ -309,6 +313,12 @@ class TestMetadataStore:
             paths = [chunk.source_path for chunk in loaded_chunks]
             assert "/test1.py" in paths
             assert "/test2.py" in paths
+        finally:
+            # Clean up
+            try:
+                os.unlink(temp_file)
+            except (OSError, FileNotFoundError):
+                pass
 
     def test_clear(self):
         """Test clearing all metadata."""
@@ -460,13 +470,17 @@ class TestClass:
         store.add_relationship("numpy", "chunk1", RelationshipStore.IMPORT)
         store.add_relationship("pandas", "chunk2", RelationshipStore.REFERENCE)
 
-        with tempfile.NamedTemporaryFile(suffix=".pkl") as f:
+        # Use tempfile.mktemp to avoid Windows permission issues
+        import tempfile
+        import os
+        temp_file = tempfile.mktemp(suffix=".pkl")
+        try:
             # Save
-            store.save_to_file(f.name)
+            store.save_to_file(temp_file)
 
             # Create new store and load
             new_store = RelationshipStore()
-            new_store.load_from_file(f.name)
+            new_store.load_from_file(temp_file)
 
             # Verify data was loaded
             entities = new_store.get_all_entities()
@@ -475,6 +489,12 @@ class TestClass:
 
             chunks = new_store.get_related_chunks("numpy")
             assert "chunk1" in chunks
+        finally:
+            # Clean up
+            try:
+                os.unlink(temp_file)
+            except (OSError, FileNotFoundError):
+                pass
 
     def test_get_stats(self):
         """Test getting relationship statistics."""
