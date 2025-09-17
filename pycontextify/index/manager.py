@@ -686,6 +686,16 @@ class IndexManager:
         codebases = set()
         documents = set()
         
+        # Common stop words to filter from topics
+        stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+            'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+            'will', 'would', 'could', 'should', 'may', 'might', 'can', 'must', 'this', 'that', 'these', 'those',
+            'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your',
+            'his', 'her', 'its', 'our', 'their', 'page', 'section', 'chapter', 'document', 'text', 'content',
+            'file', 'line', 'item', 'part', 'type', 'kind', 'way', 'time', 'place', 'thing', 'person'
+        }
+        
         for chunk in all_chunks:
             source_paths.add(chunk.source_path)
             
@@ -703,25 +713,67 @@ class IndexManager:
                     '.c': 'C',
                     '.go': 'Go',
                     '.rs': 'Rust',
-                    '.php': 'PHP'
+                    '.php': 'PHP',
+                    '.rb': 'Ruby',
+                    '.swift': 'Swift',
+                    '.kt': 'Kotlin',
+                    '.scala': 'Scala',
+                    '.sh': 'Shell',
+                    '.sql': 'SQL'
                 }
                 if chunk.file_extension in lang_map:
                     programming_languages.add(lang_map[chunk.file_extension])
             
-            # Extract codebase paths from source paths  
+            # Enhanced codebase detection from source paths  
             if chunk.source_type.value == 'code':
-                # Extract the root codebase directory path
                 path_parts = chunk.source_path.replace('\\', '/').split('/')
-                if len(path_parts) > 2:
-                    # Find the likely root project directory (avoid system paths)
-                    for i, part in enumerate(path_parts[:-1]):  # Exclude filename
-                        if part and not part.startswith('.') and any(char.isalpha() for char in part):
-                            if part.lower() not in ['src', 'lib', 'bin', 'test', 'tests', 'node_modules']:
-                                # Take the parent directory of the project
-                                root_path = '/'.join(path_parts[:i+1])
-                                if len(root_path) > 5:  # Avoid very short paths
-                                    codebases.add(root_path)
+                
+                # Look for project root by finding directories that contain project files
+                # or have src/lib structure underneath them
+                project_path = None
+                
+                # Work backwards from the file to find the most likely project root
+                for i in range(len(path_parts) - 2, 0, -1):  # Start from parent of file, work backwards
+                    current_path = '/'.join(path_parts[:i+1])
+                    part = path_parts[i]
+                    
+                    # Skip system directories and common subdirectories
+                    if part.lower() in {'usr', 'bin', 'lib', 'opt', 'home', 'windows', 'program files',
+                                        'src', 'lib', 'app', 'components', 'modules', 'packages',
+                                        'build', 'dist', '__pycache__', 'node_modules', 'target',
+                                        'test', 'tests', 'docs', 'examples', 'tools'}:
+                        continue
+                    
+                    # Look for directories that are likely project roots
+                    if (part and len(part) > 2 and any(char.isalpha() for char in part) and
+                        not part.startswith('.')):
+                        
+                        # Check if this directory has project-like structure below it
+                        has_src_structure = False
+                        project_indicators = {'src', 'lib', 'app', 'components', 'modules', 'packages'}
+                        
+                        # Look at immediate children for common project structure
+                        for j in range(i+1, min(i+3, len(path_parts))):
+                            if path_parts[j].lower() in project_indicators:
+                                has_src_structure = True
                                 break
+                        
+                        # Or check if this looks like a meaningful project name
+                        looks_like_project = (
+                            len(part) > 4 or  # Longer names
+                            any(char.isupper() for char in part) or  # CamelCase  
+                            '_' in part or '-' in part or  # snake_case or kebab-case
+                            part.startswith('py') or  # Python projects
+                            any(x in part.lower() for x in ['project', 'app', 'service', 'api', 'tool'])
+                        )
+                        
+                        if has_src_structure or looks_like_project:
+                            project_path = current_path
+                            break  # Take the first (deepest) match
+                
+                # If we found a project path, add it
+                if project_path and len(project_path) > 10:  # Avoid very short paths
+                    codebases.add(project_path)
             
             # Extract document filenames
             if chunk.source_type.value == 'document':
@@ -756,24 +808,79 @@ class IndexManager:
             }
         }
         
-        # Create knowledge catalog
-        # Get top items by frequency for better discovery
-        top_symbols = sorted([(symbol, sum(1 for chunk in all_chunks if symbol in chunk.code_symbols)) 
-                            for symbol in code_symbols], key=lambda x: x[1], reverse=True)[:20]
-        top_references = sorted([(ref, sum(1 for chunk in all_chunks if ref in chunk.references)) 
-                               for ref in all_references], key=lambda x: x[1], reverse=True)[:15]
+        # Create knowledge catalog with improved filtering
+        # Filter and rank code symbols by relevance
+        symbol_scores = []
+        for symbol in code_symbols:
+            frequency = sum(1 for chunk in all_chunks if symbol in chunk.code_symbols)
+            # Boost score for symbols that look like meaningful identifiers
+            relevance_boost = 1.0
+            if len(symbol) > 3 and not symbol.lower() in stop_words:
+                relevance_boost = 1.5
+            if any(char.isupper() for char in symbol):  # CamelCase or mixed case
+                relevance_boost *= 1.2
+            symbol_scores.append((symbol, frequency * relevance_boost))
+        
+        top_symbols = sorted(symbol_scores, key=lambda x: x[1], reverse=True)[:20]
+        
+        # Filter and rank references by semantic relevance
+        reference_scores = []
+        for ref in all_references:
+            frequency = sum(1 for chunk in all_chunks if ref in chunk.references)
+            # Filter out stop words and very short/generic terms
+            if (len(ref) > 2 and 
+                ref.lower() not in stop_words and 
+                not ref.isdigit() and 
+                len(ref.strip()) > 1):
+                
+                # Boost score for terms that look like domain concepts
+                relevance_boost = 1.0
+                if len(ref) > 5:  # Longer terms are often more specific
+                    relevance_boost = 1.3
+                if any(char.isupper() for char in ref):  # Proper nouns or acronyms
+                    relevance_boost *= 1.2
+                if '_' in ref or '-' in ref:  # Technical terms
+                    relevance_boost *= 1.1
+                    
+                reference_scores.append((ref, frequency * relevance_boost))
+        
+        top_references = sorted(reference_scores, key=lambda x: x[1], reverse=True)[:15]
+        
+        # Filter tags for quality
+        quality_tags = []
+        for tag in all_tags:
+            if (len(tag) > 3 and 
+                tag.lower() not in stop_words and
+                not tag.isdigit() and
+                len(tag.strip()) > 1):
+                quality_tags.append(tag)
+        
+        # Deduplicate codebases - keep only root paths, remove subdirectories
+        unique_codebases = []
+        sorted_codebases = sorted(codebases, key=len)  # Shorter paths first (likely parents)
+        
+        for codebase in sorted_codebases:
+            # Check if this codebase is a subdirectory of any existing codebase
+            is_subdirectory = False
+            for existing in unique_codebases:
+                if codebase.startswith(existing + '/'):
+                    is_subdirectory = True
+                    break
+            
+            if not is_subdirectory:
+                unique_codebases.append(codebase)
         
         knowledge_catalog = {
             "indexed_sources": {
-                "codebases": list(codebases)[:5] if codebases else [],
+                "codebases": unique_codebases[:10] if unique_codebases else [],
                 "webpages": list(web_domains) if web_domains else [],
-                "documents": list(documents)[:10] if documents else []  # Document filenames
+                "documents": list(documents)[:15] if documents else []  # Increased from 10
             },
-            "primary_topics": [ref[0] for ref in top_references[:10]],  # Most referenced concepts
+            "primary_topics": [ref[0] for ref in top_references[:12]],  # Filtered meaningful concepts
             "searchable_concepts": {
-                "code_symbols": [symbol[0] for symbol in top_symbols[:10]],  # Most common symbols
+                "code_symbols": [symbol[0] for symbol in top_symbols[:15]],  # High-quality symbols
                 "technologies": list(programming_languages) if programming_languages else [],
-                "tags": list(all_tags)[:10] if all_tags else []
+                "tags": quality_tags[:12] if quality_tags else []  # Filtered quality tags
             }
         }
         
