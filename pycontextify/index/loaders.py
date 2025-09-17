@@ -335,7 +335,7 @@ class WebpageLoader(BaseLoader):
         return pages
 
     def _load_single_page(self, url: str) -> Optional[str]:
-        """Load single web page content."""
+        """Load single web page content with improved extraction strategy."""
         try:
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
@@ -347,23 +347,103 @@ class WebpageLoader(BaseLoader):
             for script in soup(["script", "style", "nav", "footer", "aside"]):
                 script.decompose()
 
-            # Extract main content
-            main_content = (
-                soup.find("main")
-                or soup.find("article")
-                or soup.find("div", class_="content")
-                or soup.body
-            )
-
+            # IMPROVED CONTENT EXTRACTION STRATEGY
+            content_candidates = []
+            
+            # Strategy 1: Try semantic HTML elements
+            main_content = soup.find("main")
             if main_content:
                 text = main_content.get_text(separator=" ", strip=True)
-            else:
-                text = soup.get_text(separator=" ", strip=True)
+                text = re.sub(r"\s+", " ", text).strip()
+                content_candidates.append(("main", text))
 
-            # Clean up whitespace
+            article_content = soup.find("article")
+            if article_content:
+                text = article_content.get_text(separator=" ", strip=True)
+                text = re.sub(r"\s+", " ", text).strip()
+                content_candidates.append(("article", text))
+
+            # Strategy 2: Try common content containers
+            content_selectors = [
+                ("div.container", "container"),
+                ("div[class*='content']", "content_div"),
+                (".main-content", "main_content_class"),
+                ("#content", "content_id"),
+                ("#main", "main_id"),
+            ]
+            
+            for selector, name in content_selectors:
+                try:
+                    elements = soup.select(selector)
+                    for element in elements:
+                        text = element.get_text(separator=" ", strip=True)
+                        text = re.sub(r"\s+", " ", text).strip()
+                        if text:  # Only add non-empty content
+                            content_candidates.append((name, text))
+                except Exception:
+                    continue
+
+            # Strategy 3: Try body as fallback
+            if soup.body:
+                text = soup.body.get_text(separator=" ", strip=True)
+                text = re.sub(r"\s+", " ", text).strip()
+                content_candidates.append(("body", text))
+
+            # Strategy 4: Full soup as last resort
+            text = soup.get_text(separator=" ", strip=True)
             text = re.sub(r"\s+", " ", text).strip()
+            content_candidates.append(("full", text))
 
-            return text
+            # CHOOSE THE BEST CANDIDATE
+            # Look for the candidate with the most substantial content
+            # that contains key structural indicators
+            
+            best_candidate = None
+            max_quality_score = 0
+            
+            for source, text in content_candidates:
+                if len(text) < 100:  # Skip very short content
+                    continue
+                    
+                # Calculate quality score based on:
+                # 1. Length (longer is generally better for main content)
+                # 2. Presence of structural indicators (headings, sections)
+                # 3. Avoid pure navigation/header content
+                
+                length_score = min(len(text) / 10000, 1.0)  # Normalize to 0-1
+                
+                # Look for structural indicators
+                structure_indicators = [
+                    "What", "How", "Why",  # Question headings
+                    "Introduction", "Overview", "Summary",
+                    "Product", "Service", "Solution",
+                    "Architecture", "Design", "Implementation"
+                ]
+                
+                structure_score = sum(1 for indicator in structure_indicators 
+                                    if indicator.lower() in text.lower()) / len(structure_indicators)
+                
+                # Penalize if it looks like pure navigation
+                nav_penalties = ["Home", "About", "Contact", "Privacy", "Terms"]
+                nav_ratio = sum(1 for nav in nav_penalties 
+                               if nav in text) / len(nav_penalties)
+                nav_penalty = min(nav_ratio, 0.5)
+                
+                quality_score = length_score + structure_score - nav_penalty
+                
+                logger.debug(f"Content candidate '{source}': {len(text)} chars, quality={quality_score:.3f}")
+                
+                if quality_score > max_quality_score:
+                    max_quality_score = quality_score
+                    best_candidate = (source, text)
+
+            if best_candidate:
+                source, final_text = best_candidate
+                logger.info(f"Selected content from '{source}': {len(final_text)} characters")
+                return final_text
+            else:
+                logger.warning("No suitable content found")
+                return None
 
         except requests.RequestException as e:
             logger.warning(f"Failed to load {url}: {e}")

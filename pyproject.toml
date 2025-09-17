@@ -84,6 +84,13 @@ disallow_untyped_defs = true
 minversion = "6.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (requires --runslow to run)",
+    "integration: marks tests as integration tests",
+    "embedding: marks tests as requiring embedding models",
+    "unit: marks tests as fast unit tests",
+    "no_mock_st: disable sentence-transformers mocking for this test"
+]
 
 [dependency-groups]
 dev = [

@@ -360,6 +360,7 @@ class TestSentenceTransformersEmbedder:
         if "max_seq_length" in info:
             assert info["max_seq_length"] == 512
 
+    @pytest.mark.no_mock_st
     def test_is_available_without_import(self):
         """Test availability check when sentence-transformers not installed."""
         with patch("importlib.import_module", side_effect=ImportError):

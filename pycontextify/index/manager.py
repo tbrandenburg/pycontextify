@@ -132,24 +132,49 @@ class IndexManager:
             if all(path.exists() for path in paths.values()):
                 logger.info("Loading existing index...")
 
-                # Load vector store
-                self.vector_store.load_from_file(str(paths["index"]))
-
-                # Load metadata
+                # First load metadata to get embedding info
                 self.metadata_store.load_from_file(str(paths["metadata"]))
-
+                
                 # Load relationships
                 self.relationship_store.load_from_file(str(paths["relationships"]))
-
-                # Validate embedding compatibility
-                if not self._validate_embedding_compatibility():
-                    logger.warning("Existing index uses different embedding settings")
+                
+                # Check if we have chunks to load
+                if self.metadata_store.get_stats().get("total_chunks", 0) > 0:
+                    # Get embedding info from stored metadata
+                    embedding_info = self.metadata_store.get_embedding_info()
+                    if embedding_info and embedding_info.get("models"):
+                        # Extract provider and model from stored info
+                        first_model = embedding_info["models"][0]  # Format: "provider:model"
+                        if ":" in first_model:
+                            stored_provider, stored_model = first_model.split(":", 1)
+                            
+                            # Override config temporarily to match stored embeddings
+                            original_provider = self.config.embedding_provider
+                            original_model = self.config.embedding_model
+                            self.config.embedding_provider = stored_provider
+                            self.config.embedding_model = stored_model
+                            
+                            logger.info(f"Loading with stored embedding settings: {stored_provider}:{stored_model}")
+                    
+                    # Now ensure embedder is loaded (this will create vector store with correct dimensions)
+                    self._ensure_embedder_loaded()
+                    
+                    # Load vector store after embedder initialization
+                    if self.vector_store is not None:
+                        self.vector_store.load_from_file(str(paths["index"]))
+                        logger.info(f"Loaded {self.vector_store.get_total_vectors()} vectors")
+                    else:
+                        logger.error("Vector store not initialized, cannot load vectors")
+                else:
+                    logger.info("No chunks in metadata, skipping vector loading")
 
                 logger.info("Successfully loaded existing index")
             else:
                 logger.info("No existing index found, starting fresh")
         except Exception as e:
             logger.warning(f"Failed to load existing index: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
 
     def _validate_embedding_compatibility(self) -> bool:
         """Validate that existing index is compatible with current embedding settings."""
@@ -605,6 +630,14 @@ class IndexManager:
             metadata_stats = self.metadata_store.get_stats()
             relationship_stats = self.relationship_store.get_stats()
             vector_stats = self.vector_store.get_index_info() if self.vector_store else {"total_vectors": 0, "dimension": None}
+            
+            # Create unified index stats
+            index_stats = {
+                "total_chunks": metadata_stats.get("total_chunks", 0),
+                "total_documents": len(set(chunk.source_path for chunk in self.metadata_store.get_all_chunks())),
+                "total_vectors": vector_stats.get("total_vectors", 0),
+                "source_types": metadata_stats.get("source_types", {})
+            }
 
             # Memory usage
             process = psutil.Process()
@@ -666,6 +699,7 @@ class IndexManager:
 
             return {
                 "status": "healthy",
+                "index_stats": index_stats,
                 "metadata": metadata_stats,
                 "relationships": relationship_stats,
                 "vector_store": vector_stats,
