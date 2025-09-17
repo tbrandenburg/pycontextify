@@ -71,7 +71,7 @@ class TestMCPFunctions:
         
         # MCP server info
         assert status["mcp_server"]["name"] == "PyContextify"
-        assert len(status["mcp_server"]["mcp_functions"]) == 6
+        assert len(status["mcp_server"]["mcp_functions"]) == 7  # Now includes reset_index
         
         print("✅ Status function working correctly")
     

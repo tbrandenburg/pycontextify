@@ -404,6 +404,99 @@ def search_with_context(
 
 
 @mcp.tool
+def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, Any]:
+    """Reset the entire knowledge index, clearing all indexed content.
+
+    This function clears all indexed data from memory and optionally removes
+    saved index files from disk. This is a destructive operation that cannot
+    be undone without re-indexing all content.
+
+    Args:
+        remove_files: Whether to remove saved index files from disk (default: True)
+        confirm: Safety confirmation - must be True to proceed (default: False)
+
+    Returns:
+        Dictionary with reset operation results and before/after statistics
+    """
+    try:
+        # Safety check - require explicit confirmation
+        if not confirm:
+            return {
+                "success": False,
+                "error": "Reset operation requires explicit confirmation. Set confirm=True to proceed.",
+                "warning": "This operation will permanently delete all indexed content.",
+                "help": "Use reset_index(confirm=True) to proceed with the reset."
+            }
+
+        # Validate parameters
+        if not isinstance(remove_files, bool):
+            return {"success": False, "error": "remove_files must be a boolean"}
+
+        if not isinstance(confirm, bool):
+            return {"success": False, "error": "confirm must be a boolean"}
+
+        # Initialize manager to get before-reset stats
+        mgr = initialize_manager()
+        
+        # Capture before-reset statistics
+        try:
+            before_status = mgr.get_status()
+            before_stats = {
+                "total_chunks": before_status.get("index_stats", {}).get("total_chunks", 0),
+                "total_documents": before_status.get("index_stats", {}).get("total_documents", 0),
+                "memory_usage_mb": before_status.get("performance", {}).get("memory_usage_mb", 0)
+            }
+        except Exception:
+            # If we can't get stats, provide defaults
+            before_stats = {"total_chunks": 0, "total_documents": 0, "memory_usage_mb": 0}
+
+        # Perform the reset operation
+        reset_result = mgr.clear_index(remove_files=remove_files)
+        
+        if not reset_result.get("success", False):
+            return {
+                "success": False,
+                "error": f"Reset operation failed: {reset_result.get('error', 'Unknown error')}",
+                "before_reset": before_stats
+            }
+
+        # Capture after-reset statistics
+        try:
+            after_status = mgr.get_status()
+            after_stats = {
+                "total_chunks": after_status.get("index_stats", {}).get("total_chunks", 0),
+                "memory_usage_mb": after_status.get("performance", {}).get("memory_usage_mb", 0)
+            }
+        except Exception:
+            after_stats = {"total_chunks": 0, "memory_usage_mb": 0}
+
+        success_message = f"Index reset completed successfully. "
+        if remove_files:
+            success_message += "All indexed data and files have been removed."
+        else:
+            success_message += "All indexed data cleared from memory."
+
+        result = {
+            "success": True,
+            "message": success_message,
+            "before_reset": before_stats,
+            "after_reset": after_stats,
+            "files_removed": remove_files
+        }
+
+        logger.info(f"Index reset completed: {before_stats['total_chunks']} chunks removed, files_removed={remove_files}")
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to reset index: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+
+@mcp.tool
 def status() -> Dict[str, Any]:
     """Get system status and comprehensive statistics.
 
@@ -441,9 +534,10 @@ def status() -> Dict[str, Any]:
                 "index_webpage",
                 "search",
                 "search_with_context",
+                "reset_index",
                 "status",
             ],
-            "interface": "simplified",  # 6-function interface
+            "interface": "enhanced",  # 7-function interface now
         }
 
         logger.info("Status request completed successfully")
