@@ -209,20 +209,39 @@ class TestEnhancedIntegration:
                 # Mock the DocumentLoader's load method and chunking pipeline
                 with patch('pycontextify.index.loaders.DocumentLoader.load') as mock_document_load, \
                      patch('pycontextify.index.manager.MetadataStore') as mock_metadata_store_class, \
-                     patch('pycontextify.index.manager.ChunkerFactory') as mock_chunker_factory:
+                     patch('pycontextify.index.manager.ChunkerFactory') as mock_chunker_factory, \
+                     patch('pycontextify.index.manager.RelationshipStore') as mock_relationship_store_class:
                     
                     mock_document_load.return_value = [(fake_pdf_path, "This is extracted PDF text content for testing.")]
                     
                     # Mock metadata store
                     mock_metadata_store = Mock()
                     mock_metadata_store.add_chunk.return_value = None
+                    mock_metadata_store.get_chunks_by_source_path.return_value = []  # No existing chunks for reindexing
                     mock_metadata_store_class.return_value = mock_metadata_store
                     
-                    # Mock chunker
+                    # Mock relationship store
+                    mock_relationship_store = Mock()
+                    mock_relationship_store.build_relationships_from_chunks.return_value = None
+                    mock_relationship_store_class.return_value = mock_relationship_store
+                    
+                    # Mock chunker - create a proper ChunkMetadata mock
                     mock_chunker = Mock()
-                    mock_chunk = Mock()
-                    mock_chunk.chunk_text = "Test chunk text"
-                    mock_chunker.chunk_text.return_value = [mock_chunk]
+                    from pycontextify.index.metadata import ChunkMetadata, SourceType
+                    
+                    # Create a real ChunkMetadata object instead of a mock
+                    real_chunk = ChunkMetadata(
+                        chunk_id="test-chunk-1",
+                        source_path=fake_pdf_path,
+                        source_type=SourceType.DOCUMENT,
+                        chunk_text="Test chunk text",
+                        start_char=0,
+                        end_char=15,
+                        embedding_provider="sentence_transformers",
+                        embedding_model="all-mpnet-base-v2"
+                    )
+                    
+                    mock_chunker.chunk_text.return_value = [real_chunk]
                     mock_chunker_factory.get_chunker.return_value = mock_chunker
                     
                     # Mock vector store add_vectors method

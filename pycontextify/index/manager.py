@@ -651,6 +651,120 @@ class IndexManager:
             logger.error(f"Context search failed: {e}")
             return self.search(query, top_k)  # Fallback to basic search
 
+    def _extract_knowledge_catalog(self) -> Dict[str, Any]:
+        """Extract knowledge catalog information from existing chunks.
+        
+        Returns:
+            Dictionary with content overview and knowledge catalog
+        """
+        all_chunks = self.metadata_store.get_all_chunks()
+        
+        if not all_chunks:
+            return {
+                "content_overview": {},
+                "knowledge_catalog": {
+                    "indexed_sources": [],
+                    "primary_topics": [],
+                    "code_repositories": [],
+                    "searchable_concepts": []
+                }
+            }
+        
+        # Extract basic information from chunks
+        source_paths = set()
+        file_extensions = set()
+        code_symbols = set()
+        all_tags = set()
+        all_references = set()
+        
+        # Simple domain detection from file paths and extensions
+        programming_languages = set()
+        web_domains = set()
+        project_names = set()
+        
+        for chunk in all_chunks:
+            source_paths.add(chunk.source_path)
+            
+            # Extract file extension
+            if chunk.file_extension:
+                file_extensions.add(chunk.file_extension)
+                
+                # Simple programming language detection
+                lang_map = {
+                    '.py': 'Python',
+                    '.js': 'JavaScript', 
+                    '.ts': 'TypeScript',
+                    '.java': 'Java',
+                    '.cpp': 'C++',
+                    '.c': 'C',
+                    '.go': 'Go',
+                    '.rs': 'Rust',
+                    '.php': 'PHP'
+                }
+                if chunk.file_extension in lang_map:
+                    programming_languages.add(lang_map[chunk.file_extension])
+            
+            # Extract project names from paths
+            if chunk.source_type.value == 'code':
+                path_parts = chunk.source_path.replace('\\', '/').split('/')
+                for part in path_parts:
+                    if part and not part.startswith('.') and len(part) > 2:
+                        # Look for likely project names (directories with meaningful names)
+                        if any(char.isalpha() for char in part) and part.lower() not in ['src', 'lib', 'bin', 'test', 'tests']:
+                            project_names.add(part)
+            
+            # Extract web domains
+            if chunk.source_type.value == 'webpage' and chunk.source_path.startswith(('http://', 'https://')):
+                try:
+                    from urllib.parse import urlparse
+                    domain = urlparse(chunk.source_path).netloc
+                    if domain:
+                        web_domains.add(domain)
+                except:
+                    pass
+            
+            # Collect symbols, tags, references
+            code_symbols.update(chunk.code_symbols)
+            all_tags.update(chunk.tags)
+            all_references.update(chunk.references)
+        
+        # Create content overview
+        content_overview = {
+            "total_sources": len(source_paths),
+            "content_types": list(file_extensions) if file_extensions else [],
+            "programming_languages": list(programming_languages) if programming_languages else [],
+            "domains": {
+                "web_domains": list(web_domains) if web_domains else [],
+                "project_names": list(project_names)[:10] if project_names else []  # Limit to top 10
+            }
+        }
+        
+        # Create knowledge catalog
+        # Get top items by frequency for better discovery
+        top_symbols = sorted([(symbol, sum(1 for chunk in all_chunks if symbol in chunk.code_symbols)) 
+                            for symbol in code_symbols], key=lambda x: x[1], reverse=True)[:20]
+        top_references = sorted([(ref, sum(1 for chunk in all_chunks if ref in chunk.references)) 
+                               for ref in all_references], key=lambda x: x[1], reverse=True)[:15]
+        
+        knowledge_catalog = {
+            "indexed_sources": {
+                "code_repositories": list(project_names)[:5] if project_names else [],
+                "web_resources": list(web_domains) if web_domains else [],
+                "document_types": [ext for ext in file_extensions if ext in ['.md', '.txt', '.pdf', '.doc', '.docx']]
+            },
+            "primary_topics": [ref[0] for ref in top_references[:10]],  # Most referenced concepts
+            "searchable_concepts": {
+                "code_symbols": [symbol[0] for symbol in top_symbols[:10]],  # Most common symbols
+                "technologies": list(programming_languages) if programming_languages else [],
+                "tags": list(all_tags)[:10] if all_tags else []
+            }
+        }
+        
+        return {
+            "content_overview": content_overview,
+            "knowledge_catalog": knowledge_catalog
+        }
+
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive system status.
 
@@ -728,6 +842,9 @@ class IndexManager:
                 "disk_usage_percent": disk_usage.percent,
                 "disk_free_gb": disk_usage.free / (1024 * 1024 * 1024)
             }
+            
+            # Extract knowledge catalog and enhanced metadata
+            knowledge_info = self._extract_knowledge_catalog()
 
             return {
                 "status": "healthy",
@@ -741,6 +858,8 @@ class IndexManager:
                 "performance": performance_info,
                 "persistence": persistence_info,
                 "configuration": self.config.get_config_summary(),
+                "content_overview": knowledge_info["content_overview"],
+                "knowledge_catalog": knowledge_info["knowledge_catalog"],
             }
 
         except Exception as e:
