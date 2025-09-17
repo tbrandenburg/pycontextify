@@ -663,9 +663,12 @@ class IndexManager:
             return {
                 "content_overview": {},
                 "knowledge_catalog": {
-                    "indexed_sources": [],
+                    "indexed_sources": {
+                        "codebases": [],
+                        "webpages": [],
+                        "documents": []
+                    },
                     "primary_topics": [],
-                    "code_repositories": [],
                     "searchable_concepts": []
                 }
             }
@@ -680,7 +683,8 @@ class IndexManager:
         # Simple domain detection from file paths and extensions
         programming_languages = set()
         web_domains = set()
-        project_names = set()
+        codebases = set()
+        documents = set()
         
         for chunk in all_chunks:
             source_paths.add(chunk.source_path)
@@ -704,15 +708,28 @@ class IndexManager:
                 if chunk.file_extension in lang_map:
                     programming_languages.add(lang_map[chunk.file_extension])
             
-            # Extract project names from paths
+            # Extract codebase paths from source paths  
             if chunk.source_type.value == 'code':
+                # Extract the root codebase directory path
                 path_parts = chunk.source_path.replace('\\', '/').split('/')
-                for part in path_parts:
-                    if part and not part.startswith('.') and len(part) > 2:
-                        # Look for likely project names (directories with meaningful names)
-                        if any(char.isalpha() for char in part) and part.lower() not in ['src', 'lib', 'bin', 'test', 'tests']:
-                            project_names.add(part)
+                if len(path_parts) > 2:
+                    # Find the likely root project directory (avoid system paths)
+                    for i, part in enumerate(path_parts[:-1]):  # Exclude filename
+                        if part and not part.startswith('.') and any(char.isalpha() for char in part):
+                            if part.lower() not in ['src', 'lib', 'bin', 'test', 'tests', 'node_modules']:
+                                # Take the parent directory of the project
+                                root_path = '/'.join(path_parts[:i+1])
+                                if len(root_path) > 5:  # Avoid very short paths
+                                    codebases.add(root_path)
+                                break
             
+            # Extract document filenames
+            if chunk.source_type.value == 'document':
+                # Get just the filename from the path
+                filename = chunk.source_path.replace('\\', '/').split('/')[-1]
+                if filename and '.' in filename:
+                    documents.add(filename)
+                
             # Extract web domains
             if chunk.source_type.value == 'webpage' and chunk.source_path.startswith(('http://', 'https://')):
                 try:
@@ -735,7 +752,7 @@ class IndexManager:
             "programming_languages": list(programming_languages) if programming_languages else [],
             "domains": {
                 "web_domains": list(web_domains) if web_domains else [],
-                "project_names": list(project_names)[:10] if project_names else []  # Limit to top 10
+                "codebase_paths": list(codebases)[:10] if codebases else []  # Limit to top 10
             }
         }
         
@@ -748,9 +765,9 @@ class IndexManager:
         
         knowledge_catalog = {
             "indexed_sources": {
-                "code_repositories": list(project_names)[:5] if project_names else [],
-                "web_resources": list(web_domains) if web_domains else [],
-                "document_types": [ext for ext in file_extensions if ext in ['.md', '.txt', '.pdf', '.doc', '.docx']]
+                "codebases": list(codebases)[:5] if codebases else [],
+                "webpages": list(web_domains) if web_domains else [],
+                "documents": list(documents)[:10] if documents else []  # Document filenames
             },
             "primary_topics": [ref[0] for ref in top_references[:10]],  # Most referenced concepts
             "searchable_concepts": {
