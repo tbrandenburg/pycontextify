@@ -310,6 +310,28 @@ class MetadataStore:
             ),
         }
 
+    def remove_chunk(self, faiss_id: int) -> bool:
+        """Remove chunk metadata by FAISS ID.
+        
+        Args:
+            faiss_id: FAISS ID of the chunk to remove
+            
+        Returns:
+            True if chunk was removed, False if not found
+        """
+        if faiss_id not in self._id_to_metadata:
+            return False
+            
+        # Get the chunk to remove
+        chunk = self._id_to_metadata[faiss_id]
+        
+        # Remove from both mappings
+        del self._id_to_metadata[faiss_id]
+        if chunk.chunk_id in self._chunk_id_to_faiss_id:
+            del self._chunk_id_to_faiss_id[chunk.chunk_id]
+            
+        return True
+
     def clear(self) -> None:
         """Clear all metadata."""
         self._id_to_metadata.clear()

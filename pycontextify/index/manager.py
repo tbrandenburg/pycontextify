@@ -382,6 +382,38 @@ class IndexManager:
         Returns:
             Number of chunks added
         """
+        # CHECK FOR EXISTING CONTENT AND REMOVE (RE-INDEXING LOGIC)
+        existing_chunks = self.metadata_store.get_chunks_by_source_path(source_path)
+        chunks_removed = 0
+        
+        if existing_chunks:
+            logger.info(f"Found {len(existing_chunks)} existing chunks for {source_path}, removing for re-indexing")
+            
+            # Remove from vector store
+            if self.vector_store is not None:
+                faiss_ids_to_remove = []
+                for chunk in existing_chunks:
+                    faiss_id = self.metadata_store.get_faiss_id(chunk.chunk_id)
+                    if faiss_id is not None:
+                        faiss_ids_to_remove.append(faiss_id)
+                
+                if faiss_ids_to_remove:
+                    self.vector_store.remove_vectors(faiss_ids_to_remove)
+            
+            # Remove from metadata store
+            for chunk in existing_chunks:
+                faiss_id = self.metadata_store.get_faiss_id(chunk.chunk_id)
+                if faiss_id is not None:
+                    self.metadata_store.remove_chunk(faiss_id)
+            
+            # Remove from relationship store
+            if self.config.enable_relationships and self.relationship_store:
+                for chunk in existing_chunks:
+                    self.relationship_store.remove_chunk_relationships(chunk.chunk_id)
+            
+            chunks_removed = len(existing_chunks)
+            logger.info(f"Removed {chunks_removed} existing chunks for re-indexing")
+        
         # Get appropriate chunker
         chunker = ChunkerFactory.get_chunker(source_type, self.config)
 

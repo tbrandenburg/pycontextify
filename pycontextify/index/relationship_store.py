@@ -401,6 +401,51 @@ class RelationshipStore:
             "chunks_with_relationships": len(self._reverse_index),
         }
 
+    def remove_chunk_relationships(self, chunk_id: str) -> int:
+        """Remove all relationships for a specific chunk.
+        
+        Args:
+            chunk_id: ID of the chunk whose relationships to remove
+            
+        Returns:
+            Number of relationships removed
+        """
+        if chunk_id not in self._reverse_index:
+            return 0
+            
+        removed_count = 0
+        
+        # Get all entities associated with this chunk
+        entities_to_clean = list(self._reverse_index[chunk_id])
+        
+        # Remove chunk from each entity's relationship lists
+        for entity in entities_to_clean:
+            if entity in self._relationships:
+                # Remove chunk from each relationship type for this entity
+                for rel_type in list(self._relationships[entity].keys()):
+                    if chunk_id in self._relationships[entity][rel_type]:
+                        self._relationships[entity][rel_type].remove(chunk_id)
+                        removed_count += 1
+                        
+                        # Clean up empty relationship type lists
+                        if not self._relationships[entity][rel_type]:
+                            del self._relationships[entity][rel_type]
+                            
+                # Clean up empty entity entries
+                if not self._relationships[entity]:
+                    del self._relationships[entity]
+                    
+            # Remove chunk from entity_chunks mapping
+            if entity in self._entity_chunks:
+                self._entity_chunks[entity].discard(chunk_id)
+                if not self._entity_chunks[entity]:
+                    del self._entity_chunks[entity]
+        
+        # Remove chunk from reverse index
+        del self._reverse_index[chunk_id]
+        
+        return removed_count
+
     def clear(self) -> None:
         """Clear all relationships."""
         self._relationships.clear()
