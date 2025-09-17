@@ -4,16 +4,15 @@ A Python-based MCP (Model Context Protocol) server for semantic search over code
 
 ## Features
 
-- **Semantic Search**: Vector similarity search using FAISS with multiple embedding providers
+- **Semantic Search**: FAISS vector similarity search with hybrid keyword matching (TF-IDF + BM25)
 - **Multi-Source Support**: Index codebases, documents (PDF, Markdown, text), and webpages
-- **Lightweight Knowledge Graph**: Relationship extraction and entity linking without complex graph databases
-- **Specialized Content Processing**: Dedicated chunkers for code, documents, and web content
-- **Auto-Persistence**: Automatic saving with configurable backup management
-- **Extensible Embedding System**: Support for sentence-transformers with plans for Ollama and OpenAI
-- **Modern UV Project**: Fast dependency management and reproducible builds
-- **Simplified MCP Interface**: Essential functions only for ease of use
-- **CLI Configuration**: Command-line arguments for server startup with initial document/codebase indexing
-- **Flexible Configuration**: CLI arguments override environment variables for easy project-specific setups
+- **Lightweight Knowledge Graph**: Relationship extraction without external graph databases
+- **Content-Aware Processing**: Specialized chunkers for code structure, document hierarchy, and web content
+- **Advanced Search**: Vector similarity, keyword search, and neural reranking
+- **Auto-Persistence**: Automatic saving with compressed backups
+- **Lazy Loading**: Fast startup with on-demand component initialization
+- **CLI Configuration**: Command-line arguments with environment variable overrides
+- **Extensible Architecture**: Factory pattern for embedding providers and content processors
 
 ## Installation
 
@@ -22,34 +21,23 @@ A Python-based MCP (Model Context Protocol) server for semantic search over code
 - Python 3.10 or higher
 - UV package manager
 
-### Install UV
+### Project Setup
 
+1. Install UV:
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Project Setup
-
-1. Clone the repository:
+2. Clone and install:
 ```bash
 git clone <repository-url>
 cd pycontextify
-```
-
-2. Install dependencies:
-```bash
 uv sync
 ```
 
-3. For development with additional tools:
+3. Optional - development tools:
 ```bash
 uv sync --extra dev
-```
-
-4. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your preferred settings
 ```
 
 ## Quick Start
@@ -61,14 +49,11 @@ cp .env.example .env
 # Production mode
 uv run pycontextify
 
-# Or directly with FastMCP
-uv run fastmcp run pycontextify/mcp_server.py
-
-# Development mode with tools
-uv run --extra dev fastmcp run pycontextify/mcp_server.py
+# With verbose logging
+uv run pycontextify --verbose
 ```
 
-**CLI Arguments (New!):**
+**CLI Arguments:**
 ```bash
 # Start with custom index path
 uv run pycontextify --index-path ./my_project_index
@@ -95,16 +80,16 @@ uv run pycontextify \
 uv run pycontextify --help
 ```
 
-### Example Usage
+### MCP Functions
 
-The server provides 6 MCP functions:
+The server provides 6 essential MCP functions:
 
-1. **`index_code(path)`** - Index a codebase directory
-2. **`index_document(path)`** - Index a single document (PDF, MD, TXT)
+1. **`index_code(path)`** - Index codebase with relationship extraction
+2. **`index_document(path)`** - Index documents (PDF, MD, TXT)
 3. **`index_webpage(url, recursive=False, max_depth=1)`** - Index web content
-4. **`search(query, top_k=5)`** - Basic semantic search
-5. **`status()`** - Get system status and statistics
-6. **`search_with_context(query, top_k=5, include_related=False)`** - Enhanced search with relationship context
+4. **`search(query, top_k=5)`** - Hybrid semantic + keyword search
+5. **`search_with_context(query, top_k=5, include_related=False)`** - Search with relationship context
+6. **`status()`** - System status and statistics
 
 ### CLI Usage Examples
 
@@ -153,9 +138,9 @@ uv run pycontextify \
 
 ## Configuration
 
-### CLI Arguments (New!)
+### CLI Arguments
 
-The MCP server now supports command-line arguments for easy startup configuration:
+Command-line arguments for startup configuration:
 
 ```bash
 # Index configuration
@@ -233,26 +218,28 @@ PYCONTEXTIFY_ENABLE_RELATIONSHIPS=true
 
 ### Core Components
 
-- **IndexManager**: Central orchestrator handling all operations
+- **IndexManager**: Central orchestrator with lazy loading
 - **VectorStore**: FAISS wrapper with persistence and backup
 - **EmbedderFactory**: Extensible embedding provider system
-- **Specialized Chunkers**: Content-specific processing
-- **RelationshipStore**: Lightweight knowledge graph storage
-- **MetadataStore**: Chunk metadata with relationship tracking
+- **HybridSearchEngine**: Combines vector similarity with TF-IDF + BM25
+- **CrossEncoderReranker**: Neural reranking for improved results
+- **RelationshipStore**: Lightweight knowledge graph without external databases
+- **MetadataStore**: Chunk metadata with FAISS ID mapping
 
-### Content Processing
+### Content Processing Pipeline
 
-- **CodeChunker**: Function/class boundary awareness, symbol extraction
-- **DocumentChunker**: Section hierarchy, citation extraction
-- **WebPageChunker**: HTML structure awareness, link extraction
-- **Automatic Selection**: Based on content type
+1. **Load**: Content-specific loaders (PDF, web, file)
+2. **Chunk**: Content-aware chunking with relationship extraction
+3. **Embed**: Lazy-loaded embedding providers
+4. **Store**: Parallel storage in vector, metadata, and relationship stores
+5. **Search**: Multi-modal search with optional reranking
 
-### Knowledge Graph Features
+### Search Capabilities
 
-- **Lightweight Approach**: No external graph database required
-- **Relationship Types**: Function calls, imports, references, links, hierarchies
-- **Entity Extraction**: Automatic from code, documents, and web content
-- **Relationship-Aware Search**: Enhanced search via `search_with_context`
+- **Vector Similarity**: FAISS IndexFlatIP for cosine similarity
+- **Keyword Search**: TF-IDF and BM25 with configurable weighting
+- **Neural Reranking**: Cross-encoder for improved relevance
+- **Relationship Context**: Knowledge graph traversal for related content
 
 ## MCP Client Integration
 
@@ -271,7 +258,7 @@ PYCONTEXTIFY_ENABLE_RELATIONSHIPS=true
 }
 ```
 
-**With CLI arguments for project-specific setup:**
+**Project-specific setup:**
 ```json
 {
   "mcpServers": {
@@ -280,11 +267,8 @@ PYCONTEXTIFY_ENABLE_RELATIONSHIPS=true
       "args": [
         "run", "pycontextify",
         "--index-path", "./project_index",
-        "--index-name", "my_project",
         "--initial-codebase", "src", "tests",
-        "--initial-documents", "README.md",
-        "--initial-webpages", "https://docs.myproject.com",
-        "--recursive-crawling"
+        "--initial-documents", "README.md"
       ],
       "cwd": "/path/to/pycontextify"
     }
@@ -319,33 +303,20 @@ python3 tests/smoke/test_mcp_functionality.py
 
 ### Testing
 
-**Unit Tests**: Comprehensive test suite with 55+ tests covering:
-- Configuration system and environment variables
-- Metadata and relationship management
-- Content loading and chunking
-- Embedding system factories
-- Index management and persistence
-
-**Smoke Tests**: Quick integration tests that work with minimal dependencies:
+**Unit Tests**: Comprehensive test suite with 230+ tests:
 ```bash
-# Test MCP server interface and imports
-python3 tests/smoke/test_mcp_server.py
+# Run all tests with coverage
+uv run pytest --cov=pycontextify
 
-# Test MCP functionality without heavy dependencies
-python3 tests/smoke/test_mcp_functionality.py
-
-# Run all smoke tests with pytest (if pytest available)
-python3 -m pytest tests/smoke/ -v
-
-# Or use the simple test runner (no pytest required)
-python3 tests/smoke/run_smoke_tests.py
+# Run specific test categories
+uv run pytest tests/test_*_consolidated.py
 ```
 
-Smoke tests are perfect for:
-- ✅ Verifying system health without installing torch/sentence-transformers
-- ✅ Testing MCP server initialization and tool registration
-- ✅ Validating configuration and core module functionality
-- ✅ Quick CI/CD pipeline checks
+**Current Test Coverage**: 71% overall with excellent coverage of core components:
+- Vector Store: 87%
+- Reranker: 91% 
+- Metadata: 91%
+- Relationship Store: 84%
 
 ### Adding Dependencies
 
@@ -382,40 +353,22 @@ uv add --optional embedding-provider package-name
 - Respectful crawling with delays (CLI: `--crawl-delay`, min: 1 second)
 - Automatic content filtering and structure extraction
 
-## Performance Considerations
+## Performance
 
-- **Memory**: Scales with corpus size and embedding model
-- **Embedding Models**: 
+- **Memory**: Scales with corpus size and embedding model choice
+- **Search**: Sub-second with FAISS IndexFlatIP
+- **Startup**: Lazy loading reduces initialization time
+- **Models**: 
   - `all-MiniLM-L6-v2`: Fast, 384 dimensions
-  - `all-mpnet-base-v2`: High quality, 768 dimensions
-- **Chunking Strategy**: Affects search granularity
-- **Auto-persistence**: Minimal overhead with compression
-- **Relationship Extraction**: Configurable complexity
+  - `all-mpnet-base-v2`: Higher quality, 768 dimensions
+- **Auto-persistence**: Compressed storage with minimal overhead
 
 ## Troubleshooting
 
-### Common Issues
-
-**Model Loading Errors**: Ensure sufficient memory and stable internet for first download
-
-**Memory Issues**: Use smaller embedding models or reduce batch sizes
-
-**File Permission Problems**: Check index directory write permissions
-
-**Import Errors**: Verify UV virtual environment activation
-
-### UV-Specific Issues
-
-```bash
-# Recreate environment
-uv sync --reinstall
-
-# Clear cache
-uv cache clean
-
-# Check lock file
-uv lock --check
-```
+**Model Loading**: Ensure stable internet for first-time model download
+**Memory Issues**: Use `all-MiniLM-L6-v2` model or reduce batch sizes
+**Permissions**: Check write access to index directory
+**Dependencies**: Recreate environment with `uv sync --reinstall`
 
 ## Contributing
 
@@ -454,12 +407,10 @@ uv run pytest
 
 ## Roadmap
 
-- [ ] Ollama embedding provider
-- [ ] OpenAI embedding provider  
+- [ ] Additional embedding providers (Ollama, OpenAI)
 - [ ] Advanced relationship queries
-- [ ] Vector database alternatives
-- [ ] Performance optimizations
-- [ ] Web UI for management
+- [ ] Performance optimizations for large corpora
+- [ ] Web UI for index management
 
 ## License
 
