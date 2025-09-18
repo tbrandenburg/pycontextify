@@ -18,7 +18,7 @@ class TestConfig(unittest.TestCase):
         config = Config()
 
         self.assertEqual(config.embedding_provider, "sentence_transformers")
-        self.assertEqual(config.embedding_model, "all-mpnet-base-v2")
+        self.assertEqual(config.embedding_model, "all-MiniLM-L6-v2")
         self.assertEqual(config.chunk_size, 512)
         self.assertEqual(config.chunk_overlap, 50)
         self.assertTrue(config.auto_persist)
