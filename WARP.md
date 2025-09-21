@@ -51,9 +51,9 @@ uv sync --reinstall              # Reset environment
 6 essential functions:
 1. `index_code(path)` - Codebase with relationship extraction
 2. `index_document(path)` - Documents (PDF, MD, TXT)
-3. `index_webpage(url)` - Web content with optional recursion
+3. `index_webpage(url, recursive=False, max_depth=1)` - Web content with optional recursion
 4. `search(query, top_k=5)` - Hybrid semantic + keyword search
-5. `search_with_context(query, include_related=False)` - With relationships
+5. `search_with_context(query, top_k=5, include_related=False)` - With relationships
 6. `status()` - System statistics
 
 ## Configuration
@@ -79,7 +79,10 @@ uv sync --reinstall              # Reset environment
 **230+ tests, 71% coverage**
 - Core components: 87-91% coverage
 - Run: `uv run pytest --cov=pycontextify`
+- MCP test runner: `uv run python scripts/run_mcp_tests.py`
+- Quick smoke test: `uv run python scripts/run_mcp_tests.py --smoke`
 - Consolidated test files: `test_*_consolidated.py`
+- Main test files: `test_mcp_simple.py` (8 tests), `test_integration.py` (4 tests)
 
 ## File Support
 
@@ -95,6 +98,15 @@ uv sync --reinstall              # Reset environment
 
 **Scaling**: Memory scales with corpus size. Use IndexIVFFlat for >100k chunks.
 
+## Performance Scripts
+
+**Available utilities**:
+- `python scripts/measure_startup_time.py` - Startup performance measurement
+- `python scripts/debug_lazy_loading.py` - Lazy loading verification  
+- `python scripts/detailed_perf.py` - Component performance analysis
+- `python scripts/fast_startup_test.py` - Startup optimization testing
+- `python scripts/test_hf_connectivity.py` - HuggingFace connectivity test
+
 ## Troubleshooting
 
 **Model loading**: Ensure internet for first download  
@@ -102,6 +114,7 @@ uv sync --reinstall              # Reset environment
 **Dependencies**: `uv sync --reinstall`  
 **Permissions**: Check index directory write access  
 **Debug**: Use `--verbose` flag for detailed logging
+**Windows**: Set `$env:PYTHONPATH = "."` before running scripts
 
 ## Design Decisions
 
