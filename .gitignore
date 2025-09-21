@@ -38,6 +38,9 @@ venv.bak/
 *.swo
 *~
 
+# Serena MCP
+.serena/
+
 # OS
 .DS_Store
 .DS_Store?

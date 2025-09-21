@@ -1,423 +1,168 @@
-# PyContextify
+# PyContextify ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
 
-A Python-based MCP (Model Context Protocol) server for semantic search over codebases, documents, and webpages with lightweight knowledge graph capabilities.
+**One-line:** Semantic search server with relationship-aware discovery across codebases, documents, and webpages.
 
-## Features
+PyContextify is a Python-based MCP (Model Context Protocol) server that provides intelligent semantic search capabilities over diverse knowledge sources. It combines vector similarity search with lightweight knowledge graph features to help developers, researchers, and technical writers discover contextually relevant information across codebases, documentation, and web resources.
 
-- **Semantic Search**: FAISS vector similarity search with hybrid keyword matching (TF-IDF + BM25)
-- **Multi-Source Support**: Index codebases, documents (PDF, Markdown, text), and webpages
-- **Lightweight Knowledge Graph**: Relationship extraction without external graph databases
-- **Content-Aware Processing**: Specialized chunkers for code structure, document hierarchy, and web content
-- **Advanced Search**: Vector similarity, keyword search, and neural reranking
-- **Auto-Persistence**: Automatic saving with compressed backups
-- **Lazy Loading**: Fast startup with on-demand component initialization
-- **CLI Configuration**: Command-line arguments with environment variable overrides
-- **Extensible Architecture**: Factory pattern for embedding providers and content processors
+---
 
-## Installation
+## Quickstart
 
-### Prerequisites
-
-- Python 3.10 or higher
-- UV package manager
-
-### Project Setup
-
-1. Install UV:
 ```bash
+# Install UV and dependencies
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-2. Clone and install:
-```bash
-git clone <repository-url>
-cd pycontextify
 uv sync
-```
 
-3. Optional - development tools:
-```bash
-uv sync --extra dev
-```
-
-## Quick Start
-
-### Start the MCP Server
-
-**Basic startup:**
-```bash
-# Production mode
-uv run pycontextify
-
-# With verbose logging
+# Run MCP server
 uv run pycontextify --verbose
 ```
 
-**CLI Arguments:**
+## Table of Contents
+- [Quickstart](#quickstart)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [API Reference](#api-reference)
+- [Tests & CI](#tests--ci)
+- [Contributing](#contributing)
+- [License](#license)
+- [Security](#security)
+- [Maintainers](#maintainers)
+
+## Installation
+
+**Requirements:** Python 3.10+ and UV package manager
+
 ```bash
-# Start with custom index path
-uv run pycontextify --index-path ./my_project_index
+# Install UV package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Start with custom index name
-uv run pycontextify --index-name project_search
+# Clone and install dependencies
+git clone <repository-url>
+cd pycontextify
+uv sync
 
-# Start and index initial documents
-uv run pycontextify --initial-documents README.md docs/api.md
-
-# Start and index initial codebase
-uv run pycontextify --initial-codebase src tests
-
-# Full example with multiple options
-uv run pycontextify \
-  --index-path ./project_index \
-  --index-name my_search \
-  --initial-documents README.md \
-  --initial-codebase src tests \
-  --embedding-provider sentence_transformers \
-  --verbose
-
-# Show all available options
-uv run pycontextify --help
+# Optional: Install development tools
+uv sync --extra dev
 ```
 
-### MCP Functions
+(Alternative: build from source: `uv sync --reinstall`)
 
-The server provides 6 essential MCP functions:
+## Usage
 
-1. **`index_code(path)`** - Index codebase with relationship extraction
-2. **`index_document(path)`** - Index documents (PDF, MD, TXT)
-3. **`index_webpage(url, recursive=False, max_depth=1)`** - Index web content
-4. **`search(query, top_k=5)`** - Hybrid semantic + keyword search
-5. **`search_with_context(query, top_k=5, include_related=False)`** - Search with relationship context
-6. **`status()`** - System status and statistics
-
-### CLI Usage Examples
+Minimal example:
 
 ```bash
-# Quick setup for a Python project
-uv run pycontextify \
-  --index-name python_project \
-  --initial-codebase ./src ./tests \
-  --initial-documents README.md docs/
+# Start the MCP server
+uv run pycontextify
 
-# Documentation-focused setup
-uv run pycontextify \
-  --index-path ./docs_index \
-  --initial-documents *.md docs/ \
-  --no-auto-persist \
-  --verbose
+# Index a codebase (in another terminal or via MCP client)
+# The server exposes 6 MCP functions:
+# - index_code(path)
+# - index_document(path) 
+# - index_webpage(url, recursive=False, max_depth=1)
+# - search(query, top_k=5)
+# - search_with_context(query, top_k=5, include_related=False)
+# - status()
+```
 
-# Multi-language codebase
-uv run pycontextify \
-  --initial-codebase frontend/ backend/ mobile/ \
-  --embedding-provider sentence_transformers \
-  --embedding-model all-mpnet-base-v2
+Expected output:
 
-# Research paper analysis with related websites
-uv run pycontextify \
-  --index-name research \
-  --initial-documents papers/*.pdf references.md \
-  --initial-webpages https://arxiv.org/abs/1234.5678 \
-  --index-path ./research_index
-
-# Documentation site with recursive crawling
-uv run pycontextify \
-  --index-name docs_site \
-  --initial-webpages https://docs.myproject.com \
-  --recursive-crawling --max-crawl-depth 2 \
-  --crawl-delay 2
-
-# Comprehensive knowledge base
-uv run pycontextify \
-  --index-name knowledge_base \
-  --initial-documents ./knowledge/*.md \
-  --initial-codebase ./examples \
-  --initial-webpages https://api-docs.com https://tutorials.com \
-  --recursive-crawling --max-crawl-depth 1
+```
+🚀 Starting PyContextify MCP Server...
+Server provides 6 simplified MCP functions:
+  - index_code(path): Index codebase directory
+  - index_document(path): Index document
+  - index_webpage(url, recursive, max_depth): Index web content
+  - search(query, top_k): Basic semantic search
+  - search_with_context(query, top_k, include_related): Enhanced search with relationships
+  - status(): Get system status and statistics
+MCP server ready and listening for requests...
 ```
 
 ## Configuration
 
-### CLI Arguments
+Required environment variables / config:
+- `PYCONTEXTIFY_EMBEDDING_MODEL` — string — default: `all-MiniLM-L6-v2` — Embedding model for semantic search
+- `PYCONTEXTIFY_INDEX_DIR` — string — default: `./index_data` — Directory for storing search indices
+- `PYCONTEXTIFY_AUTO_PERSIST` — boolean — default: `true` — Automatically save after indexing
+- `PYCONTEXTIFY_CHUNK_SIZE` — integer — default: `512` — Text chunk size for processing
 
-Command-line arguments for startup configuration:
+Copy `.env.example` to `.env` and customize as needed.
 
-```bash
-# Index configuration
---index-path DIR        # Directory for vector storage (default: ./index_data)
---index-name NAME       # Custom index name (default: semantic_index)
+## API Reference
 
-# Initial indexing
---initial-documents FILES...  # Documents to index at startup
---initial-codebase DIRS...    # Codebases to index at startup
---initial-webpages URLS...    # Webpages to index at startup (http/https only)
+PyContextify exposes 6 MCP (Model Context Protocol) functions for semantic search and indexing:  
+Full docs: See [WARP.md](./WARP.md) for development guidance and architecture details
 
-# Webpage crawling options
---recursive-crawling    # Enable recursive crawling for webpages
---max-crawl-depth N     # Maximum crawl depth (1-3, default: 1)
---crawl-delay N         # Delay between requests in seconds (default: 1)
+## Tests & CI
 
-# Server options  
---no-auto-persist       # Disable automatic persistence
---no-auto-load         # Disable automatic index loading
+Run tests:
 
-# Embedding configuration
---embedding-provider PROVIDER  # Provider: sentence_transformers, ollama, openai
---embedding-model MODEL        # Model name for the provider
-
-# Logging
---verbose, -v          # Enable verbose logging (DEBUG level)
---quiet               # Minimize logging (WARNING level only)
-
-# Help
---help, -h            # Show all options with examples
-```
-
-**Configuration Priority:** CLI arguments > Environment variables > Defaults
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and customize:
-
-### Embedding Providers
-
-**Sentence Transformers (Default)**:
-```bash
-PYCONTEXTIFY_EMBEDDING_PROVIDER=sentence_transformers
-PYCONTEXTIFY_EMBEDDING_MODEL=all-mpnet-base-v2
-```
-
-**Future Providers**:
-```bash
-# Ollama (coming soon)
-PYCONTEXTIFY_EMBEDDING_PROVIDER=ollama
-PYCONTEXTIFY_EMBEDDING_MODEL=nomic-embed-text
-
-# OpenAI (coming soon)  
-PYCONTEXTIFY_EMBEDDING_PROVIDER=openai
-PYCONTEXTIFY_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-### Storage & Persistence
-
-```bash
-PYCONTEXTIFY_INDEX_DIR=./index_data
-PYCONTEXTIFY_AUTO_PERSIST=true
-PYCONTEXTIFY_BACKUP_INDICES=false
-```
-
-### Text Processing
-
-```bash
-PYCONTEXTIFY_CHUNK_SIZE=512
-PYCONTEXTIFY_CHUNK_OVERLAP=50
-PYCONTEXTIFY_ENABLE_RELATIONSHIPS=true
-```
-
-## Architecture
-
-### Core Components
-
-- **IndexManager**: Central orchestrator with lazy loading
-- **VectorStore**: FAISS wrapper with persistence and backup
-- **EmbedderFactory**: Extensible embedding provider system
-- **HybridSearchEngine**: Combines vector similarity with TF-IDF + BM25
-- **CrossEncoderReranker**: Neural reranking for improved results
-- **RelationshipStore**: Lightweight knowledge graph without external databases
-- **MetadataStore**: Chunk metadata with FAISS ID mapping
-
-### Content Processing Pipeline
-
-1. **Load**: Content-specific loaders (PDF, web, file)
-2. **Chunk**: Content-aware chunking with relationship extraction
-3. **Embed**: Lazy-loaded embedding providers
-4. **Store**: Parallel storage in vector, metadata, and relationship stores
-5. **Search**: Multi-modal search with optional reranking
-
-### Search Capabilities
-
-- **Vector Similarity**: FAISS IndexFlatIP for cosine similarity
-- **Keyword Search**: TF-IDF and BM25 with configurable weighting
-- **Neural Reranking**: Cross-encoder for improved relevance
-- **Relationship Context**: Knowledge graph traversal for related content
-
-## MCP Client Integration
-
-### Claude Desktop Configuration
-
-**Basic configuration:**
-```json
-{
-  "mcpServers": {
-    "pycontextify": {
-      "command": "uv",
-      "args": ["run", "pycontextify"],
-      "cwd": "/path/to/pycontextify"
-    }
-  }
-}
-```
-
-**Project-specific setup:**
-```json
-{
-  "mcpServers": {
-    "my-project-search": {
-      "command": "uv",
-      "args": [
-        "run", "pycontextify",
-        "--index-path", "./project_index",
-        "--initial-codebase", "src", "tests",
-        "--initial-documents", "README.md"
-      ],
-      "cwd": "/path/to/pycontextify"
-    }
-  }
-}
-```
-
-## Development
-
-### Code Quality
-
-```bash
-# Format code
-uv run black .
-
-# Sort imports
-uv run isort .
-
-# Lint code
-uv run flake8
-
-# Type checking
-uv run mypy pycontextify
-
-# Run tests
-uv run pytest
-
-# Run smoke tests (minimal dependencies)
-python3 tests/smoke/test_mcp_server.py
-python3 tests/smoke/test_mcp_functionality.py
-```
-
-### Testing
-
-**Unit Tests**: Comprehensive test suite with 230+ tests:
 ```bash
 # Run all tests with coverage
 uv run pytest --cov=pycontextify
 
-# Run specific test categories
-uv run pytest tests/test_*_consolidated.py
+# Run MCP-specific tests
+uv run python scripts/run_mcp_tests.py
+
+# Quick smoke test
+uv run python scripts/run_mcp_tests.py --smoke
 ```
 
-**Current Test Coverage**: 71% overall with excellent coverage of core components:
-- Vector Store: 87%
-- Reranker: 91% 
-- Metadata: 91%
-- Relationship Store: 84%
-
-### Adding Dependencies
-
-```bash
-# Add runtime dependency
-uv add package-name
-
-# Add development dependency
-uv add --dev package-name
-
-# Add optional dependency
-uv add --optional embedding-provider package-name
-```
-
-## Supported File Types
-
-### Code Files
-- Python (`.py`)
-- JavaScript/TypeScript (`.js`, `.ts`)
-- Java (`.java`)
-- C/C++ (`.c`, `.cpp`, `.h`)
-- Rust (`.rs`)
-- Go (`.go`)
-- And more...
-
-### Documents
-- PDF files (`.pdf`)
-- Markdown (`.md`)
-- Text files (`.txt`)
-
-### Web Content
-- HTML pages with optional recursive crawling (CLI: `--recursive-crawling`)
-- Configurable crawl depth (CLI: `--max-crawl-depth`, max: 3 for safety)
-- Respectful crawling with delays (CLI: `--crawl-delay`, min: 1 second)
-- Automatic content filtering and structure extraction
-
-## Performance
-
-- **Memory**: Scales with corpus size and embedding model choice
-- **Search**: Sub-second with FAISS IndexFlatIP
-- **Startup**: Lazy loading reduces initialization time
-- **Models**: 
-  - `all-MiniLM-L6-v2`: Fast, 384 dimensions
-  - `all-mpnet-base-v2`: Higher quality, 768 dimensions
-- **Auto-persistence**: Compressed storage with minimal overhead
-
-## Troubleshooting
-
-**Model Loading**: Ensure stable internet for first-time model download
-**Memory Issues**: Use `all-MiniLM-L6-v2` model or reduce batch sizes
-**Permissions**: Check write access to index directory
-**Dependencies**: Recreate environment with `uv sync --reinstall`
+CI: Manual testing ![Tests](https://img.shields.io/badge/tests-71%25_coverage-yellow)
 
 ## Contributing
 
-1. Set up development environment:
-```bash
-uv sync --extra dev
-```
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) (or follow the short flow below):
 
-2. Follow code style guidelines:
-```bash
-uv run black .
-uv run isort .
-uv run flake8
-```
+1. Fork the project
+2. Create a branch `feature/your-feature`
+3. Add tests and documentation
+4. Open a pull request
 
-3. Run tests:
-```bash
-uv run pytest
-```
+## Security
 
-4. Add type hints and documentation
-
-### Adding Embedding Providers
-
-1. Implement `BaseEmbedder` interface
-2. Register with `EmbedderFactory`
-3. Add configuration validation
-4. Update documentation
-
-### Extending Chunkers
-
-1. Inherit from `BaseChunker`
-2. Implement content-specific logic
-3. Add to `ChunkerFactory`
-4. Include relationship extraction
-
-## Roadmap
-
-- [ ] Additional embedding providers (Ollama, OpenAI)
-- [ ] Advanced relationship queries
-- [ ] Performance optimizations for large corpora
-- [ ] Web UI for index management
+Please report security issues to: Create an issue in this repository (or see [SECURITY.md](./SECURITY.md))
 
 ## License
 
-MIT License - see LICENSE file for details
+![MIT License](https://img.shields.io/badge/license-MIT-green)  
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
 
-## Support
+## Maintainers
 
-- GitHub Issues: Report bugs and feature requests
-- Documentation: This README and inline docstrings
-- Examples: See `examples/` directory (coming soon)
+- PyContextify Project — contact: Create an issue for questions or support
+
+## Tests & CI
+
+Run tests:
+
+```bash
+# Run all tests with coverage
+uv run pytest --cov=pycontextify
+
+# Run MCP-specific tests
+uv run python scripts/run_mcp_tests.py
+
+# Quick smoke test
+uv run python scripts/run_mcp_tests.py --smoke
+```
+
+CI: Manual testing ![Tests](https://img.shields.io/badge/tests-71%25_coverage-yellow)
+
+## Contributing
+
+1. Fork the project
+2. Create a branch `feature/your-feature`
+3. Add tests and documentation
+4. Open a pull request
+
+## License
+
+![MIT License](https://img.shields.io/badge/license-MIT-green)  
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
+## Maintainers
+
+- PyContextify Project — contact: Create an issue for questions or support
