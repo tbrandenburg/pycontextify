@@ -56,6 +56,33 @@ uv sync --reinstall              # Reset environment
 5. `search_with_context(query, top_k=5, include_related=False)` - With relationships
 6. `status()` - System statistics
 
+### Search Result JSON Outline
+
+Both `search` and `search_with_context` return a list of result objects (JSON). The exact shape depends on enabled features.
+
+- Always-present fields (across all modes):
+  - `score: float` – primary relevance score
+  - `source_path: string` – file path or URL of the source
+  - `source_type: string` – one of `codebase`, `document`, `webpage`
+  - `chunk_text: string` – the matched content chunk
+  - `chunk_id: string` – unique chunk identifier
+
+- Standard vector search (default):
+  - Adds: `start_char: int`, `end_char: int`, `created_at: ISO-8601 string`
+
+- Hybrid search (vector + keyword), when enabled:
+  - Adds: `vector_score: float`, `keyword_score: float`
+  - Adds: `metadata: object` with keys such as `source_type`, `source_path`, `chunk_id`, `created_at`, and optionally `file_extension`, `embedding_provider`, `embedding_model`
+
+- Reranking (cross-encoder), when enabled:
+  - Adds: `original_score: float`, `rerank_score: float` (and `score` becomes the final combined score)
+
+- Context enrichment via `search_with_context(..., include_related=True)` (if relationships are enabled):
+  - Adds: `relationships: object` (e.g., `references`, `imports`, `entities`)
+  - Adds: `related_chunks: array` of up to 3 objects: `{ source_path, chunk_text (truncated), relationship_type }`
+
+- Error behavior: Both functions return `[]` (empty list) on error or no results.
+
 ## Configuration
 
 **Priority**: CLI args > Environment variables > Defaults
