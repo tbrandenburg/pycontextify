@@ -21,6 +21,7 @@ uv run pycontextify --verbose
 - [Quickstart](#quickstart)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Chunking Techniques](#chunking-techniques)
 - [Configuration](#configuration)
 - [API Reference](#api-reference)
 - [Tests & CI](#tests--ci)
@@ -79,6 +80,57 @@ Server provides 6 MCP functions:
   - status(): Get system status and statistics
 MCP server ready and listening for requests...
 ```
+
+## Chunking Techniques
+
+PyContextify employs a **hierarchical chunking system** with specialized processors for different content types, optimizing semantic search while preserving structural integrity.
+
+### Content-Aware Chunking Strategies
+
+#### 🔧 **Code Chunking** (`CodeChunker`)
+- **Primary Strategy**: Structure-aware splitting by function/class boundaries
+- **Language Support**: Python, JavaScript, TypeScript, Java, C/C++, Rust, Go, and more
+- **Boundary Detection**: `def`, `class`, `function`, `const`, `var`, `let`, `public`, `private`, `protected`
+- **Relationship Extraction**: Functions, classes, imports, variable assignments
+- **Fallback**: Token-based splitting when code blocks exceed size limits
+
+#### 📄 **Document Chunking** (`DocumentChunker`)
+- **Primary Strategy**: Markdown header hierarchy preservation (`#`, `##`, `###`)
+- **Section Tracking**: Maintains parent-section relationships for context
+- **Content Filtering**: Requires minimum 50 characters per meaningful chunk
+- **Relationship Extraction**: Links `[text](url)`, citations `[1]`, `(Smith 2020)`, emphasized terms
+- **Fallback**: Token-based splitting when no structure is detected
+
+#### 🌐 **Webpage Chunking** (`WebPageChunker`)
+- **Primary Strategy**: HTML semantic structure awareness (extends DocumentChunker)
+- **Web-Specific Processing**: Domain extraction, URL path analysis, link discovery
+- **Content Processing**: Works with cleaned HTML text content
+- **Relationship Extraction**: External links (max 10), email addresses, domain tags
+- **Metadata Enhancement**: URL parsing, path segmentation, contact information
+
+#### ⚡ **Simple Chunking** (`SimpleChunker`)
+- **Fallback Strategy**: Pure token-based chunking for unstructured content
+- **Basic Relationships**: Capitalized word extraction for entity hints
+- **Universal Compatibility**: Handles any text format as last resort
+
+### Technical Configuration
+
+```python
+chunk_size: int = 512        # Target tokens per chunk (configurable)
+chunk_overlap: int = 64      # Overlap between adjacent chunks  
+enable_relationships: bool   # Extract lightweight knowledge graph data
+max_relationships_per_chunk: int  # Limit relationships to avoid noise
+```
+
+### Key Features
+
+- **Smart Selection**: Automatic chunker selection via `ChunkerFactory` based on content type
+- **Token Estimation**: `words × 1.3` heuristic for English text with automatic oversized chunk splitting
+- **Position Tracking**: Maintains precise character start/end positions for all chunks
+- **Metadata Preservation**: Source path, embedding info, creation timestamps, and custom metadata
+- **Relationship Graph**: Lightweight knowledge extraction (imports, references, citations, links)
+
+**Bottom Line**: PyContextify's chunking system intelligently adapts to content structure—respecting code boundaries, document hierarchy, and web semantics—while maintaining configurable token limits and extracting contextual relationships for enhanced semantic search.
 
 ## Configuration
 
