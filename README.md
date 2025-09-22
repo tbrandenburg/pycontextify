@@ -87,28 +87,28 @@ PyContextify employs a **hierarchical chunking system** with specialized process
 
 ### Content-Aware Chunking Strategies
 
-#### 🔧 **Code Chunking** (`CodeChunker`)
+#### **Code Chunking** (`CodeChunker`)
 - **Primary Strategy**: Structure-aware splitting by function/class boundaries
 - **Language Support**: Python, JavaScript, TypeScript, Java, C/C++, Rust, Go, and more
 - **Boundary Detection**: `def`, `class`, `function`, `const`, `var`, `let`, `public`, `private`, `protected`
 - **Relationship Extraction**: Functions, classes, imports, variable assignments
 - **Fallback**: Token-based splitting when code blocks exceed size limits
 
-#### 📄 **Document Chunking** (`DocumentChunker`)
+#### **Document Chunking** (`DocumentChunker`)
 - **Primary Strategy**: Markdown header hierarchy preservation (`#`, `##`, `###`)
 - **Section Tracking**: Maintains parent-section relationships for context
 - **Content Filtering**: Requires minimum 50 characters per meaningful chunk
 - **Relationship Extraction**: Links `[text](url)`, citations `[1]`, `(Smith 2020)`, emphasized terms
 - **Fallback**: Token-based splitting when no structure is detected
 
-#### 🌐 **Webpage Chunking** (`WebPageChunker`)
+#### **Webpage Chunking** (`WebPageChunker`)
 - **Primary Strategy**: HTML semantic structure awareness (extends DocumentChunker)
 - **Web-Specific Processing**: Domain extraction, URL path analysis, link discovery
 - **Content Processing**: Works with cleaned HTML text content
 - **Relationship Extraction**: External links (max 10), email addresses, domain tags
 - **Metadata Enhancement**: URL parsing, path segmentation, contact information
 
-#### ⚡ **Simple Chunking** (`SimpleChunker`)
+#### **Simple Chunking** (`SimpleChunker`)
 - **Fallback Strategy**: Pure token-based chunking for unstructured content
 - **Basic Relationships**: Capitalized word extraction for entity hints
 - **Universal Compatibility**: Handles any text format as last resort
