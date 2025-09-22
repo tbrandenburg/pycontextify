@@ -399,6 +399,13 @@ class TestEnhancedConfig:
 
     def test_env_file_loading_with_advanced_settings(self, monkeypatch):
         """Test loading advanced settings from .env file."""
+        # Clear any existing environment variables first to ensure clean test
+        pycontextify_keys = [
+            k for k in os.environ.keys() if k.startswith("PYCONTEXTIFY_")
+        ]
+        for key in pycontextify_keys:
+            monkeypatch.delenv(key, raising=False)
+
         with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
             f.write("PYCONTEXTIFY_USE_HYBRID_SEARCH=false\n")
             f.write("PYCONTEXTIFY_KEYWORD_WEIGHT=0.4\n")
