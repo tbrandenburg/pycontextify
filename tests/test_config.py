@@ -321,25 +321,19 @@ class TestEnhancedConfig:
         config = Config()
 
         assert config.use_hybrid_search is True
-        assert config.use_reranking is True
         assert config.keyword_weight == 0.3
-        assert config.reranking_model == "cross-encoder/ms-marco-MiniLM-L-6-v2"
         assert config.pdf_engine == "pymupdf"
 
     def test_custom_advanced_search_settings(self, monkeypatch):
         """Test custom advanced search settings from environment."""
         monkeypatch.setenv("PYCONTEXTIFY_USE_HYBRID_SEARCH", "false")
-        monkeypatch.setenv("PYCONTEXTIFY_USE_RERANKING", "false")
         monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", "0.5")
-        monkeypatch.setenv("PYCONTEXTIFY_RERANKING_MODEL", "custom-model")
         monkeypatch.setenv("PYCONTEXTIFY_PDF_ENGINE", "pypdf2")
 
         config = Config()
 
         assert config.use_hybrid_search is False
-        assert config.use_reranking is False
         assert config.keyword_weight == 0.5
-        assert config.reranking_model == "custom-model"
         assert config.pdf_engine == "pypdf2"
 
     def test_keyword_weight_validation(self, monkeypatch):
@@ -395,16 +389,12 @@ class TestEnhancedConfig:
 
         # Check that new settings are included
         assert "use_hybrid_search" in summary
-        assert "use_reranking" in summary
         assert "keyword_weight" in summary
-        assert "reranking_model" in summary
         assert "pdf_engine" in summary
 
         # Verify values
         assert summary["use_hybrid_search"] is True
-        assert summary["use_reranking"] is True
         assert summary["keyword_weight"] == 0.3
-        assert summary["reranking_model"] == "cross-encoder/ms-marco-MiniLM-L-6-v2"
         assert summary["pdf_engine"] == "pymupdf"
 
     def test_env_file_loading_with_advanced_settings(self, monkeypatch):

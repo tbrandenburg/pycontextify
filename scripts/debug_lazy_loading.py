@@ -19,7 +19,6 @@ def debug_index_manager():
         "auto_persist": False,
     }
     config = Config(config_overrides=config_overrides)
-    config.use_reranking = False  # Disable for debugging
     config.use_hybrid_search = False  # Disable for debugging
 
     with tempfile.TemporaryDirectory() as temp_dir:

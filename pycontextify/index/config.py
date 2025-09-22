@@ -98,11 +98,7 @@ class Config:
         self.use_hybrid_search = self._get_bool_config(
             "PYCONTEXTIFY_USE_HYBRID_SEARCH", True
         )
-        self.use_reranking = self._get_bool_config("PYCONTEXTIFY_USE_RERANKING", True)
         self.keyword_weight = self._get_float_config("PYCONTEXTIFY_KEYWORD_WEIGHT", 0.3)
-        self.reranking_model = os.getenv(
-            "PYCONTEXTIFY_RERANKING_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-        )
 
         # PDF processing settings
         self.pdf_engine = os.getenv("PYCONTEXTIFY_PDF_ENGINE", "pymupdf")
@@ -294,9 +290,7 @@ class Config:
             "backup_indices": self.backup_indices,
             "max_backups": self.max_backups,
             "use_hybrid_search": self.use_hybrid_search,
-            "use_reranking": self.use_reranking,
             "keyword_weight": self.keyword_weight,
-            "reranking_model": self.reranking_model,
             "pdf_engine": self.pdf_engine,
         }
 

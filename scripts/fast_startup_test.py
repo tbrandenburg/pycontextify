@@ -15,7 +15,6 @@ def test_fast_startup_config():
     config = Config()
 
     # Optimization 1: Disable expensive components
-    config.use_reranking = False  # Saves ~2s
     config.use_hybrid_search = False  # Minor savings
     config.auto_load = False  # Don't load existing indices
     config.auto_persist = False  # Don't persist during tests
@@ -84,7 +83,6 @@ def test_lazy_loading_concept():
 
     # This shows how we could implement lazy loading
     config = Config()
-    config.use_reranking = False
     config.use_hybrid_search = False
     config.auto_load = False
     config.auto_persist = False

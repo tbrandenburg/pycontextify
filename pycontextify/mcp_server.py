@@ -723,7 +723,6 @@ def status() -> Dict[str, Any]:
                 "index_document",
                 "index_webpage",
                 "search",
-                "search_with_context",
                 "reset_index",
                 "status",
             ],
@@ -984,14 +983,12 @@ def main():
         setup_logging(args)
 
         logger.info("Starting PyContextify MCP Server...")
-        logger.info("Server provides 6 simplified MCP functions:")
+        logger.info("Server provides 5 simplified MCP functions:")
         logger.info("  - index_code(path): Index codebase directory")
         logger.info("  - index_document(path): Index document")
         logger.info("  - index_webpage(url, recursive, max_depth): Index web content")
         logger.info("  - search(query, top_k): Basic semantic search")
-        logger.info(
-            "  - search_with_context(query, top_k, include_related): Enhanced search with relationships"
-        )
+        logger.info("  - reset_index(confirm=True): Clear all indexed content")
         logger.info("  - status(): Get system status and statistics")
 
         # Convert CLI args to config overrides

@@ -91,28 +91,10 @@ def main():
             print("    ⏭️ Hybrid search disabled")
             hybrid_time = 0
 
-        # Initialize reranker
+        # Reranker feature removed
         print("\n6. Reranker initialization...")
+        print("    ⏭️ Reranker feature removed")
         reranker_time = 0
-        if config.use_reranking:
-            try:
-                from pycontextify.index.reranker import CrossEncoderReranker
-
-                def create_and_warmup_reranker():
-                    reranker = CrossEncoderReranker(model_name=config.reranking_model)
-                    if reranker.is_available:
-                        reranker.warmup()
-                    return reranker
-
-                reranker, reranker_time = time_operation(
-                    "CrossEncoderReranker + warmup", create_and_warmup_reranker
-                )
-                total_time += reranker_time
-            except ImportError as e:
-                print(f"    ❌ Reranker unavailable: {e}")
-                reranker_time = 0
-        else:
-            print("    ⏭️ Reranker disabled")
 
         print(f"\n{'='*50}")
         print("DETAILED TIMING BREAKDOWN:")
@@ -124,7 +106,7 @@ def main():
         print(f"Get dimension:             {dimension_time:.2f}s")
         print(f"VectorStore:               {vector_time:.2f}s")
         print(f"HybridSearchEngine:        {hybrid_time:.2f}s")
-        print(f"Reranker + warmup:         {reranker_time:.2f}s")
+        print(f"Reranker (removed):        {reranker_time:.2f}s")
         print(f"{'='*50}")
         print(f"TOTAL STARTUP TIME:        {total_time:.2f}s")
 
