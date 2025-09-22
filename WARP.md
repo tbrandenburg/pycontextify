@@ -36,7 +36,7 @@ uv sync --reinstall              # Reset environment
 - **VectorStore**: FAISS wrapper with persistence (`vector_store.py`)
 - **EmbedderFactory**: Provider system (`embedders/factory.py`)
 - **HybridSearchEngine**: Vector + keyword search (`hybrid_search.py`)
-- **RelationshipStore**: Knowledge graph without external DB (`relationship_store.py`)
+- **RelationshipStore**: Lightweight knowledge graph storage (`relationship_store.py`)
 - **Content Chunkers**: Code/document/web-aware processing (`chunker.py`)
 
 ### Pipeline: Load → Chunk → Embed → Store → Search
@@ -53,7 +53,7 @@ uv sync --reinstall              # Reset environment
 2. `index_document(path)` - Documents (PDF, MD, TXT)
 3. `index_webpage(url, recursive=False, max_depth=1)` - Web content with optional recursion
 4. `search(query, top_k=5)` - Hybrid semantic + keyword search
-5. `search_with_context(query, top_k=5, include_related=False)` - With relationships
+5. `reset_index(remove_files=True, confirm=False)` - Clear index data
 6. `status()` - System statistics
 
 ### Search Result JSON Outline
@@ -156,17 +156,17 @@ Consistent response envelope with standardized result objects:
 **Lightweight approach** - no external database required
 
 **Relationship types**: function_call, import, reference, link, hierarchy, tag  
-**Access**: `search_with_context(query, include_related=True)`
+**Access**: Relationships are extracted but simplified API focuses on core search
 
 ## Testing
 
-**230+ tests, 71% coverage**
-- Core components: 87-91% coverage
+**247 tests, 67% coverage - 100% pass rate**
+- Core components: 85-87% coverage
 - Run: `uv run pytest --cov=pycontextify`
 - MCP test runner: `uv run python scripts/run_mcp_tests.py`
 - Quick smoke test: `uv run python scripts/run_mcp_tests.py --smoke`
-- Consolidated test files: `test_*_consolidated.py`
-- Main test files: `test_mcp_simple.py` (8 tests), `test_integration.py` (4 tests)
+- Consolidated test files: 13 focused test modules
+- All persistence tests passing after auto-load fixes
 
 ## File Support
 
@@ -205,5 +205,5 @@ Consistent response envelope with standardized result objects:
 **UV**: Fast dependency management, lockfiles, optional dependencies  
 **FAISS**: High-performance vector search with CPU/GPU support  
 **Lazy Loading**: Fast startup, components loaded on demand  
-**Simplified MCP**: 6 essential functions, relationships via enhanced search  
+**Simplified MCP**: 6 essential functions, clean and focused API
 **No External DB**: File-based persistence, lightweight knowledge graph

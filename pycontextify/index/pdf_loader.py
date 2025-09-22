@@ -6,7 +6,7 @@ different backends (PyMuPDF, PyPDF2, pdfplumber) with fallback support.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -205,9 +205,9 @@ class PDFLoader:
         # Look for section titles (common patterns)
         section_patterns = [
             r"^\d+\.\d*\s+(.+)$",  # Numbered sections like "1.2 Introduction"
-            r"^[A-Z][A-Z\s]{5,50}$",  # ALL CAPS headings
+            r"^([A-Z][A-Z\s]{5,50})$",  # ALL CAPS headings (with capture group)
             r"^\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,5})\s*$",  # Title Case headings
-            r"^\s*(Chapter|Section|Part|Annex|Appendix)\s+([\w\s]+)$",  # Explicit chapter/section markers
+            r"^\s*((Chapter|Section|Part|Annex|Appendix)\s+[\w\s]+)$",  # Explicit chapter/section markers
         ]
 
         # Check first few lines for section titles
@@ -220,11 +220,8 @@ class PDFLoader:
             for pattern in section_patterns:
                 match = re.match(pattern, line)
                 if match:
-                    # Extract the title part
-                    if match.lastindex and match.lastindex > 1:
-                        title = match.group(2).strip()
-                    else:
-                        title = match.group(1).strip()
+                    # Extract the title part - always use group 1 as all patterns have it
+                    title = match.group(1).strip()
 
                     if title and len(title) > 2:
                         context["section_title"] = title
@@ -245,7 +242,6 @@ class PDFLoader:
             Dictionary with comprehensive PDF metadata
         """
         path = Path(file_path)
-        import os
         from datetime import datetime
 
         stat = path.stat()

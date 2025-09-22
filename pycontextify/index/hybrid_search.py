@@ -6,9 +6,7 @@ with traditional keyword search using TF-IDF and BM25 algorithms.
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
-
-import numpy as np
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +49,6 @@ class HybridSearchEngine:
     def _initialize_keyword_search(self):
         """Initialize keyword search components."""
         try:
-            from rank_bm25 import BM25Okapi
             from sklearn.feature_extraction.text import TfidfVectorizer
 
             self.tfidf_vectorizer = TfidfVectorizer(

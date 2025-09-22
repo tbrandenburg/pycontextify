@@ -69,7 +69,7 @@ More content to ensure we have multiple chunks.
             expected_files = [
                 "test_index.faiss",
                 "test_index.pkl",
-                "test_index_relationships.pkl",
+                # Note: relationships file removed in simplified version
             ]
             actual_files = [f.name for f in index_files]
 
@@ -210,8 +210,9 @@ More content to ensure we have multiple chunks.
             manager1 = IndexManager(config1)
             manager1.index_document(str(test_file))
 
-            # Remove one file
-            (test_index_dir / "test_index_relationships.pkl").unlink()
+            # Remove one file (relationships file no longer exists in simplified version)
+            # Remove the metadata file instead
+            (test_index_dir / "test_index.pkl").unlink()
 
             # Try to load - should handle gracefully
             config2 = Config(config_overrides=config_overrides)

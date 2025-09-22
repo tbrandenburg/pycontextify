@@ -216,8 +216,10 @@ from web development to data science and artificial intelligence.
                 score = result.relevance_score
                 # Different embedding models use different score ranges
                 # Some use [0,1], others use [-1,1], and some use arbitrary ranges
+                import numpy as np
+
                 assert isinstance(
-                    score, (int, float)
+                    score, (int, float, np.integer, np.floating)
                 ), f"Score should be numeric for '{query}': {score}"
 
                 # For semantic search, we expect the score to exist and be finite
@@ -235,47 +237,32 @@ from web development to data science and artificial intelligence.
 
     def _test_relationship_search(self, index_manager):
         """Test relationship-aware search functionality."""
-        # Test with relationship context
+        # Test basic search with relationship metadata
         query = "Python programming language"
 
         # Basic search
         basic_response = index_manager.search(query, top_k=5)
+        assert hasattr(basic_response, "success")
 
-        # Search with context (if supported)
-        try:
-            context_response = index_manager.search_with_context(
-                query, top_k=5, include_related=True
-            )
+        print(f"✅ Relationship search test:")
+        print(f"   - Basic search: {len(basic_response.results)} results")
 
-            # Both should return SearchResponse objects
-            assert hasattr(basic_response, "success")
-            assert hasattr(context_response, "success")
+        # Verify relationship metadata if chunks have it
+        sample_chunks = index_manager.metadata_store.get_all_chunks()
+        if sample_chunks and index_manager.config.enable_relationships:
+            chunk_with_refs = None
+            for chunk in sample_chunks:
+                if chunk.references or chunk.tags:
+                    chunk_with_refs = chunk
+                    break
 
-            print(f"✅ Relationship search test:")
-            print(f"   - Basic search: {len(basic_response.results)} results")
-            print(f"   - Context search: {len(context_response.results)} results")
+            if chunk_with_refs:
+                print(f"✅ Found chunk with relationships:")
+                print(f"   - References: {len(chunk_with_refs.references)}")
+                print(f"   - Tags: {len(chunk_with_refs.tags)}")
 
-            # Verify relationship metadata if chunks have it
-            sample_chunks = index_manager.metadata_store.get_all_chunks()
-            if sample_chunks and index_manager.config.enable_relationships:
-                chunk_with_refs = None
-                for chunk in sample_chunks:
-                    if chunk.references or chunk.tags:
-                        chunk_with_refs = chunk
-                        break
-
-                if chunk_with_refs:
-                    print(f"✅ Found chunk with relationships:")
-                    print(f"   - References: {len(chunk_with_refs.references)}")
-                    print(f"   - Tags: {len(chunk_with_refs.tags)}")
-
-                    if chunk_with_refs.references:
-                        print(
-                            f"   - Sample references: {chunk_with_refs.references[:3]}"
-                        )
-
-        except Exception as e:
-            print(f"⚠️  Relationship search not fully implemented: {e}")
+                if chunk_with_refs.references:
+                    print(f"   - Sample references: {chunk_with_refs.references[:3]}")
 
     @pytest.mark.slow
     def test_multiple_document_types(self, index_manager):
@@ -537,8 +524,10 @@ if __name__ == "__main__":
                         # For mocked embeddings, just check that we get a valid numeric score
                         import math
 
+                        import numpy as np
+
                         assert isinstance(
-                            score, (int, float)
+                            score, (int, float, np.integer, np.floating)
                         ), f"Score should be numeric for '{query}': {score}"
                         assert math.isfinite(
                             score
@@ -705,8 +694,10 @@ print(f'Mean Squared Error: {mse}')
                         # Just check that we get a valid numeric score
                         import math
 
+                        import numpy as np
+
                         assert isinstance(
-                            score, (int, float)
+                            score, (int, float, np.integer, np.floating)
                         ), f"Score should be numeric for '{query}': {score}"
                         assert math.isfinite(
                             score

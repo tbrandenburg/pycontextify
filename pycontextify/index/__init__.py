@@ -8,7 +8,6 @@ and lightweight knowledge graph capabilities.
 from .config import Config
 from .manager import IndexManager
 from .metadata import ChunkMetadata, MetadataStore, SourceType
-from .relationship_store import RelationshipStore
 
 __all__ = [
     "IndexManager",
@@ -16,5 +15,4 @@ __all__ = [
     "ChunkMetadata",
     "SourceType",
     "MetadataStore",
-    "RelationshipStore",
 ]

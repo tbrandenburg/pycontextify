@@ -62,7 +62,7 @@ uv run pycontextify
 # - index_document(path) 
 # - index_webpage(url, recursive=False, max_depth=1)
 # - search(query, top_k=5)
-# - search_with_context(query, top_k=5, include_related=False)
+# - reset_index(remove_files=True, confirm=False)
 # - status()
 ```
 
@@ -70,12 +70,12 @@ Expected output:
 
 ```
 🚀 Starting PyContextify MCP Server...
-Server provides 6 simplified MCP functions:
+Server provides 6 MCP functions:
   - index_code(path): Index codebase directory
-  - index_document(path): Index document
+  - index_document(path): Index document files (PDF, MD, TXT)
   - index_webpage(url, recursive, max_depth): Index web content
-  - search(query, top_k): Basic semantic search
-  - search_with_context(query, top_k, include_related): Enhanced search with relationships
+  - search(query, top_k): Semantic search
+  - reset_index(remove_files, confirm): Clear index data
   - status(): Get system status and statistics
 MCP server ready and listening for requests...
 ```
@@ -92,7 +92,7 @@ Copy `.env.example` to `.env` and customize as needed.
 
 ## API Reference
 
-PyContextify exposes 6 MCP (Model Context Protocol) functions for semantic search and indexing:  
+PyContextify exposes 6 MCP (Model Context Protocol) functions for semantic search and indexing:
 Full docs: See [WARP.md](./WARP.md) for development guidance and architecture details
 
 ## Tests & CI
@@ -110,7 +110,7 @@ uv run python scripts/run_mcp_tests.py
 uv run python scripts/run_mcp_tests.py --smoke
 ```
 
-CI: Manual testing ![Tests](https://img.shields.io/badge/tests-71%25_coverage-yellow)
+CI: Manual testing ![Tests](https://img.shields.io/badge/tests-100%25_pass-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-67%25-yellow)
 
 ## Contributing
 
@@ -134,35 +134,3 @@ This project is licensed under the MIT License — see the [LICENSE](./LICENSE) 
 
 - PyContextify Project — contact: Create an issue for questions or support
 
-## Tests & CI
-
-Run tests:
-
-```bash
-# Run all tests with coverage
-uv run pytest --cov=pycontextify
-
-# Run MCP-specific tests
-uv run python scripts/run_mcp_tests.py
-
-# Quick smoke test
-uv run python scripts/run_mcp_tests.py --smoke
-```
-
-CI: Manual testing ![Tests](https://img.shields.io/badge/tests-71%25_coverage-yellow)
-
-## Contributing
-
-1. Fork the project
-2. Create a branch `feature/your-feature`
-3. Add tests and documentation
-4. Open a pull request
-
-## License
-
-![MIT License](https://img.shields.io/badge/license-MIT-green)  
-This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
-
-## Maintainers
-
-- PyContextify Project — contact: Create an issue for questions or support

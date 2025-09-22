@@ -5,9 +5,7 @@ components for indexing operations, persistence, and search functionality.
 """
 
 import logging
-import os
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import psutil
 
@@ -21,16 +19,12 @@ from .models import (
     SearchPerformanceLogger,
     SearchResponse,
     SearchResult,
-    create_query_analysis,
     create_search_performance_info,
     create_search_provenance,
     create_structured_metadata,
-    create_structured_position,
     create_structured_scores,
     enhance_search_results_with_ranking,
 )
-from .relationship_store import RelationshipStore
-from .search_intelligence import SearchIntelligenceFramework
 from .vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -49,12 +43,9 @@ class IndexManager:
 
         # Initialize components
         self.metadata_store = MetadataStore()
-        self.relationship_store = RelationshipStore()
         self.embedder = None
         self.vector_store = None
         self.hybrid_search = None
-        self.reranker = None
-
         # Store embedder configuration for lazy loading
         self._embedder_config = None
         self._embedder_initialized = False
@@ -62,12 +53,8 @@ class IndexManager:
         # Initialize performance logger
         self.performance_logger = SearchPerformanceLogger()
 
-        # Initialize search intelligence framework (Phase 3)
-        self._initialize_search_intelligence()
-
-        # Initialize enhanced search components (these are lightweight)
+        # Initialize hybrid search (lightweight)
         self._initialize_hybrid_search()
-        self._initialize_reranker()
 
         # Auto-load existing index if enabled
         if self.config.auto_load:
@@ -134,47 +121,6 @@ class IndexManager:
         except ImportError as e:
             logger.warning(f"Could not initialize hybrid search: {e}")
             self.hybrid_search = None
-
-    def _initialize_reranker(self) -> None:
-        """Initialize cross-encoder reranker if enabled."""
-        if not self.config.use_reranking:
-            logger.info("Reranking disabled by configuration")
-            return
-
-        try:
-            from .reranker import CrossEncoderReranker
-
-            self.reranker = CrossEncoderReranker(model_name=self.config.reranking_model)
-
-            # Warm up the model
-            if self.reranker.is_available:
-                self.reranker.warmup()
-
-            logger.info(
-                f"Initialized reranker with model: {self.config.reranking_model}"
-            )
-        except ImportError as e:
-            logger.warning(f"Could not initialize reranker: {e}")
-            self.reranker = None
-
-    def _initialize_search_intelligence(self) -> None:
-        """Initialize search intelligence framework."""
-        try:
-            # Create storage path based on config
-            intelligence_path = None
-            if hasattr(self.config, "index_directory") and self.config.index_directory:
-                intelligence_path = os.path.join(
-                    self.config.index_directory, "search_intelligence.json"
-                )
-
-            self.search_intelligence = SearchIntelligenceFramework(
-                storage_path=intelligence_path,
-                max_history=getattr(self.config, "max_search_history", 10000),
-            )
-            logger.info("Initialized search intelligence framework")
-        except Exception as e:
-            logger.warning(f"Could not initialize search intelligence: {e}")
-            self.search_intelligence = None
 
     def _create_smart_preview(
         self, text: str, entity: str, max_length: int = 150
@@ -413,15 +359,15 @@ class IndexManager:
         try:
             paths = self.config.get_index_paths()
 
-            # Check if index files exist
-            if all(path.exists() for path in paths.values()):
+            # Check if essential index files exist (metadata and vector index)
+            essential_paths = {
+                k: v for k, v in paths.items() if k in ["metadata", "index"]
+            }
+            if all(path.exists() for path in essential_paths.values()):
                 logger.info("Loading existing index...")
 
                 # First load metadata to get embedding info
                 self.metadata_store.load_from_file(str(paths["metadata"]))
-
-                # Load relationships
-                self.relationship_store.load_from_file(str(paths["relationships"]))
 
                 # Check if we have chunks to load
                 if self.metadata_store.get_stats().get("total_chunks", 0) > 0:
@@ -496,11 +442,6 @@ class IndexManager:
             # Save metadata
             self.metadata_store.save_to_file(
                 str(paths["metadata"]), self.config.compress_metadata
-            )
-
-            # Save relationships
-            self.relationship_store.save_to_file(
-                str(paths["relationships"]), self.config.compress_metadata
             )
 
             logger.info("Auto-saved index to disk")
@@ -701,11 +642,6 @@ class IndexManager:
                 if faiss_id is not None:
                     self.metadata_store.remove_chunk(faiss_id)
 
-            # Remove from relationship store
-            if self.config.enable_relationships and self.relationship_store:
-                for chunk in existing_chunks:
-                    self.relationship_store.remove_chunk_relationships(chunk.chunk_id)
-
             chunks_removed = len(existing_chunks)
             logger.info(f"Removed {chunks_removed} existing chunks for re-indexing")
 
@@ -740,756 +676,15 @@ class IndexManager:
         for chunk, faiss_id in zip(chunks, faiss_ids):
             self.metadata_store.add_chunk(chunk)
 
-        # Build relationships
-        if self.config.enable_relationships:
-            self.relationship_store.build_relationships_from_chunks(chunks)
-
         return len(chunks)
-
-    def _analyze_query(self, query: str) -> Dict[str, Any]:
-        """Advanced query analysis with semantic understanding and search intelligence.
-
-        Args:
-            query: The search query to analyze
-
-        Returns:
-            Comprehensive query analysis with enhanced insights
-        """
-        # Phase 3.1: Enhanced Query Preprocessing
-        normalized_query = self._normalize_query(query)
-
-        # Phase 3.2: Advanced Intent Detection
-        intent_analysis = self._analyze_query_intent(normalized_query, query)
-
-        # Phase 3.3: Semantic Complexity Analysis
-        complexity_analysis = self._analyze_query_complexity(query, normalized_query)
-
-        # Phase 3.4: Domain and Context Detection
-        domain_analysis = self._analyze_query_domain(normalized_query)
-
-        # Phase 3.5: Query Quality Assessment
-        quality_analysis = self._assess_query_quality(query, normalized_query)
-
-        # Phase 3.6: Intelligent Search Suggestions
-        suggestions = self._generate_intelligent_suggestions(
-            query, normalized_query, intent_analysis, domain_analysis
-        )
-
-        # Phase 3.7: Search Strategy Recommendations
-        search_strategies = self._recommend_search_strategies(
-            query, intent_analysis, complexity_analysis, domain_analysis
-        )
-
-        # Compile comprehensive analysis
-        analysis = create_query_analysis(
-            original_query=query,
-            normalized_query=(
-                normalized_query if normalized_query != query.lower() else None
-            ),
-            query_length=len(query),
-            word_count=len(query.split()),
-            detected_intent=intent_analysis["primary_intent"],
-            complexity_score=complexity_analysis["overall_score"],
-            suggested_alternatives=(
-                suggestions.get("alternatives") if suggestions else None
-            ),
-            expansion_terms=suggestions.get("expansions") if suggestions else None,
-        )
-
-        # Add Phase 3 enhanced analysis
-        analysis.update(
-            {
-                "intent_analysis": intent_analysis,
-                "complexity_analysis": complexity_analysis,
-                "domain_analysis": domain_analysis,
-                "quality_analysis": quality_analysis,
-                "search_strategies": search_strategies,
-                "intelligent_suggestions": suggestions,
-            }
-        )
-
-        return analysis
-
-    def _normalize_query(self, query: str) -> str:
-        """Enhanced query normalization with intelligent preprocessing."""
-        import re
-
-        # Basic normalization
-        normalized = query.strip().lower()
-
-        # Handle multiple whitespace
-        normalized = re.sub(r"\s+", " ", normalized)
-
-        # Handle common query patterns
-        normalized = re.sub(r'["\']+', "", normalized)  # Remove quotes
-        normalized = re.sub(r"[!?]{2,}", "!", normalized)  # Normalize punctuation
-
-        # Handle common abbreviations and expansions
-        expansions = {
-            "how to": "how to",  # Keep as is
-            "howto": "how to",
-            "what's": "what is",
-            "where's": "where is",
-            "can't": "cannot",
-            "won't": "will not",
-        }
-
-        for abbrev, expansion in expansions.items():
-            normalized = normalized.replace(abbrev, expansion)
-
-        return normalized
-
-    def _analyze_query_intent(
-        self, normalized_query: str, original_query: str
-    ) -> Dict[str, Any]:
-        """Advanced intent analysis with confidence scoring."""
-        import re
-
-        # Intent patterns with confidence weights
-        intent_patterns = {
-            "informational": {
-                "patterns": [
-                    r"\b(how|what|why|when|where|which|who)\b",
-                    r"\b(explain|describe|define)\b",
-                ],
-                "confidence": 0.8,
-            },
-            "navigational": {
-                "patterns": [
-                    r"\b(find|show|get|search|locate|lookup)\b",
-                    r"\b(go to|navigate to)\b",
-                ],
-                "confidence": 0.7,
-            },
-            "example_seeking": {
-                "patterns": [
-                    r"\b(example|sample|demo|tutorial|walkthrough)\b",
-                    r"\b(show me|give me).*\b(example|sample)\b",
-                ],
-                "confidence": 0.9,
-            },
-            "comparative": {
-                "patterns": [
-                    r"\b(compare|vs|versus|difference|better|best|worst)\b",
-                    r"\b(which is|what\'s the difference)\b",
-                ],
-                "confidence": 0.85,
-            },
-            "troubleshooting": {
-                "patterns": [
-                    r"\b(error|bug|issue|problem|fix|solve|troubleshoot)\b",
-                    r"\b(not working|doesn\'t work)\b",
-                ],
-                "confidence": 0.9,
-            },
-            "implementation": {
-                "patterns": [
-                    r"\b(implement|create|build|make|develop|code)\b",
-                    r"\b(step by step|guide)\b",
-                ],
-                "confidence": 0.8,
-            },
-        }
-
-        # Score each intent
-        intent_scores = {}
-        for intent, config in intent_patterns.items():
-            score = 0
-            for pattern in config["patterns"]:
-                matches = len(re.findall(pattern, normalized_query))
-                score += matches * config["confidence"]
-            intent_scores[intent] = score
-
-        # Determine primary and secondary intents
-        sorted_intents = sorted(intent_scores.items(), key=lambda x: x[1], reverse=True)
-
-        primary_intent = sorted_intents[0][0] if sorted_intents[0][1] > 0 else "general"
-        secondary_intent = (
-            sorted_intents[1][0]
-            if len(sorted_intents) > 1 and sorted_intents[1][1] > 0
-            else None
-        )
-
-        # Calculate confidence
-        total_score = sum(intent_scores.values())
-        primary_confidence = (
-            intent_scores.get(primary_intent, 0.0) / max(total_score, 1.0)
-            if total_score > 0
-            else 0.1
-        )
-
-        return {
-            "primary_intent": primary_intent,
-            "secondary_intent": secondary_intent,
-            "confidence": round(primary_confidence, 3),
-            "all_scores": intent_scores,
-            "intent_indicators": self._extract_intent_indicators(
-                normalized_query, original_query
-            ),
-        }
-
-    def _analyze_query_complexity(
-        self, query: str, normalized_query: str
-    ) -> Dict[str, Any]:
-        """Comprehensive query complexity analysis."""
-        import re
-
-        word_count = len(query.split())
-        char_count = len(query)
-
-        # Lexical complexity
-        unique_words = len(set(normalized_query.split()))
-        lexical_diversity = unique_words / max(word_count, 1)
-
-        # Syntactic complexity
-        punctuation_count = len(re.findall(r'[.,;:!?()\[\]{}"\']', query))
-        syntactic_score = min(punctuation_count / max(char_count, 1) * 10, 1.0)
-
-        # Semantic complexity
-        technical_terms = len(
-            re.findall(r"\b[A-Z]{2,}\b|\b\w*[A-Z]\w*[A-Z]\w*\b", query)
-        )
-        semantic_score = min(technical_terms / max(word_count, 1) * 2, 1.0)
-
-        # Query structure complexity
-        has_operators = bool(re.search(r"\b(and|or|not|AND|OR|NOT)\b", query))
-        has_quotes = '"' in query or "'" in query
-        has_wildcards = "*" in query or "?" in query
-
-        structure_features = sum([has_operators, has_quotes, has_wildcards])
-        structure_score = min(structure_features / 3.0, 1.0)
-
-        # Overall complexity calculation
-        complexity_factors = {
-            "length": min(char_count / 100, 1.0),
-            "word_count": min(word_count / 20, 1.0),
-            "lexical_diversity": lexical_diversity,
-            "syntactic": syntactic_score,
-            "semantic": semantic_score,
-            "structure": structure_score,
-        }
-
-        overall_score = sum(complexity_factors.values()) / len(complexity_factors)
-
-        # Complexity classification
-        if overall_score < 0.3:
-            complexity_level = "simple"
-        elif overall_score < 0.6:
-            complexity_level = "moderate"
-        else:
-            complexity_level = "complex"
-
-        return {
-            "overall_score": round(overall_score, 3),
-            "complexity_level": complexity_level,
-            "factors": {k: round(v, 3) for k, v in complexity_factors.items()},
-            "metrics": {
-                "word_count": word_count,
-                "char_count": char_count,
-                "unique_words": unique_words,
-                "lexical_diversity": round(lexical_diversity, 3),
-                "has_operators": has_operators,
-                "has_quotes": has_quotes,
-                "has_wildcards": has_wildcards,
-            },
-        }
-
-    def _analyze_query_domain(self, normalized_query: str) -> Dict[str, Any]:
-        """Detect query domain and technical context."""
-        # Domain keyword patterns
-        domains = {
-            "programming": [
-                "code",
-                "function",
-                "class",
-                "method",
-                "api",
-                "library",
-                "framework",
-                "debug",
-                "syntax",
-                "algorithm",
-            ],
-            "data_science": [
-                "data",
-                "analysis",
-                "model",
-                "machine learning",
-                "statistics",
-                "dataset",
-                "prediction",
-                "analytics",
-            ],
-            "web_development": [
-                "html",
-                "css",
-                "javascript",
-                "react",
-                "vue",
-                "angular",
-                "frontend",
-                "backend",
-                "web",
-                "server",
-            ],
-            "database": [
-                "sql",
-                "database",
-                "query",
-                "table",
-                "schema",
-                "index",
-                "join",
-                "select",
-                "insert",
-                "update",
-            ],
-            "system_admin": [
-                "server",
-                "linux",
-                "windows",
-                "network",
-                "security",
-                "firewall",
-                "backup",
-                "monitoring",
-            ],
-            "mobile": [
-                "android",
-                "ios",
-                "mobile",
-                "app",
-                "react native",
-                "flutter",
-                "swift",
-                "kotlin",
-            ],
-            "cloud": [
-                "aws",
-                "azure",
-                "gcp",
-                "cloud",
-                "docker",
-                "kubernetes",
-                "serverless",
-                "microservices",
-            ],
-            "ai_ml": [
-                "artificial intelligence",
-                "neural network",
-                "deep learning",
-                "tensorflow",
-                "pytorch",
-                "nlp",
-            ],
-        }
-
-        # Score domains
-        domain_scores = {}
-        for domain, keywords in domains.items():
-            score = sum(1 for keyword in keywords if keyword in normalized_query)
-            if score > 0:
-                domain_scores[domain] = score
-
-        # Determine primary domain
-        primary_domain = "general"
-        confidence = 0.0
-
-        if domain_scores:
-            primary_domain = max(domain_scores.keys(), key=lambda k: domain_scores[k])
-            max_score = domain_scores[primary_domain]
-            total_words = len(normalized_query.split())
-            confidence = min(max_score / max(total_words, 1) * 2, 1.0)
-
-        return {
-            "primary_domain": primary_domain,
-            "confidence": round(confidence, 3),
-            "domain_scores": domain_scores,
-            "technical_indicators": self._extract_technical_indicators(
-                normalized_query
-            ),
-        }
-
-    def _assess_query_quality(
-        self, query: str, normalized_query: str
-    ) -> Dict[str, Any]:
-        """Assess query quality and provide improvement suggestions."""
-        import re
-
-        quality_factors = {
-            "length_appropriate": 3 <= len(query.split()) <= 15,
-            "has_content_words": any(
-                len(word) > 3 for word in normalized_query.split()
-            ),
-            "not_too_vague": len(
-                [
-                    w
-                    for w in normalized_query.split()
-                    if w not in ["thing", "stuff", "something", "anything"]
-                ]
-            )
-            > 0,
-            "has_specific_terms": bool(re.search(r"\b[A-Z][a-z]+|\b\w{6,}\b", query)),
-            "grammatically_coherent": not re.search(
-                r"\b(\w+)\s+\1\b", normalized_query
-            ),  # No repeated words
-        }
-
-        quality_score = sum(quality_factors.values()) / len(quality_factors)
-
-        # Quality level
-        if quality_score >= 0.8:
-            quality_level = "excellent"
-        elif quality_score >= 0.6:
-            quality_level = "good"
-        elif quality_score >= 0.4:
-            quality_level = "fair"
-        else:
-            quality_level = "needs_improvement"
-
-        # Generate improvement suggestions
-        suggestions = []
-        if not quality_factors["length_appropriate"]:
-            if len(query.split()) < 3:
-                suggestions.append("Add more descriptive terms to your query")
-            else:
-                suggestions.append(
-                    "Try simplifying your query to focus on key concepts"
-                )
-
-        if not quality_factors["has_specific_terms"]:
-            suggestions.append(
-                "Include more specific terminology related to your topic"
-            )
-
-        if not quality_factors["not_too_vague"]:
-            suggestions.append("Replace vague terms with more precise language")
-
-        return {
-            "quality_score": round(quality_score, 3),
-            "quality_level": quality_level,
-            "factors": quality_factors,
-            "improvement_suggestions": suggestions,
-        }
-
-    def _generate_intelligent_suggestions(
-        self,
-        query: str,
-        normalized_query: str,
-        intent_analysis: Dict,
-        domain_analysis: Dict,
-    ) -> Dict[str, Any]:
-        """Generate intelligent search suggestions based on analysis."""
-        suggestions = {
-            "alternatives": [],
-            "expansions": [],
-            "refinements": [],
-            "related_queries": [],
-        }
-
-        # Intent-based alternatives
-        intent = intent_analysis["primary_intent"]
-        if intent == "example_seeking":
-            suggestions["alternatives"] = [
-                f"{query} tutorial",
-                f"{query} sample code",
-                f"examples of {query}",
-            ]
-        elif intent == "informational":
-            suggestions["alternatives"] = [
-                f"how to {query}",
-                f"{query} guide",
-                f"{query} documentation",
-            ]
-        elif intent == "troubleshooting":
-            suggestions["alternatives"] = [
-                f"fix {query}",
-                f"solve {query}",
-                f"{query} solution",
-            ]
-
-        # Domain-based expansions
-        domain = domain_analysis["primary_domain"]
-        if domain != "general":
-            domain_terms = self._get_domain_expansion_terms(domain)
-            suggestions["expansions"] = domain_terms[:5]  # Limit to 5
-
-        # Query refinements based on complexity
-        words = normalized_query.split()
-        if len(words) > 8:  # Complex query
-            # Suggest breaking it down
-            key_terms = [w for w in words if len(w) > 4][:3]
-            suggestions["refinements"] = (
-                [f"{' '.join(key_terms[:2])}", f"{' '.join(key_terms[1:])}"]
-                if len(key_terms) >= 2
-                else []
-            )
-        elif len(words) <= 2:  # Simple query
-            # Suggest expansion
-            suggestions["refinements"] = [
-                f"{query} tutorial",
-                f"{query} example",
-                f"{query} guide",
-            ]
-
-        # Generate related queries using word associations
-        suggestions["related_queries"] = self._generate_related_queries(
-            normalized_query, domain
-        )
-
-        # Filter out duplicates and empty suggestions
-        for key in suggestions:
-            suggestions[key] = list(
-                dict.fromkeys([s for s in suggestions[key] if s and s != query])
-            )
-
-        return suggestions
-
-    def _recommend_search_strategies(
-        self,
-        query: str,
-        intent_analysis: Dict,
-        complexity_analysis: Dict,
-        domain_analysis: Dict,
-    ) -> List[Dict[str, Any]]:
-        """Recommend optimal search strategies based on analysis."""
-        strategies = []
-
-        complexity_level = complexity_analysis["complexity_level"]
-        intent = intent_analysis["primary_intent"]
-        domain = domain_analysis["primary_domain"]
-
-        # Complexity-based strategies
-        if complexity_level == "complex":
-            strategies.append(
-                {
-                    "strategy": "query_decomposition",
-                    "description": "Break your complex query into smaller, focused searches",
-                    "rationale": "Complex queries may miss relevant results due to over-specification",
-                    "priority": "high",
-                }
-            )
-        elif complexity_level == "simple":
-            strategies.append(
-                {
-                    "strategy": "query_expansion",
-                    "description": "Add more specific terms to narrow your search",
-                    "rationale": "Simple queries may return too broad results",
-                    "priority": "medium",
-                }
-            )
-
-        # Intent-based strategies
-        if intent == "example_seeking":
-            strategies.append(
-                {
-                    "strategy": "example_focused",
-                    "description": "Search for 'tutorial', 'example', or 'demo' content",
-                    "rationale": "Example queries benefit from instructional content",
-                    "priority": "high",
-                }
-            )
-        elif intent == "troubleshooting":
-            strategies.append(
-                {
-                    "strategy": "problem_solution",
-                    "description": "Include error messages or symptoms in your search",
-                    "rationale": "Troubleshooting queries need specific problem context",
-                    "priority": "high",
-                }
-            )
-
-        # Domain-based strategies
-        if domain != "general":
-            strategies.append(
-                {
-                    "strategy": "domain_specific",
-                    "description": f"Focus on {domain.replace('_', ' ')} specific terminology",
-                    "rationale": f"Specialized {domain.replace('_', ' ')} queries benefit from domain context",
-                    "priority": "medium",
-                }
-            )
-
-        return strategies[:3]  # Limit to top 3 strategies
-
-    def _extract_intent_indicators(
-        self, normalized_query: str, original_query: str
-    ) -> List[str]:
-        """Extract specific words/phrases that indicate intent."""
-        indicators = []
-
-        # Question words
-        question_words = ["how", "what", "why", "when", "where", "which", "who"]
-        indicators.extend([word for word in question_words if word in normalized_query])
-
-        # Action words
-        action_words = ["find", "show", "get", "create", "build", "fix", "solve"]
-        indicators.extend([word for word in action_words if word in normalized_query])
-
-        # Context indicators
-        if "example" in normalized_query or "sample" in normalized_query:
-            indicators.append("example_seeking")
-
-        if (
-            "vs" in normalized_query
-            or "versus" in normalized_query
-            or "compare" in normalized_query
-        ):
-            indicators.append("comparison")
-
-        return list(set(indicators))
-
-    def _extract_technical_indicators(self, normalized_query: str) -> List[str]:
-        """Extract technical terms and indicators."""
-        import re
-
-        indicators = []
-
-        # Programming languages
-        languages = [
-            "python",
-            "java",
-            "javascript",
-            "c++",
-            "c#",
-            "go",
-            "rust",
-            "ruby",
-            "php",
-        ]
-        indicators.extend([lang for lang in languages if lang in normalized_query])
-
-        # Technical acronyms (2-5 uppercase letters)
-        acronyms = re.findall(r"\b[A-Z]{2,5}\b", normalized_query.upper())
-        indicators.extend(acronyms)
-
-        # File extensions
-        extensions = re.findall(r"\.[a-z]{2,4}\b", normalized_query)
-        indicators.extend(extensions)
-
-        return list(set(indicators))
-
-    def _get_domain_expansion_terms(self, domain: str) -> List[str]:
-        """Get expansion terms for specific domains."""
-        expansions = {
-            "programming": [
-                "implementation",
-                "syntax",
-                "best practices",
-                "tutorial",
-                "documentation",
-            ],
-            "data_science": [
-                "analysis",
-                "visualization",
-                "modeling",
-                "preprocessing",
-                "evaluation",
-            ],
-            "web_development": [
-                "responsive",
-                "optimization",
-                "deployment",
-                "testing",
-                "security",
-            ],
-            "database": [
-                "optimization",
-                "indexing",
-                "normalization",
-                "backup",
-                "performance",
-            ],
-            "system_admin": [
-                "configuration",
-                "monitoring",
-                "automation",
-                "troubleshooting",
-                "security",
-            ],
-            "mobile": ["development", "testing", "deployment", "performance", "ui/ux"],
-            "cloud": [
-                "architecture",
-                "scalability",
-                "deployment",
-                "monitoring",
-                "cost optimization",
-            ],
-            "ai_ml": [
-                "training",
-                "evaluation",
-                "deployment",
-                "optimization",
-                "preprocessing",
-            ],
-        }
-        return expansions.get(domain, [])
-
-    def _generate_related_queries(
-        self, normalized_query: str, domain: str
-    ) -> List[str]:
-        """Generate related queries using semantic associations."""
-        related = []
-        words = normalized_query.split()
-
-        if len(words) >= 2:
-            # Permutations of key terms
-            key_words = [w for w in words if len(w) > 3][:3]
-            if len(key_words) >= 2:
-                related.append(f"{key_words[-1]} {key_words[0]}")
-                related.append(f"{' '.join(key_words)} best practices")
-                related.append(f"{' '.join(key_words)} common issues")
-
-        return related[:3]  # Limit to 3 related queries
-
-    def _create_vector_search_results(self, distances, indices) -> List[SearchResult]:
-        """Create SearchResult objects from vector search results."""
-        # Removed debug print
-        search_results = []
-        for distance, faiss_id in zip(distances, indices):
-            chunk = self.metadata_store.get_chunk(faiss_id)
-            if chunk:
-                # Create source info from chunk metadata
-                source_info = self._create_source_info_from_chunk(chunk)
-                # Removed debug print
-                logger.debug(f"Created source_info for {chunk.chunk_id}: {source_info}")
-
-                search_result = SearchResult(
-                    chunk_id=chunk.chunk_id,
-                    source_path=chunk.source_path,
-                    source_type=chunk.source_type.value,
-                    text=chunk.chunk_text,
-                    relevance_score=float(distance),
-                    position=create_structured_position(
-                        start_char=chunk.start_char, end_char=chunk.end_char
-                    ),
-                    metadata=create_structured_metadata(
-                        created_at=chunk.created_at.isoformat(),
-                        word_count=len(chunk.chunk_text.split()),
-                        char_count=len(chunk.chunk_text),
-                        file_extension=getattr(chunk, "file_extension", None),
-                    ),
-                    scores=create_structured_scores(vector_score=float(distance)),
-                    provenance=create_search_provenance(
-                        search_features=["vector"], search_stage="vector_only"
-                    ),
-                    source_info=source_info,
-                )
-                search_results.append(search_result)
-        return search_results
 
     def _get_search_config(self) -> Dict[str, Any]:
         """Get current search configuration for response metadata."""
         return {
             "hybrid_search": self.config.use_hybrid_search,
-            "reranking": self.config.use_reranking,
-            "relationships": self.config.enable_relationships,
             "embedding_provider": self.config.embedding_provider,
             "embedding_model": self.config.embedding_model,
             "keyword_weight": getattr(self.config, "keyword_weight", 0.3),
-            "reranking_model": getattr(
-                self.config, "reranking_model", "cross-encoder/ms-marco-MiniLM-L-6-v2"
-            ),
         }
 
     def _create_source_info_from_chunk(self, chunk) -> Dict[str, Any]:
@@ -1616,13 +811,7 @@ class IndexManager:
     def search(
         self, query: str, top_k: int = 5, display_format: str = "readable"
     ) -> SearchResponse:
-        """Perform semantic search with focused services architecture.
-
-        This method now uses a focused services approach instead of the monolithic implementation:
-        - VectorSearchService: Pure vector similarity search
-        - HybridSearchService: Keyword enhancement (TF-IDF + BM25)
-        - RerankingService: Neural reranking for quality improvement
-        - SearchOrchestrator: Pipeline coordination and error handling
+        """Perform semantic search with optional hybrid enhancement.
 
         Args:
             query: Search query text
@@ -1630,31 +819,15 @@ class IndexManager:
             display_format: Output format ('readable', 'structured', 'summary')
 
         Returns:
-            SearchResponse with standardized results and metadata
+            SearchResponse with results and metadata
         """
-        # Use the new simplified search implementation
-        return self._new_search(query, top_k, display_format)
+        return self._simple_search(query, top_k, display_format)
 
-    def _new_search(
+    def _simple_search(
         self, query: str, top_k: int = 5, display_format: str = "readable"
     ) -> SearchResponse:
-        """New simplified search implementation using focused services.
-
-        This method replaces the monolithic search with focused services:
-        - VectorSearchService: Pure vector similarity
-        - HybridSearchService: Keyword enhancement
-        - RerankingService: Neural reranking
-        - SearchOrchestrator: Pipeline coordination
-        """
+        """Simplified search implementation with optional hybrid enhancement."""
         import time
-
-        from .search_services import (
-            HybridSearchService,
-            RerankingService,
-            SearchCandidate,
-            SearchOrchestrator,
-            VectorSearchService,
-        )
 
         start_time = time.time()
 
@@ -1676,81 +849,35 @@ class IndexManager:
             # Ensure embedder is loaded
             self._ensure_embedder_loaded()
 
-            # Analyze query characteristics (keep existing functionality)
-            query_analysis = self._analyze_query(query)
+            # Generate query embedding
+            query_embedding = self.embedder.embed_single(query)
 
-            # Create focused services
-            vector_service = VectorSearchService(
-                vector_store=self.vector_store,
-                metadata_store=self.metadata_store,
-                embedder=self.embedder,
-                config=self.config,
-            )
+            # Perform vector search
+            distances, indices = self.vector_store.search(
+                query_embedding, top_k * 2
+            )  # Get more for hybrid filtering
 
-            hybrid_service = HybridSearchService(
-                hybrid_search=self.hybrid_search,
-                metadata_store=self.metadata_store,
-                config=self.config,
-            )
+            # Create initial results
+            search_results = self._create_vector_search_results(distances, indices)
 
-            reranking_service = RerankingService(
-                reranker=self.reranker, config=self.config
-            )
+            # Apply hybrid search enhancement if enabled
+            if self.config.use_hybrid_search and self.hybrid_search:
+                try:
+                    self._ensure_hybrid_search_index()
+                    hybrid_results = self.hybrid_search.search(query, top_k * 2)
 
-            # Create orchestrator and execute search
-            orchestrator = SearchOrchestrator(
-                vector_service=vector_service,
-                hybrid_service=hybrid_service,
-                reranking_service=reranking_service,
-                config=self.config,
-            )
+                    # Combine and rerank results
+                    combined_results = self._combine_hybrid_results(
+                        search_results, hybrid_results
+                    )
+                    search_results = combined_results[:top_k]
+                except Exception as e:
+                    logger.warning(f"Hybrid search failed, using vector-only: {e}")
+                    search_results = search_results[:top_k]
+            else:
+                search_results = search_results[:top_k]
 
-            candidates, performance_info = orchestrator.search(query, top_k)
-
-            # Convert candidates back to SearchResult format
-            search_results = []
-            for candidate in candidates:
-                # Get chunk for source_info creation
-                chunk = self.metadata_store.get_chunk_by_chunk_id(candidate.chunk_id)
-                source_info = (
-                    self._create_source_info_from_chunk(chunk) if chunk else None
-                )
-
-                search_result = SearchResult(
-                    chunk_id=candidate.chunk_id,
-                    source_path=candidate.source_path,
-                    source_type=candidate.source_type,
-                    text=candidate.text,
-                    relevance_score=candidate.final_score,
-                    scores=create_structured_scores(
-                        vector_score=candidate.vector_score,
-                        keyword_score=candidate.keyword_score,
-                        combined_score=candidate.combined_score,
-                        rerank_score=candidate.rerank_score,
-                        original_score=candidate.original_score,
-                    ),
-                    metadata=(
-                        create_structured_metadata(**candidate.metadata)
-                        if candidate.metadata
-                        else None
-                    ),
-                    provenance=create_search_provenance(
-                        search_features=self._get_search_features(
-                            performance_info["search_mode"]
-                        ),
-                        search_stage="pipeline_final",
-                        ranking_factors={
-                            "search_mode": performance_info["search_mode"],
-                            "failed_components": performance_info.get(
-                                "failed_components", []
-                            ),
-                        },
-                    ),
-                    source_info=source_info,
-                )
-                search_results.append(search_result)
-
-            # Enhance results with ranking information and explanations
+            # Enhance results with ranking information
             enhanced_results = enhance_search_results_with_ranking(
                 results=search_results,
                 query=query,
@@ -1761,100 +888,170 @@ class IndexManager:
             # Create performance information
             performance = create_search_performance_info(
                 start_time=start_time,
-                search_mode=performance_info["search_mode"],
-                total_candidates=performance_info.get(
-                    "total_candidates", len(candidates)
-                ),
-                rerank_time=performance_info.get("rerank_time"),
-                vector_time=performance_info.get("vector_time"),
-                keyword_time=performance_info.get("keyword_time"),
-                embedding_time=performance_info.get("embedding_time"),
+                search_mode="hybrid" if self.config.use_hybrid_search else "vector",
+                total_candidates=len(search_results),
             )
 
-            # Create response based on whether components failed
-            if performance_info.get("failed_components"):
-                response = SearchResponse.create_degraded(
-                    query=query,
-                    results=enhanced_results,
-                    search_config=self._get_search_config(),
-                    performance=performance,
-                    degradation_reason=f"Some components failed: {', '.join(performance_info['failed_components'])}",
-                    failed_components=performance_info["failed_components"],
-                )
-            else:
-                response = SearchResponse.create_success(
-                    query=query,
-                    results=enhanced_results,
-                    search_config=self._get_search_config(),
-                    performance=performance,
-                    query_analysis=query_analysis,
-                )
+            # Create successful response
+            response = SearchResponse.create_success(
+                query=query,
+                results=enhanced_results,
+                search_config=self._get_search_config(),
+                performance=performance,
+            )
 
             # Set display format and generate formatted output
             response.display_format = display_format
             if display_format != "structured":
                 response.formatted_output = response.format_for_display(display_format)
 
-            # Log performance metrics
+            # Log performance
             self.performance_logger.log_search_performance(response)
-            self.performance_logger.log_slow_search(response, threshold_ms=1000)
-
-            # Record search interaction for intelligence learning
-            if self.search_intelligence:
-                try:
-                    self.search_intelligence.record_search(
-                        query, query_analysis, response
-                    )
-                except Exception as e:
-                    logger.debug(f"Failed to record search for intelligence: {e}")
 
             return response
 
         except Exception as e:
             logger.error(f"Search failed: {e}")
 
-            # Determine appropriate error code based on exception type
-            if "timeout" in str(e).lower():
-                error_code = SearchErrorCode.TIMEOUT.value
-            elif "memory" in str(e).lower() or "out of memory" in str(e).lower():
-                error_code = SearchErrorCode.MEMORY_ERROR.value
-            elif "embedder" in str(e).lower() or "embedding" in str(e).lower():
-                error_code = SearchErrorCode.EMBEDDER_UNAVAILABLE.value
-            elif "vector" in str(e).lower():
-                error_code = SearchErrorCode.VECTOR_STORE_ERROR.value
-            else:
-                error_code = SearchErrorCode.SEARCH_ERROR.value
-
             error_response = SearchResponse.create_error(
                 query=query,
                 error=f"Search operation failed: {str(e)}",
-                error_code=error_code,
+                error_code=SearchErrorCode.SEARCH_ERROR.value,
                 search_config=self._get_search_config(),
                 recovery_suggestions=[
                     "Check if the index is properly loaded",
                     "Verify the embedder is available and functional",
                     "Try a simpler query if the current one is complex",
-                    "Check system resources (memory, disk space)",
                 ],
-                query_analysis=query_analysis if "query_analysis" in locals() else None,
             )
-
-            # Log error performance
-            self.performance_logger.log_search_performance(error_response)
 
             return error_response
 
-    def _get_search_features(self, search_mode: str) -> List[str]:
-        """Get search features based on search mode."""
-        if "hybrid" in search_mode:
-            features = ["vector", "keyword", "hybrid"]
-        else:
-            features = ["vector"]
+    def _create_vector_search_results(self, distances, indices):
+        """Convert vector search results to SearchResult objects."""
+        results = []
+        for i, (distance, idx) in enumerate(zip(distances, indices)):
+            if idx >= 0:  # Valid index
+                chunk = self.metadata_store.get_chunk(idx)
+                if chunk:
+                    source_info = self._create_source_info_from_chunk(chunk)
 
-        if "reranked" in search_mode:
-            features.append("reranking")
+                    # Convert distance to similarity score (cosine distance -> similarity)
+                    relevance_score = max(0.0, 1.0 - distance)
 
-        return features
+                    result = SearchResult(
+                        chunk_id=chunk.chunk_id,
+                        source_path=chunk.source_path,
+                        source_type=chunk.source_type.value,
+                        text=chunk.chunk_text,
+                        relevance_score=relevance_score,
+                        scores=create_structured_scores(
+                            vector_score=relevance_score,
+                            original_score=relevance_score,
+                        ),
+                        metadata=(
+                            create_structured_metadata(**chunk.metadata)
+                            if chunk.metadata
+                            else None
+                        ),
+                        provenance=create_search_provenance(
+                            search_features=["vector_search"],
+                            search_stage="vector_only",
+                        ),
+                        source_info=source_info,
+                    )
+                    results.append(result)
+        return results
+
+    def _combine_hybrid_results(self, vector_results, hybrid_results):
+        """Combine vector and hybrid search results with simple scoring."""
+        # Create a dictionary to track chunks by ID
+        combined_chunks = {}
+
+        # Add vector results
+        for result in vector_results:
+            combined_chunks[result.chunk_id] = {
+                "result": result,
+                "vector_score": result.relevance_score,
+                "keyword_score": 0.0,
+                "combined_score": result.relevance_score
+                * 0.7,  # Give vector search 70% weight
+            }
+
+        # Add/enhance with hybrid results
+        for hybrid_result in hybrid_results:
+            chunk_id = hybrid_result.get("chunk_id")
+            keyword_score = hybrid_result.get("score", 0.0)
+
+            if chunk_id in combined_chunks:
+                # Update existing result with hybrid score
+                combined_chunks[chunk_id]["keyword_score"] = keyword_score
+                combined_chunks[chunk_id]["combined_score"] = (
+                    combined_chunks[chunk_id]["vector_score"] * 0.7
+                    + keyword_score * 0.3
+                )
+            else:
+                # Create new result from hybrid search
+                chunk = self.metadata_store.get_chunk_by_chunk_id(chunk_id)
+                if chunk:
+                    source_info = self._create_source_info_from_chunk(chunk)
+
+                    result = SearchResult(
+                        chunk_id=chunk.chunk_id,
+                        source_path=chunk.source_path,
+                        source_type=chunk.source_type.value,
+                        text=chunk.chunk_text,
+                        relevance_score=keyword_score,
+                        scores=create_structured_scores(
+                            keyword_score=keyword_score,
+                            combined_score=keyword_score
+                            * 0.3,  # Pure keyword gets 30% weight
+                        ),
+                        metadata=(
+                            create_structured_metadata(**chunk.metadata)
+                            if chunk.metadata
+                            else None
+                        ),
+                        provenance=create_search_provenance(
+                            search_features=["hybrid_search"],
+                            search_stage="hybrid_only",
+                        ),
+                        source_info=source_info,
+                    )
+
+                    combined_chunks[chunk_id] = {
+                        "result": result,
+                        "vector_score": 0.0,
+                        "keyword_score": keyword_score,
+                        "combined_score": keyword_score * 0.3,
+                    }
+
+        # Sort by combined score and return results
+        sorted_items = sorted(
+            combined_chunks.values(), key=lambda x: x["combined_score"], reverse=True
+        )
+
+        # Update scores in results and return
+        final_results = []
+        for item in sorted_items:
+            result = item["result"]
+            result.relevance_score = item["combined_score"]
+
+            # Update scores with combined information
+            result.scores = create_structured_scores(
+                vector_score=item["vector_score"],
+                keyword_score=item["keyword_score"],
+                combined_score=item["combined_score"],
+                original_score=(
+                    result.scores.original_score
+                    if result.scores
+                    else item["combined_score"]
+                ),
+            )
+
+            final_results.append(result)
+
+        return final_results
 
     def search_with_context(
         self,
@@ -1922,9 +1119,8 @@ class IndexManager:
                     )[:5]
 
                     for entity, frequency in top_entities:
-                        related_chunk_ids = self.relationship_store.get_related_chunks(
-                            entity
-                        )[:3]
+                        # Skip related chunks since relationship_store was removed
+                        related_chunk_ids = []
                         for chunk_id in related_chunk_ids:
                             related_chunk = self.metadata_store.get_chunk_by_chunk_id(
                                 chunk_id
@@ -2501,7 +1697,7 @@ class IndexManager:
         try:
             # Basic stats
             metadata_stats = self.metadata_store.get_stats()
-            relationship_stats = self.relationship_store.get_stats()
+            relationship_stats = {}  # Removed relationship store
             vector_stats = (
                 self.vector_store.get_index_info()
                 if self.vector_store
@@ -2543,10 +1739,15 @@ class IndexManager:
 
             # Persistence info
             paths = self.config.get_index_paths()
+            essential_paths = {
+                k: v for k, v in paths.items() if k in ["metadata", "index"]
+            }
             persistence_info = {
                 "auto_persist": self.config.auto_persist,
                 "index_dir": str(self.config.index_dir),
-                "index_files_exist": all(path.exists() for path in paths.values()),
+                "index_files_exist": all(
+                    path.exists() for path in essential_paths.values()
+                ),
                 "last_modified": {},
             }
 
@@ -2560,9 +1761,7 @@ class IndexManager:
             if self.hybrid_search:
                 hybrid_search_info = self.hybrid_search.get_stats()
 
-            reranking_info = {}
-            if self.reranker:
-                reranking_info = self.reranker.get_stats()
+            reranking_info = {}  # Reranker feature removed
 
             # System performance metrics
             cpu_percent = psutil.cpu_percent(interval=0.1)
@@ -2631,7 +1830,6 @@ class IndexManager:
         try:
             # Clear in-memory data
             self.metadata_store.clear()
-            self.relationship_store.clear()
             if self.vector_store is not None:
                 self.vector_store.clear()
 

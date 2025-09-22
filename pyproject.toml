@@ -1,7 +1,7 @@
 [project]
 name = "pycontextify"
 version = "0.1.0"
-description = "A Python-based MCP server for semantic search over codebases, documents, and webpages with lightweight knowledge graph capabilities"
+description = "A Python-based MCP server for semantic search over codebases, documents, and webpages"
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-keywords = ["mcp", "semantic-search", "embeddings", "faiss", "rag", "knowledge-graph"]
+keywords = ["mcp", "semantic-search", "embeddings", "faiss", "rag", "vector-search"]
 
 dependencies = [
     "fastmcp>=1.0.0",

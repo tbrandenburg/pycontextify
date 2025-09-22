@@ -6,7 +6,7 @@ This directory contains comprehensive tests for the PyContextify MCP server.
 
 ### 🎯 **End-to-End MCP Tests**
 - **`test_mcp_simple.py`** - Complete MCP server function testing
-  - Tests all 6 MCP functions: `status`, `index_document`, `index_code`, `search`, `search_with_context`, error handling
+  - Tests all 6 MCP functions: `status`, `index_document`, `index_code`, `index_webpage`, `search`, `reset_index`, error handling
   - Multiple document types: Markdown, Text, Codebase directories
   - Isolated test environments with proper cleanup
   - **Status: ✅ All 8 tests passing**
@@ -72,9 +72,10 @@ uv run python -m pytest tests/ -v
 1. `status()` - System status reporting
 2. `index_document(path)` - Single document indexing
 3. `index_code(path)` - Codebase directory indexing
-4. `search(query, top_k)` - Basic semantic search
-5. `search_with_context(query, top_k, include_related)` - Enhanced search
-6. Error handling for invalid inputs
+4. `index_webpage(url, recursive, max_depth)` - Web content indexing
+5. `search(query, top_k)` - Semantic search
+6. `reset_index(remove_files, confirm)` - Clear index data
+7. Error handling for invalid inputs
 
 ### Document Types Tested ✅
 - **Markdown** (`.md`) - Documentation, API guides
