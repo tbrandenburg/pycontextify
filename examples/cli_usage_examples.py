@@ -12,7 +12,7 @@ from pathlib import Path
 
 def example_python_project():
     """Example: Index a Python project with documentation."""
-    print("🐍 Python Project Setup")
+    print("Python Project Setup")
     print("=" * 50)
 
     cmd = [
@@ -26,7 +26,7 @@ def example_python_project():
         "--initial-documents",
         "README.md",
         "CHANGELOG.md",
-        "docs/",
+        "docs/guide.md",  # Specific files, not directories
         "--initial-codebase",
         "src",
         "tests",
@@ -52,7 +52,7 @@ def example_python_project():
 
 def example_research_project():
     """Example: Index research materials with academic papers."""
-    print("🔬 Research Project Setup")
+    print("Research Project Setup")
     print("=" * 50)
 
     cmd = [
@@ -64,7 +64,8 @@ def example_research_project():
         "--index-path",
         "./research_index",
         "--initial-documents",
-        "papers/*.pdf",
+        "research_paper_1.pdf",
+        "research_paper_2.pdf", 
         "notes.md",
         "references.txt",
         "--initial-webpages",
@@ -94,7 +95,7 @@ def example_research_project():
 
 def example_api_documentation():
     """Example: Index API documentation sites."""
-    print("📚 API Documentation Setup")
+    print("API Documentation Setup")
     print("=" * 50)
 
     cmd = [
@@ -127,7 +128,7 @@ def example_api_documentation():
 
 def example_knowledge_base():
     """Example: Comprehensive knowledge base with mixed content."""
-    print("🧠 Knowledge Base Setup")
+    print("Knowledge Base Setup")
     print("=" * 50)
 
     cmd = [
@@ -139,9 +140,10 @@ def example_knowledge_base():
         "--index-path",
         "./kb_index",
         "--initial-documents",
-        "knowledge/*.md",
-        "guides/*.pdf",
-        "specs/*.txt",
+        "knowledge/overview.md",
+        "knowledge/advanced.md",
+        "guides/user_guide.pdf",
+        "specs/api_spec.txt",
         "--initial-codebase",
         "examples",
         "demos",
@@ -172,7 +174,7 @@ def example_knowledge_base():
 
 def example_documentation_site():
     """Example: Deep crawl of a documentation website."""
-    print("🌐 Documentation Site Deep Crawl")
+    print("Documentation Site Deep Crawl")
     print("=" * 50)
 
     cmd = [
@@ -202,7 +204,7 @@ def example_documentation_site():
 
 def example_development_workflow():
     """Example: Development workflow with quick iteration."""
-    print("⚡ Development Workflow")
+    print("Development Workflow")
     print("=" * 50)
 
     cmd = [
@@ -231,7 +233,7 @@ def example_development_workflow():
 
 def example_multilingual_content():
     """Example: Mixed content with different embedding models."""
-    print("🌍 Multilingual Content Setup")
+    print("Multilingual Content Setup")
     print("=" * 50)
 
     cmd = [
@@ -241,9 +243,9 @@ def example_multilingual_content():
         "--index-name",
         "multilingual",
         "--initial-documents",
-        "content/en/*.md",
-        "content/es/*.md",
-        "content/fr/*.md",
+        "content/en/intro.md",
+        "content/es/introduccion.md",
+        "content/fr/introduction.md",
         "--initial-webpages",
         "https://en.wikipedia.org/wiki/Machine_learning",
         "https://es.wikipedia.org/wiki/Aprendizaje_automático",
@@ -269,7 +271,7 @@ def example_multilingual_content():
 
 def show_help_example():
     """Show how to get help information."""
-    print("❓ Getting Help")
+    print("Getting Help")
     print("=" * 50)
 
     cmd = ["uv", "run", "pycontextify", "--help"]
@@ -306,7 +308,7 @@ def main():
     for example in examples:
         example()
 
-    print("💡 Tips:")
+    print("Tips:")
     print("- Start with simple setups and add complexity gradually")
     print("- Use --verbose for detailed progress monitoring")
     print("- Adjust --crawl-delay based on the target website's capacity")
@@ -314,11 +316,14 @@ def main():
     print("- Combine different content types for comprehensive search indexes")
     print()
 
-    print("📝 Notes:")
+    print("Notes:")
     print("- Replace example URLs with your actual documentation sites")
     print("- Adjust file paths to match your project structure")
-    print("- Consider using environment variables for sensitive configurations")
+    print("- Use specific file paths (not glob patterns like *.pdf) for --initial-documents")
+    print("- Directories work fine for --initial-codebase arguments")
+    print("- Consider using environment variables for sensitive configurations") 
     print("- Test with small datasets before indexing large amounts of content")
+    print("- The system provides semantic search with relationship extraction")
 
 
 if __name__ == "__main__":
