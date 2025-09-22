@@ -56,6 +56,7 @@ class SentenceTransformersEmbedder(BaseEmbedder):
             # Auto-detect best available device
             try:
                 import torch
+
                 self.device = "cuda" if torch.cuda.is_available() else "cpu"
             except ImportError:
                 self.device = "cpu"  # Fallback if torch not available

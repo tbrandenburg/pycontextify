@@ -177,16 +177,16 @@ class CodeLoader(BaseLoader):
 
 class DocumentLoader(BaseLoader):
     """Loader for individual documents with structure extraction."""
-    
+
     def __init__(self, pdf_engine: str = "pymupdf"):
         """Initialize document loader.
-        
+
         Args:
             pdf_engine: PDF processing engine to use
         """
         self.pdf_engine = pdf_engine
         self.pdf_loader = None
-        
+
         # Initialize PDF loader if PDF support is available
         self._initialize_pdf_loader()
 
@@ -224,18 +224,19 @@ class DocumentLoader(BaseLoader):
         """Initialize PDF loader with configured engine."""
         try:
             from .pdf_loader import PDFLoader
+
             self.pdf_loader = PDFLoader(preferred_engine=self.pdf_engine)
             logger.info(f"PDF loader initialized with engine: {self.pdf_engine}")
         except ImportError as e:
             logger.warning(f"Could not initialize PDF loader: {e}")
             self.pdf_loader = None
-    
+
     def _load_pdf(self, path: Path) -> Optional[str]:
         """Load PDF file content using enhanced PDF loader."""
         if not self.pdf_loader:
             logger.error("PDF loader not available")
             return None
-            
+
         try:
             text = self.pdf_loader.load_pdf(str(path))
             logger.info(f"Successfully loaded PDF: {path.name}")
@@ -349,7 +350,7 @@ class WebpageLoader(BaseLoader):
 
             # IMPROVED CONTENT EXTRACTION STRATEGY
             content_candidates = []
-            
+
             # Strategy 1: Try semantic HTML elements
             main_content = soup.find("main")
             if main_content:
@@ -371,7 +372,7 @@ class WebpageLoader(BaseLoader):
                 ("#content", "content_id"),
                 ("#main", "main_id"),
             ]
-            
+
             for selector, name in content_selectors:
                 try:
                     elements = soup.select(selector)
@@ -397,49 +398,65 @@ class WebpageLoader(BaseLoader):
             # CHOOSE THE BEST CANDIDATE
             # Look for the candidate with the most substantial content
             # that contains key structural indicators
-            
+
             best_candidate = None
             max_quality_score = 0
-            
+
             for source, text in content_candidates:
                 if len(text) < 100:  # Skip very short content
                     continue
-                    
+
                 # Calculate quality score based on:
                 # 1. Length (longer is generally better for main content)
                 # 2. Presence of structural indicators (headings, sections)
                 # 3. Avoid pure navigation/header content
-                
+
                 length_score = min(len(text) / 10000, 1.0)  # Normalize to 0-1
-                
+
                 # Look for structural indicators
                 structure_indicators = [
-                    "What", "How", "Why",  # Question headings
-                    "Introduction", "Overview", "Summary",
-                    "Product", "Service", "Solution",
-                    "Architecture", "Design", "Implementation"
+                    "What",
+                    "How",
+                    "Why",  # Question headings
+                    "Introduction",
+                    "Overview",
+                    "Summary",
+                    "Product",
+                    "Service",
+                    "Solution",
+                    "Architecture",
+                    "Design",
+                    "Implementation",
                 ]
-                
-                structure_score = sum(1 for indicator in structure_indicators 
-                                    if indicator.lower() in text.lower()) / len(structure_indicators)
-                
+
+                structure_score = sum(
+                    1
+                    for indicator in structure_indicators
+                    if indicator.lower() in text.lower()
+                ) / len(structure_indicators)
+
                 # Penalize if it looks like pure navigation
                 nav_penalties = ["Home", "About", "Contact", "Privacy", "Terms"]
-                nav_ratio = sum(1 for nav in nav_penalties 
-                               if nav in text) / len(nav_penalties)
+                nav_ratio = sum(1 for nav in nav_penalties if nav in text) / len(
+                    nav_penalties
+                )
                 nav_penalty = min(nav_ratio, 0.5)
-                
+
                 quality_score = length_score + structure_score - nav_penalty
-                
-                logger.debug(f"Content candidate '{source}': {len(text)} chars, quality={quality_score:.3f}")
-                
+
+                logger.debug(
+                    f"Content candidate '{source}': {len(text)} chars, quality={quality_score:.3f}"
+                )
+
                 if quality_score > max_quality_score:
                     max_quality_score = quality_score
                     best_candidate = (source, text)
 
             if best_candidate:
                 source, final_text = best_candidate
-                logger.info(f"Selected content from '{source}': {len(final_text)} characters")
+                logger.info(
+                    f"Selected content from '{source}': {len(final_text)} characters"
+                )
                 return final_text
             else:
                 logger.warning("No suitable content found")

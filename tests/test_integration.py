@@ -5,9 +5,10 @@ ensuring the system works end-to-end with real data.
 """
 
 import tempfile
+from pathlib import Path
+
 import numpy as np
 import pytest
-from pathlib import Path
 
 from pycontextify.index.config import Config
 from pycontextify.index.manager import IndexManager
@@ -71,10 +72,10 @@ from web development to data science and artificial intelligence.
             # Override settings for testing
             config.index_dir = Path(temp_dir)
             config.auto_persist = False  # Don't persist for tests
-            config.auto_load = False     # Don't try to load existing
+            config.auto_load = False  # Don't try to load existing
             config.embedding_provider = "sentence_transformers"
             config.embedding_model = "all-MiniLM-L6-v2"  # Faster for testing
-            config.chunk_size = 256      # Smaller chunks for testing
+            config.chunk_size = 256  # Smaller chunks for testing
             config.chunk_overlap = 25
             config.enable_relationships = True
             yield config
@@ -87,7 +88,7 @@ from web development to data science and artificial intelligence.
         # Cleanup
         try:
             manager.clear_index()
-            if hasattr(manager, 'embedder') and manager.embedder:
+            if hasattr(manager, "embedder") and manager.embedder:
                 manager.embedder.cleanup()
         except Exception:
             pass  # Ignore cleanup errors in tests
@@ -98,36 +99,36 @@ from web development to data science and artificial intelligence.
         """Test complete pipeline: markdown → chunks → embeddings → search."""
         # Create temporary markdown file
         with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.md', delete=False, encoding='utf-8'
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
         ) as temp_file:
             temp_file.write(sample_markdown_content)
             temp_file.flush()
-            
+
             try:
                 # Test document indexing
                 result = index_manager.index_document(temp_file.name)
-                
+
                 # Verify indexing succeeded
                 assert "error" not in result
                 assert result["chunks_added"] > 0
                 assert result["source_type"] == "document"
-                
+
                 print(f"Successfully indexed document: {result}")
-                
+
                 # Get status to verify embeddings were created
                 status = index_manager.get_status()
                 assert status["metadata"]["total_chunks"] > 0
                 assert status["vector_store"]["total_vectors"] > 0
-                
+
                 # Test that embeddings have correct properties
                 self._verify_embeddings_properties(index_manager, status)
-                
+
                 # Test semantic search functionality
                 self._test_semantic_search(index_manager)
-                
+
                 # Test relationship-aware search
                 self._test_relationship_search(index_manager)
-                
+
             finally:
                 # Clean up temporary file (Windows-safe)
                 try:
@@ -141,34 +142,36 @@ from web development to data science and artificial intelligence.
         # Check embedding dimensions
         embedder = index_manager.embedder
         expected_dim = embedder.get_dimension()
-        
+
         # For all-MiniLM-L6-v2, dimension should be 384
         if "MiniLM-L6-v2" in embedder.model_name:
             assert expected_dim == 384, f"Expected 384 dimensions, got {expected_dim}"
-        
+
         # Check that vector store has same dimension
         assert index_manager.vector_store.dimension == expected_dim
-        
+
         # Verify embeddings are normalized (length close to 1.0 for cosine similarity)
         sample_chunks = index_manager.metadata_store.get_all_chunks()
         if sample_chunks:
             sample_chunk = sample_chunks[0]
-            
+
             # Get embedding for this chunk
             embedding = index_manager.embedder.embed_single(sample_chunk.chunk_text)
-            
+
             # Check embedding properties
-            assert embedding.shape == (expected_dim,), f"Wrong embedding shape: {embedding.shape}"
+            assert embedding.shape == (
+                expected_dim,
+            ), f"Wrong embedding shape: {embedding.shape}"
             assert embedding.dtype == np.float32, f"Wrong dtype: {embedding.dtype}"
-            
+
             # Check if normalized (length should be close to 1.0)
             norm = np.linalg.norm(embedding)
             assert 0.9 <= norm <= 1.1, f"Embedding not normalized, norm: {norm}"
-            
+
             # Check for reasonable value distribution (no all zeros, no extreme values)
             assert not np.allclose(embedding, 0), "Embedding is all zeros"
             assert np.all(np.abs(embedding) <= 1.0), "Embedding has extreme values"
-            
+
             print(f"✅ Embedding verification passed:")
             print(f"   - Shape: {embedding.shape}")
             print(f"   - Dtype: {embedding.dtype}")
@@ -182,36 +185,51 @@ from web development to data science and artificial intelligence.
             ("object-oriented", "Should find OOP section"),
             ("standard library", "Should find library content"),
             ("code example", "Should find code examples"),
-            ("artificial intelligence", "Should find AI mention in conclusion")
+            ("artificial intelligence", "Should find AI mention in conclusion"),
         ]
-        
+
         for query, description in test_queries:
             response = index_manager.search(query, top_k=3)
-            
+
             # Basic checks
-            assert hasattr(response, 'success'), f"Response should be SearchResponse for query '{query}'"
-            assert response.success, f"Search should succeed for query '{query}': {response.error}"
+            assert hasattr(
+                response, "success"
+            ), f"Response should be SearchResponse for query '{query}'"
+            assert (
+                response.success
+            ), f"Search should succeed for query '{query}': {response.error}"
             assert len(response.results) <= 3, f"Too many results for query '{query}'"
-            
+
             if response.results:  # If we got results
                 result = response.results[0]
-                
+
                 # Check result structure (new format)
-                assert hasattr(result, 'text'), f"Missing text in result for '{query}'"
-                assert hasattr(result, 'relevance_score'), f"Missing relevance_score in result for '{query}'"
-                assert hasattr(result, 'source_path'), f"Missing source_path in result for '{query}'"
-                
+                assert hasattr(result, "text"), f"Missing text in result for '{query}'"
+                assert hasattr(
+                    result, "relevance_score"
+                ), f"Missing relevance_score in result for '{query}'"
+                assert hasattr(
+                    result, "source_path"
+                ), f"Missing source_path in result for '{query}'"
+
                 # Check similarity score is reasonable
                 score = result.relevance_score
                 # Different embedding models use different score ranges
                 # Some use [0,1], others use [-1,1], and some use arbitrary ranges
-                assert isinstance(score, (int, float)), f"Score should be numeric for '{query}': {score}"
-                
+                assert isinstance(
+                    score, (int, float)
+                ), f"Score should be numeric for '{query}': {score}"
+
                 # For semantic search, we expect the score to exist and be finite
                 import math
-                assert math.isfinite(score), f"Score should be finite for '{query}': {score}"
-                
-                print(f"✅ Query '{query}': {len(response.results)} results, best score: {score:.4f}")
+
+                assert math.isfinite(
+                    score
+                ), f"Score should be finite for '{query}': {score}"
+
+                print(
+                    f"✅ Query '{query}': {len(response.results)} results, best score: {score:.4f}"
+                )
             else:
                 print(f"⚠️  Query '{query}': No results found")
 
@@ -219,24 +237,24 @@ from web development to data science and artificial intelligence.
         """Test relationship-aware search functionality."""
         # Test with relationship context
         query = "Python programming language"
-        
+
         # Basic search
         basic_response = index_manager.search(query, top_k=5)
-        
+
         # Search with context (if supported)
         try:
             context_response = index_manager.search_with_context(
                 query, top_k=5, include_related=True
             )
-            
+
             # Both should return SearchResponse objects
-            assert hasattr(basic_response, 'success')
-            assert hasattr(context_response, 'success')
-            
+            assert hasattr(basic_response, "success")
+            assert hasattr(context_response, "success")
+
             print(f"✅ Relationship search test:")
             print(f"   - Basic search: {len(basic_response.results)} results")
             print(f"   - Context search: {len(context_response.results)} results")
-            
+
             # Verify relationship metadata if chunks have it
             sample_chunks = index_manager.metadata_store.get_all_chunks()
             if sample_chunks and index_manager.config.enable_relationships:
@@ -245,15 +263,17 @@ from web development to data science and artificial intelligence.
                     if chunk.references or chunk.tags:
                         chunk_with_refs = chunk
                         break
-                
+
                 if chunk_with_refs:
                     print(f"✅ Found chunk with relationships:")
                     print(f"   - References: {len(chunk_with_refs.references)}")
                     print(f"   - Tags: {len(chunk_with_refs.tags)}")
-                    
+
                     if chunk_with_refs.references:
-                        print(f"   - Sample references: {chunk_with_refs.references[:3]}")
-                
+                        print(
+                            f"   - Sample references: {chunk_with_refs.references[:3]}"
+                        )
+
         except Exception as e:
             print(f"⚠️  Relationship search not fully implemented: {e}")
 
@@ -261,7 +281,9 @@ from web development to data science and artificial intelligence.
     def test_multiple_document_types(self, index_manager):
         """Test with different types of content to verify embedding consistency."""
         test_documents = [
-            ("Technical documentation", """
+            (
+                "Technical documentation",
+                """
 # API Documentation
 
 ## Authentication
@@ -270,13 +292,19 @@ All API requests require authentication via API key.
 ## Endpoints
 - GET /users: Retrieve user list
 - POST /users: Create new user
-"""),
-            ("Narrative text", """
+""",
+            ),
+            (
+                "Narrative text",
+                """
 Once upon a time, in a land far away, there lived a young developer
 who dreamed of creating the perfect search system. She worked day and night,
 experimenting with different algorithms and approaches.
-"""),
-            ("Code-heavy content", """
+""",
+            ),
+            (
+                "Code-heavy content",
+                """
 ```python
 class SearchEngine:
     def __init__(self, embedder):
@@ -285,37 +313,44 @@ class SearchEngine:
     def index_document(self, text):
         return self.embedder.embed(text)
 ```
-""")
+""",
+            ),
         ]
-        
+
         for doc_type, content in test_documents:
             with tempfile.NamedTemporaryFile(
-                mode='w', suffix='.md', delete=False, encoding='utf-8'
+                mode="w", suffix=".md", delete=False, encoding="utf-8"
             ) as temp_file:
                 temp_file.write(content)
                 temp_file.flush()
-                
+
                 try:
                     result = index_manager.index_document(temp_file.name)
                     assert "error" not in result
                     assert result["chunks_added"] > 0
-                    print(f"✅ Successfully indexed {doc_type}: {result['chunks_added']} chunks")
-                    
+                    print(
+                        f"✅ Successfully indexed {doc_type}: {result['chunks_added']} chunks"
+                    )
+
                 finally:
                     # Windows-safe cleanup
                     try:
                         Path(temp_file.name).unlink(missing_ok=True)
                     except PermissionError:
                         pass
-        
+
         # After indexing multiple documents, test cross-document search
         response = index_manager.search("API documentation", top_k=5)
         assert response.success, f"Search should succeed: {response.error}"
-        assert len(response.results) > 0, "Should find results across different document types"
-        
+        assert (
+            len(response.results) > 0
+        ), "Should find results across different document types"
+
         final_status = index_manager.get_status()
-        print(f"✅ Final index status: {final_status['metadata']['total_chunks']} chunks, "
-              f"{final_status['vector_store']['total_vectors']} vectors")
+        print(
+            f"✅ Final index status: {final_status['metadata']['total_chunks']} chunks, "
+            f"{final_status['vector_store']['total_vectors']} vectors"
+        )
 
     def test_code_file_embedding_generation(self, index_manager):
         """Test complete pipeline for code files: Python code → chunks → embeddings → search."""
@@ -456,31 +491,31 @@ def main():
 if __name__ == "__main__":
     main()
 '''
-        
+
         # Create temporary Python file
         with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.py', delete=False, encoding='utf-8'
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
         ) as temp_file:
             temp_file.write(python_code)
             temp_file.flush()
-            
+
             try:
                 # Test code indexing
                 result = index_manager.index_codebase(str(Path(temp_file.name).parent))
-                
+
                 # Verify indexing succeeded
                 assert "error" not in result
                 assert result["files_processed"] > 0
                 assert result["chunks_added"] > 0
                 assert result["source_type"] == "code"
-                
+
                 print(f"✅ Successfully indexed code file: {result}")
-                
+
                 # Get status to verify embeddings were created
                 status = index_manager.get_status()
                 assert status["metadata"]["total_chunks"] > 0
                 assert status["vector_store"]["total_vectors"] > 0
-                
+
                 # Test code-specific semantic search
                 code_queries = [
                     ("search engine class", "Should find SearchEngine class"),
@@ -488,23 +523,30 @@ if __name__ == "__main__":
                     ("document indexing", "Should find indexing functionality"),
                     ("machine learning embeddings", "Should find embedding generation"),
                 ]
-                
+
                 for query, description in code_queries:
                     response = index_manager.search(query, top_k=3)
-                    
-                    assert response.success, f"Search should succeed for '{query}': {response.error}"
-                    
+
+                    assert (
+                        response.success
+                    ), f"Search should succeed for '{query}': {response.error}"
+
                     if response.results:
                         result = response.results[0]
                         score = result.relevance_score
                         # For mocked embeddings, just check that we get a valid numeric score
                         import math
-                        assert isinstance(score, (int, float)), f"Score should be numeric for '{query}': {score}"
-                        assert math.isfinite(score), f"Score should be finite for '{query}': {score}"
+
+                        assert isinstance(
+                            score, (int, float)
+                        ), f"Score should be numeric for '{query}': {score}"
+                        assert math.isfinite(
+                            score
+                        ), f"Score should be finite for '{query}': {score}"
                         print(f"✅ Code query '{query}': score {score:.4f}")
                     else:
                         print(f"⚠️  Code query '{query}': No results found")
-                
+
             finally:
                 # Clean up temporary file (Windows-safe)
                 try:
@@ -515,7 +557,7 @@ if __name__ == "__main__":
     def test_webpage_embedding_generation(self, index_manager):
         """Test complete pipeline for webpage-like content: Markdown → chunks → embeddings → search."""
         # Sample webpage-like content in Markdown format (equivalent to HTML content)
-        webpage_content = '''# Machine Learning Tutorial: A Complete Guide
+        webpage_content = """# Machine Learning Tutorial: A Complete Guide
 
 **Meta**: Comprehensive guide to machine learning concepts and algorithms
 
@@ -615,51 +657,64 @@ print(f'Mean Squared Error: {mse}')
 
 **Contact**: info@mltutorial.com  
 **Copyright**: 2024 Machine Learning Tutorial. All rights reserved.
-'''
-        
+"""
+
         # Create temporary Markdown file
         with tempfile.NamedTemporaryFile(
-            mode='w', suffix='.md', delete=False, encoding='utf-8'
+            mode="w", suffix=".md", delete=False, encoding="utf-8"
         ) as temp_file:
             temp_file.write(webpage_content)
             temp_file.flush()
-            
+
             try:
                 # Test webpage-like content indexing
                 result = index_manager.index_document(temp_file.name)
-                
+
                 # Verify indexing succeeded
                 assert "error" not in result
                 assert result["chunks_added"] > 0
                 assert result["source_type"] == "document"
-                
+
                 print(f"✅ Successfully indexed webpage content: {result}")
-                
+
                 # Test webpage-specific semantic search
                 webpage_queries = [
                     ("machine learning tutorial", "Should find ML tutorial content"),
-                    ("neural networks deep learning", "Should find neural network sections"),
-                    ("supervised learning algorithms", "Should find supervised learning content"),
+                    (
+                        "neural networks deep learning",
+                        "Should find neural network sections",
+                    ),
+                    (
+                        "supervised learning algorithms",
+                        "Should find supervised learning content",
+                    ),
                     ("code example python", "Should find code examples"),
                     ("regression classification", "Should find algorithm descriptions"),
                 ]
-                
+
                 for query, description in webpage_queries:
                     response = index_manager.search(query, top_k=3)
-                    
-                    assert response.success, f"Search should succeed for '{query}': {response.error}"
-                    
+
+                    assert (
+                        response.success
+                    ), f"Search should succeed for '{query}': {response.error}"
+
                     if response.results:
                         result = response.results[0]
                         score = result.relevance_score
                         # Just check that we get a valid numeric score
                         import math
-                        assert isinstance(score, (int, float)), f"Score should be numeric for '{query}': {score}"
-                        assert math.isfinite(score), f"Score should be finite for '{query}': {score}"
+
+                        assert isinstance(
+                            score, (int, float)
+                        ), f"Score should be numeric for '{query}': {score}"
+                        assert math.isfinite(
+                            score
+                        ), f"Score should be finite for '{query}': {score}"
                         print(f"✅ Webpage query '{query}': score {score:.4f}")
                     else:
                         print(f"⚠️  Webpage query '{query}': No results found")
-                
+
             finally:
                 # Clean up temporary file (Windows-safe)
                 try:
@@ -671,7 +726,7 @@ print(f'Mean Squared Error: {mse}')
 @pytest.mark.integration
 class TestFullPipeline:
     """Test the complete MCP server pipeline."""
-    
+
     def test_mcp_status_after_indexing(self, sample_markdown_content=None):
         """Test MCP status function returns proper information after indexing."""
         if not sample_markdown_content:
@@ -680,60 +735,64 @@ class TestFullPipeline:
 This is a simple test document for checking MCP functionality.
 It contains some basic content for indexing and search testing.
 """
-        
+
         # Use a more isolated config for this test
         config = Config()
         config.auto_persist = False
         config.auto_load = False
         config.embedding_model = "all-MiniLM-L6-v2"  # Faster model for testing
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             config.index_dir = Path(temp_dir)
-            
+
             manager = IndexManager(config)
             try:
                 # Create and index a test document
                 with tempfile.NamedTemporaryFile(
-                    mode='w', suffix='.md', delete=False, encoding='utf-8'
+                    mode="w", suffix=".md", delete=False, encoding="utf-8"
                 ) as temp_file:
                     temp_file.write(sample_markdown_content)
                     temp_file.flush()
-                    
+
                     # Index the document
                     result = manager.index_document(temp_file.name)
                     assert "error" not in result
-                    
+
                     # Test status
                     status = manager.get_status()
-                    
+
                     # Verify status structure
                     assert "metadata" in status
                     assert "vector_store" in status
                     assert "embedding" in status
                     assert "performance" in status
                     assert "memory_usage_mb" in status["performance"]
-                    
+
                     # Verify content was indexed
                     assert status["metadata"]["total_chunks"] > 0
                     assert status["vector_store"]["total_vectors"] > 0
                     assert status["embedding"]["provider"] == "sentence_transformers"
-                    
+
                     print(f"✅ MCP Status test passed:")
                     print(f"   - Total chunks: {status['metadata']['total_chunks']}")
-                    print(f"   - Total vectors: {status['vector_store']['total_vectors']}")
-                    print(f"   - Memory usage: {status['performance']['memory_usage_mb']:.2f} MB")
-                    
+                    print(
+                        f"   - Total vectors: {status['vector_store']['total_vectors']}"
+                    )
+                    print(
+                        f"   - Memory usage: {status['performance']['memory_usage_mb']:.2f} MB"
+                    )
+
                     # Clean up temp file (Windows-safe)
                     try:
                         Path(temp_file.name).unlink(missing_ok=True)
                     except PermissionError:
                         pass
-                    
+
             finally:
                 # Cleanup
                 try:
                     manager.clear_index()
-                    if hasattr(manager, 'embedder') and manager.embedder:
+                    if hasattr(manager, "embedder") and manager.embedder:
                         manager.embedder.cleanup()
                 except Exception:
                     pass

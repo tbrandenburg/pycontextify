@@ -14,20 +14,32 @@ def example_python_project():
     """Example: Index a Python project with documentation."""
     print("🐍 Python Project Setup")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "python_project",
-        "--index-path", "./project_index",
-        "--initial-documents", "README.md", "CHANGELOG.md", "docs/",
-        "--initial-codebase", "src", "tests",
-        "--initial-webpages", "https://docs.python.org/3/library/", 
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "python_project",
+        "--index-path",
+        "./project_index",
+        "--initial-documents",
+        "README.md",
+        "CHANGELOG.md",
+        "docs/",
+        "--initial-codebase",
+        "src",
+        "tests",
+        "--initial-webpages",
+        "https://docs.python.org/3/library/",
         "--recursive-crawling",
-        "--max-crawl-depth", "1",
-        "--crawl-delay", "2",
-        "--verbose"
+        "--max-crawl-depth",
+        "1",
+        "--crawl-delay",
+        "2",
+        "--verbose",
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
     print("✓ Index project documentation (README, CHANGELOG, docs/)")
@@ -42,27 +54,38 @@ def example_research_project():
     """Example: Index research materials with academic papers."""
     print("🔬 Research Project Setup")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "research_ai",
-        "--index-path", "./research_index",
-        "--initial-documents", "papers/*.pdf", "notes.md", "references.txt",
-        "--initial-webpages", 
-            "https://arxiv.org/abs/1706.03762",  # Attention is All You Need
-            "https://openai.com/research/gpt-4",
-            "https://huggingface.co/docs/transformers",
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "research_ai",
+        "--index-path",
+        "./research_index",
+        "--initial-documents",
+        "papers/*.pdf",
+        "notes.md",
+        "references.txt",
+        "--initial-webpages",
+        "https://arxiv.org/abs/1706.03762",  # Attention is All You Need
+        "https://openai.com/research/gpt-4",
+        "https://huggingface.co/docs/transformers",
         "--recursive-crawling",
-        "--max-crawl-depth", "1", 
-        "--crawl-delay", "3",
-        "--embedding-provider", "sentence_transformers",
-        "--embedding-model", "all-mpnet-base-v2"
+        "--max-crawl-depth",
+        "1",
+        "--crawl-delay",
+        "3",
+        "--embedding-provider",
+        "sentence_transformers",
+        "--embedding-model",
+        "all-mpnet-base-v2",
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
     print("✓ Index research papers (PDF files)")
-    print("✓ Index personal notes and references")  
+    print("✓ Index personal notes and references")
     print("✓ Index key AI research websites")
     print("✓ Use high-quality embeddings for academic content")
     print("✓ Respectful crawling with 3-second delays")
@@ -73,21 +96,26 @@ def example_api_documentation():
     """Example: Index API documentation sites."""
     print("📚 API Documentation Setup")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "api_docs",
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "api_docs",
         "--initial-webpages",
-            "https://docs.fastapi.tiangolo.com/",
-            "https://requests.readthedocs.io/",
-            "https://docs.pydantic.dev/",
+        "https://docs.fastapi.tiangolo.com/",
+        "https://requests.readthedocs.io/",
+        "https://docs.pydantic.dev/",
         "--recursive-crawling",
-        "--max-crawl-depth", "2",
-        "--crawl-delay", "1",
+        "--max-crawl-depth",
+        "2",
+        "--crawl-delay",
+        "1",
         "--no-auto-persist",  # Don't auto-save during development
-        "--verbose"
+        "--verbose",
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
     print("✓ Index comprehensive API documentation")
@@ -101,24 +129,37 @@ def example_knowledge_base():
     """Example: Comprehensive knowledge base with mixed content."""
     print("🧠 Knowledge Base Setup")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "knowledge_base",
-        "--index-path", "./kb_index",
-        "--initial-documents", "knowledge/*.md", "guides/*.pdf", "specs/*.txt",
-        "--initial-codebase", "examples", "demos", "templates",
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "knowledge_base",
+        "--index-path",
+        "./kb_index",
+        "--initial-documents",
+        "knowledge/*.md",
+        "guides/*.pdf",
+        "specs/*.txt",
+        "--initial-codebase",
+        "examples",
+        "demos",
+        "templates",
         "--initial-webpages",
-            "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
-            "https://docs.docker.com/",
-            "https://kubernetes.io/docs/",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+        "https://docs.docker.com/",
+        "https://kubernetes.io/docs/",
         "--recursive-crawling",
-        "--max-crawl-depth", "1",
-        "--crawl-delay", "2",
-        "--embedding-provider", "sentence_transformers",
-        "--no-auto-load"  # Fresh start each time
+        "--max-crawl-depth",
+        "1",
+        "--crawl-delay",
+        "2",
+        "--embedding-provider",
+        "sentence_transformers",
+        "--no-auto-load",  # Fresh start each time
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
     print("✓ Index comprehensive documentation files")
@@ -133,17 +174,23 @@ def example_documentation_site():
     """Example: Deep crawl of a documentation website."""
     print("🌐 Documentation Site Deep Crawl")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "django_docs",
-        "--initial-webpages", "https://docs.djangoproject.com/en/stable/",
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "django_docs",
+        "--initial-webpages",
+        "https://docs.djangoproject.com/en/stable/",
         "--recursive-crawling",
-        "--max-crawl-depth", "3",  # Maximum allowed depth
-        "--crawl-delay", "2",
-        "--verbose"
+        "--max-crawl-depth",
+        "3",  # Maximum allowed depth
+        "--crawl-delay",
+        "2",
+        "--verbose",
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
     print("✓ Deep crawl Django documentation (depth 3)")
@@ -157,17 +204,22 @@ def example_development_workflow():
     """Example: Development workflow with quick iteration."""
     print("⚡ Development Workflow")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "dev_workspace",
-        "--initial-documents", "README.md",
-        "--initial-codebase", "src",
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "dev_workspace",
+        "--initial-documents",
+        "README.md",
+        "--initial-codebase",
+        "src",
         "--no-auto-persist",
-        "--no-auto-load", 
-        "--verbose"
+        "--no-auto-load",
+        "--verbose",
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
     print("✓ Quick indexing of core development files")
@@ -181,24 +233,34 @@ def example_multilingual_content():
     """Example: Mixed content with different embedding models."""
     print("🌍 Multilingual Content Setup")
     print("=" * 50)
-    
+
     cmd = [
-        "uv", "run", "pycontextify",
-        "--index-name", "multilingual",
-        "--initial-documents", "content/en/*.md", "content/es/*.md", "content/fr/*.md",
+        "uv",
+        "run",
+        "pycontextify",
+        "--index-name",
+        "multilingual",
+        "--initial-documents",
+        "content/en/*.md",
+        "content/es/*.md",
+        "content/fr/*.md",
         "--initial-webpages",
-            "https://en.wikipedia.org/wiki/Machine_learning",
-            "https://es.wikipedia.org/wiki/Aprendizaje_automático",
+        "https://en.wikipedia.org/wiki/Machine_learning",
+        "https://es.wikipedia.org/wiki/Aprendizaje_automático",
         "--recursive-crawling",
-        "--max-crawl-depth", "1",
-        "--crawl-delay", "3",
-        "--embedding-provider", "sentence_transformers",
-        "--embedding-model", "paraphrase-multilingual-mpnet-base-v2"  # Multilingual model
+        "--max-crawl-depth",
+        "1",
+        "--crawl-delay",
+        "3",
+        "--embedding-provider",
+        "sentence_transformers",
+        "--embedding-model",
+        "paraphrase-multilingual-mpnet-base-v2",  # Multilingual model
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis setup will:")
-    print("✓ Index multilingual documents") 
+    print("✓ Index multilingual documents")
     print("✓ Index Wikipedia content in multiple languages")
     print("✓ Use multilingual embedding model")
     print("✓ Respectful crawling for Wikipedia")
@@ -209,9 +271,9 @@ def show_help_example():
     """Show how to get help information."""
     print("❓ Getting Help")
     print("=" * 50)
-    
+
     cmd = ["uv", "run", "pycontextify", "--help"]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print("\nThis will show:")
     print("✓ All available CLI arguments")
@@ -229,21 +291,21 @@ def main():
     print("These examples show practical ways to use the PyContextify CLI")
     print("for different scenarios. Copy and modify them for your needs!")
     print()
-    
+
     examples = [
         example_python_project,
-        example_research_project, 
+        example_research_project,
         example_api_documentation,
         example_knowledge_base,
         example_documentation_site,
         example_development_workflow,
         example_multilingual_content,
-        show_help_example
+        show_help_example,
     ]
-    
+
     for example in examples:
         example()
-    
+
     print("💡 Tips:")
     print("- Start with simple setups and add complexity gradually")
     print("- Use --verbose for detailed progress monitoring")
@@ -251,10 +313,10 @@ def main():
     print("- Use --no-auto-persist during development for faster iteration")
     print("- Combine different content types for comprehensive search indexes")
     print()
-    
+
     print("📝 Notes:")
     print("- Replace example URLs with your actual documentation sites")
-    print("- Adjust file paths to match your project structure") 
+    print("- Adjust file paths to match your project structure")
     print("- Consider using environment variables for sensitive configurations")
     print("- Test with small datasets before indexing large amounts of content")
 

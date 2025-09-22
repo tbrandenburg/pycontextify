@@ -298,6 +298,7 @@ class TestMetadataStore:
 
         # Use tempfile.mktemp to avoid Windows permission issues
         import tempfile
+
         temp_file = tempfile.mktemp(suffix=".pkl")
         try:
             # Save
@@ -471,8 +472,9 @@ class TestClass:
         store.add_relationship("pandas", "chunk2", RelationshipStore.REFERENCE)
 
         # Use tempfile.mktemp to avoid Windows permission issues
-        import tempfile
         import os
+        import tempfile
+
         temp_file = tempfile.mktemp(suffix=".pkl")
         try:
             # Save

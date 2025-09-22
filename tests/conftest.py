@@ -4,49 +4,52 @@ This file provides performance optimizations by mocking heavy dependencies
 to dramatically reduce test execution time.
 """
 
-import pytest
-import numpy as np
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 
 @pytest.fixture(autouse=True)
 def mock_sentence_transformers(request):
     """Mock sentence-transformers to avoid model loading.
-    
+
     This fixture automatically mocks sentence-transformers for all tests,
     reducing test time from ~300s to ~60s (80% improvement).
-    
+
     Tests can use the marker @pytest.mark.no_mock_st to disable this mock.
     """
     # Check if test wants to disable this mock
-    if hasattr(request, 'node') and request.node.get_closest_marker('no_mock_st'):
+    if hasattr(request, "node") and request.node.get_closest_marker("no_mock_st"):
         yield None
         return
-        
-    with patch('sentence_transformers.SentenceTransformer') as mock_st:
+
+    with patch("sentence_transformers.SentenceTransformer") as mock_st:
         # Create mock model with realistic behavior
         mock_model = Mock()
-        
+
         # Mock encode method to return realistic normalized embeddings
         def mock_encode(texts, *args, **kwargs):
             if isinstance(texts, str):
                 texts = [texts]
             # Return normalized random embeddings (L2 norm ≈ 1.0)
             batch_size = len(texts)
-            embeddings = np.random.randn(batch_size, 384).astype(np.float32)  # Normal distribution
+            embeddings = np.random.randn(batch_size, 384).astype(
+                np.float32
+            )  # Normal distribution
             # Normalize to unit vectors
             norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
             return embeddings / norms
-        
+
         mock_model.encode = mock_encode
         mock_model.get_sentence_embedding_dimension.return_value = 384
         mock_model.max_seq_length = 512
-        
+
         # Mock model loading
         mock_st.return_value = mock_model
-        
+
         yield mock_model
 
 
@@ -129,7 +132,7 @@ def mock_embedder():
     """Provide a mock embedder instance for testing."""
     embedder = Mock()
     embedder.embed_texts.return_value = np.random.rand(5, 384).astype(np.float32)
-    embedder.embed_single.return_value = np.random.rand(384).astype(np.float32) 
+    embedder.embed_single.return_value = np.random.rand(384).astype(np.float32)
     embedder.get_dimension.return_value = 384
     embedder.get_provider_name.return_value = "mock_provider"
     embedder.get_model_name.return_value = "mock_model"
@@ -142,15 +145,15 @@ def mock_embedder():
 def mock_config(temp_index_dir):
     """Provide a mock config for testing."""
     from pycontextify.index.config import Config
-    
+
     # Create config with temporary directory
     config_overrides = {
         "index_dir": str(temp_index_dir),
         "auto_persist": False,  # Disable for faster tests
         "auto_load": False,
-        "index_name": "test_index"
+        "index_name": "test_index",
     }
-    
+
     return Config(config_overrides=config_overrides)
 
 
@@ -160,9 +163,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (skipped only with --fast flag)"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line(
         "markers", "embedding: marks tests as requiring embedding models"
     )
@@ -171,10 +172,10 @@ def pytest_configure(config):
 def pytest_addoption(parser):
     """Add command line options."""
     parser.addoption(
-        "--fast", 
-        action="store_true", 
-        default=False, 
-        help="skip slow tests for faster execution"
+        "--fast",
+        action="store_true",
+        default=False,
+        help="skip slow tests for faster execution",
     )
 
 
@@ -183,8 +184,10 @@ def pytest_collection_modifyitems(config, items):
     if not config.getoption("--fast"):
         # Run all tests by default (including slow ones)
         return
-        
-    skip_slow = pytest.mark.skip(reason="slow test skipped (use without --fast to include)")
+
+    skip_slow = pytest.mark.skip(
+        reason="slow test skipped (use without --fast to include)"
+    )
     for item in items:
         if "slow" in item.keywords:
             item.add_marker(skip_slow)

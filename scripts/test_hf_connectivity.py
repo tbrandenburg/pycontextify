@@ -4,6 +4,7 @@
 import socket
 import ssl
 import time
+
 import requests
 from transformers import AutoTokenizer
 
@@ -13,7 +14,7 @@ def test_dns_resolution():
     print("Testing DNS resolution...")
     start = time.time()
     try:
-        ip = socket.gethostbyname('huggingface.co')
+        ip = socket.gethostbyname("huggingface.co")
         duration = time.time() - start
         print(f"✅ DNS lookup successful: {ip} (took {duration:.2f}s)")
         return True
@@ -28,8 +29,8 @@ def test_ssl_connection():
     start = time.time()
     try:
         ctx = ssl.create_default_context()
-        with socket.create_connection(('huggingface.co', 443), timeout=10) as sock:
-            with ctx.wrap_socket(sock, server_hostname='huggingface.co') as ssock:
+        with socket.create_connection(("huggingface.co", 443), timeout=10) as sock:
+            with ctx.wrap_socket(sock, server_hostname="huggingface.co") as ssock:
                 pass
         duration = time.time() - start
         print(f"✅ SSL connection successful (took {duration:.2f}s)")
@@ -44,7 +45,7 @@ def test_api_request():
     print("Testing HuggingFace API request...")
     start = time.time()
     try:
-        response = requests.get('https://huggingface.co/api/models', timeout=10)
+        response = requests.get("https://huggingface.co/api/models", timeout=10)
         duration = time.time() - start
         if response.status_code == 200:
             print(f"✅ API request successful (took {duration:.2f}s)")
@@ -81,7 +82,9 @@ def test_tokenizer_loading():
     print("Testing tokenizer loading (this might take a while on first run)...")
     start = time.time()
     try:
-        tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+        tokenizer = AutoTokenizer.from_pretrained(
+            "sentence-transformers/all-MiniLM-L6-v2"
+        )
         duration = time.time() - start
         print(f"✅ Tokenizer loading successful (took {duration:.2f}s)")
         return True
@@ -93,15 +96,15 @@ def test_tokenizer_loading():
 def main():
     """Run all connectivity tests."""
     print("🔍 Testing HuggingFace connectivity...\n")
-    
+
     tests = [
         ("DNS Resolution", test_dns_resolution),
-        ("SSL Connection", test_ssl_connection), 
+        ("SSL Connection", test_ssl_connection),
         ("API Request", test_api_request),
         ("Model Config Download", test_model_config_download),
         ("Tokenizer Loading", test_tokenizer_loading),
     ]
-    
+
     results = []
     for name, test_func in tests:
         print(f"\n--- {name} ---")
@@ -111,21 +114,23 @@ def main():
         except Exception as e:
             print(f"❌ {name} failed with exception: {e}")
             results.append((name, False))
-    
-    print("\n" + "="*50)
+
+    print("\n" + "=" * 50)
     print("SUMMARY:")
-    print("="*50)
-    
+    print("=" * 50)
+
     for name, success in results:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{name:25} {status}")
-    
+
     passed = sum(1 for _, success in results if success)
     total = len(results)
     print(f"\nOverall: {passed}/{total} tests passed")
-    
+
     if passed == total:
-        print("🎉 All connectivity tests passed! Your connection to HuggingFace is working.")
+        print(
+            "🎉 All connectivity tests passed! Your connection to HuggingFace is working."
+        )
     else:
         print("⚠️  Some tests failed. Check the details above for specific issues.")
 

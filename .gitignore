@@ -41,6 +41,9 @@ venv.bak/
 # Serena MCP
 .serena/
 
+# Temp
+.temp/
+
 # OS
 .DS_Store
 .DS_Store?

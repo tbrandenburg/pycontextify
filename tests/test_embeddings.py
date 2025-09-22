@@ -277,13 +277,13 @@ class TestSentenceTransformersEmbedder:
         """Test behavior when sentence-transformers is not available."""
         # Create embedder first
         embedder = SentenceTransformersEmbedder("all-MiniLM-L6-v2")
-        
+
         # Mock the import at the exact location where it's used
         def mock_import(name, *args, **kwargs):
             if name == "sentence_transformers":
                 raise ImportError("sentence-transformers not installed")
             return __import__(name, *args, **kwargs)
-        
+
         with patch("builtins.__import__", side_effect=mock_import):
             with pytest.raises(
                 ProviderNotAvailableError, match="sentence-transformers not installed"

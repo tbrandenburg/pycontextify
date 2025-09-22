@@ -149,17 +149,17 @@ class VectorStore:
 
     def remove_vectors(self, faiss_ids: List[int]) -> None:
         """Remove vectors by FAISS IDs.
-        
+
         Note: FAISS IndexFlatIP doesn't support removal of individual vectors.
         This method logs the request but cannot actually remove vectors.
         The vector store would need to be rebuilt to truly remove vectors.
-        
+
         Args:
             faiss_ids: List of FAISS IDs to remove
         """
         if not faiss_ids:
             return
-            
+
         # FAISS IndexFlatIP doesn't support vector removal
         # Log this limitation
         logger.warning(
@@ -167,7 +167,7 @@ class VectorStore:
             "FAISS IndexFlatIP does not support individual vector removal. "
             "Consider using clear() and rebuilding the entire index for true removal."
         )
-        
+
         # In a production system, you might want to:
         # 1. Keep track of removed IDs and filter them during search
         # 2. Use a different FAISS index type that supports removal

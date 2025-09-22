@@ -9,6 +9,7 @@ import logging
 import os
 import signal
 from pathlib import Path
+from threading import Lock
 from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
@@ -20,8 +21,133 @@ from .index.manager import IndexManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global manager instance
-manager = None
+# Thread-safe singleton manager
+_manager_lock = Lock()
+_manager_instance: Optional[IndexManager] = None
+_manager_config_overrides: Optional[Dict[str, Any]] = None
+
+
+# Common MCP validation and error handling utilities
+def validate_string_param(
+    value: Any, param_name: str, allow_empty: bool = False
+) -> str:
+    """Validate string parameter for MCP functions.
+
+    Args:
+        value: Value to validate
+        param_name: Name of the parameter for error messages
+        allow_empty: Whether to allow empty strings
+
+    Returns:
+        Validated string value
+
+    Raises:
+        ValueError: If validation fails
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"{param_name} must be a string")
+
+    if not allow_empty and not value.strip():
+        raise ValueError(f"{param_name} cannot be empty")
+
+    return value.strip() if not allow_empty else value
+
+
+def validate_int_param(
+    value: Any, param_name: str, min_val: int = None, max_val: int = None
+) -> int:
+    """Validate integer parameter for MCP functions.
+
+    Args:
+        value: Value to validate
+        param_name: Name of the parameter for error messages
+        min_val: Minimum allowed value
+        max_val: Maximum allowed value
+
+    Returns:
+        Validated integer value
+
+    Raises:
+        ValueError: If validation fails
+    """
+    if not isinstance(value, int):
+        raise ValueError(f"{param_name} must be an integer")
+
+    if min_val is not None and value < min_val:
+        raise ValueError(f"{param_name} must be at least {min_val}")
+
+    if max_val is not None and value > max_val:
+        raise ValueError(f"{param_name} must be at most {max_val}")
+
+    return value
+
+
+def validate_bool_param(value: Any, param_name: str) -> bool:
+    """Validate boolean parameter for MCP functions.
+
+    Args:
+        value: Value to validate
+        param_name: Name of the parameter for error messages
+
+    Returns:
+        Validated boolean value
+
+    Raises:
+        ValueError: If validation fails
+    """
+    if not isinstance(value, bool):
+        raise ValueError(f"{param_name} must be a boolean")
+    return value
+
+
+def validate_choice_param(
+    value: Any, param_name: str, valid_choices: List[str], default: str = None
+) -> str:
+    """Validate choice parameter for MCP functions.
+
+    Args:
+        value: Value to validate
+        param_name: Name of the parameter for error messages
+        valid_choices: List of valid choices
+        default: Default value if invalid (optional)
+
+    Returns:
+        Validated choice value
+
+    Raises:
+        ValueError: If validation fails and no default provided
+    """
+    if not isinstance(value, str) or value not in valid_choices:
+        if default is not None:
+            logger.warning(f"Invalid {param_name} '{value}', using default '{default}'")
+            return default
+        raise ValueError(f"{param_name} must be one of: {', '.join(valid_choices)}")
+    return value
+
+
+def handle_mcp_errors(operation_name: str, func_impl, *args):
+    """Common error handling for MCP functions.
+
+    Args:
+        operation_name: Name of the operation for error messages
+        func_impl: The actual implementation function to call
+        *args: Arguments to pass to the function
+
+    Returns:
+        Result from function or structured error dict
+    """
+    try:
+        return func_impl(*args)
+    except ValueError as e:
+        # Validation errors - return structured error
+        error_msg = str(e)
+        logger.warning(f"{operation_name} validation error: {error_msg}")
+        return {"error": error_msg}
+    except Exception as e:
+        # Unexpected errors - log and return structured error
+        error_msg = f"{operation_name} failed: {str(e)}"
+        logger.error(error_msg)
+        return {"error": error_msg}
 
 
 def parse_args() -> argparse.Namespace:
@@ -148,28 +274,92 @@ Environment variables can still be used for all settings. Use --help for details
     return parser.parse_args()
 
 
-def initialize_manager(config_overrides: Optional[Dict[str, Any]] = None) -> IndexManager:
-    """Initialize the global IndexManager with optional configuration overrides.
-    
+def initialize_manager(
+    config_overrides: Optional[Dict[str, Any]] = None,
+) -> IndexManager:
+    """Initialize the IndexManager with thread-safe singleton pattern.
+
     Args:
         config_overrides: Optional dictionary of configuration overrides from CLI args
+
+    Returns:
+        IndexManager instance
+
+    Raises:
+        Exception: If manager initialization fails
     """
-    global manager
-    if manager is None:
-        try:
-            config = Config(config_overrides=config_overrides)
-            manager = IndexManager(config)
-            logger.info("IndexManager initialized successfully")
-            if config_overrides:
-                logger.info(f"Applied CLI configuration overrides: {list(config_overrides.keys())}")
-        except Exception as e:
-            logger.error(f"Failed to initialize IndexManager: {e}")
-            raise
-    return manager
+    global _manager_instance, _manager_config_overrides
+
+    with _manager_lock:
+        if _manager_instance is None:
+            try:
+                # Store config for cleanup handler
+                _manager_config_overrides = config_overrides
+                config = Config(config_overrides=config_overrides)
+                _manager_instance = IndexManager(config)
+                logger.info("IndexManager initialized successfully")
+                if config_overrides:
+                    logger.info(
+                        f"Applied CLI configuration overrides: {list(config_overrides.keys())}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to initialize IndexManager: {e}")
+                _manager_instance = None  # Reset on failure
+                _manager_config_overrides = None
+                raise
+
+    return _manager_instance
+
+
+def get_manager() -> Optional[IndexManager]:
+    """Get the current manager instance without initialization.
+
+    Returns:
+        Current IndexManager instance or None if not initialized
+    """
+    with _manager_lock:
+        return _manager_instance
+
+
+def reset_manager() -> None:
+    """Reset the manager singleton - primarily for testing.
+
+    This function should only be used in test environments to ensure
+    clean state between test runs.
+    """
+    global _manager_instance, _manager_config_overrides
+    with _manager_lock:
+        if _manager_instance:
+            try:
+                _manager_instance.__exit__(None, None, None)
+            except Exception:
+                pass  # Ignore cleanup errors during test reset
+        _manager_instance = None
+        _manager_config_overrides = None
 
 
 # Create FastMCP application
 mcp = FastMCP("PyContextify")
+
+
+def _index_code_impl(path: str) -> Dict[str, Any]:
+    """Implementation for index_code with validation and business logic."""
+    # Validate parameters
+    path = validate_string_param(path, "path")
+
+    path_obj = Path(path).resolve()
+    if not path_obj.exists():
+        raise ValueError(f"Path does not exist: {path}")
+
+    if not path_obj.is_dir():
+        raise ValueError(f"Path is not a directory: {path}")
+
+    # Initialize manager and index
+    mgr = initialize_manager()
+    result = mgr.index_codebase(str(path_obj))
+
+    logger.info(f"Code indexing completed for {path}: {result}")
+    return result
 
 
 @mcp.tool
@@ -186,29 +376,34 @@ def index_code(path: str) -> Dict[str, Any]:
     Returns:
         Dictionary with indexing statistics including files processed and chunks added
     """
-    try:
-        # Validate path
-        if not path or not isinstance(path, str):
-            return {"error": "Path must be a non-empty string"}
+    return handle_mcp_errors("Code indexing", _index_code_impl, path)
 
-        path_obj = Path(path).resolve()
-        if not path_obj.exists():
-            return {"error": f"Path does not exist: {path}"}
 
-        if not path_obj.is_dir():
-            return {"error": f"Path is not a directory: {path}"}
+def _index_document_impl(path: str) -> Dict[str, Any]:
+    """Implementation for index_document with validation and business logic."""
+    # Validate parameters
+    path = validate_string_param(path, "path")
 
-        # Initialize manager and index
-        mgr = initialize_manager()
-        result = mgr.index_codebase(str(path_obj))
+    path_obj = Path(path).resolve()
+    if not path_obj.exists():
+        raise ValueError(f"File does not exist: {path}")
 
-        logger.info(f"Code indexing completed for {path}: {result}")
-        return result
+    if not path_obj.is_file():
+        raise ValueError(f"Path is not a file: {path}")
 
-    except Exception as e:
-        error_msg = f"Failed to index code at {path}: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg}
+    # Check supported extensions
+    supported_extensions = {".pdf", ".md", ".txt"}
+    if path_obj.suffix.lower() not in supported_extensions:
+        raise ValueError(
+            f"Unsupported file type. Supported: {', '.join(supported_extensions)}"
+        )
+
+    # Initialize manager and index
+    mgr = initialize_manager()
+    result = mgr.index_document(str(path_obj))
+
+    logger.info(f"Document indexing completed for {path}: {result}")
+    return result
 
 
 @mcp.tool
@@ -224,36 +419,32 @@ def index_document(path: str) -> Dict[str, Any]:
     Returns:
         Dictionary with indexing statistics including chunks added
     """
-    try:
-        # Validate path
-        if not path or not isinstance(path, str):
-            return {"error": "Path must be a non-empty string"}
+    return handle_mcp_errors("Document indexing", _index_document_impl, path)
 
-        path_obj = Path(path).resolve()
-        if not path_obj.exists():
-            return {"error": f"File does not exist: {path}"}
 
-        if not path_obj.is_file():
-            return {"error": f"Path is not a file: {path}"}
+def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, Any]:
+    """Implementation for index_webpage with validation and business logic."""
+    # Validate parameters
+    url = validate_string_param(url, "url")
 
-        # Check supported extensions
-        supported_extensions = {".pdf", ".md", ".txt"}
-        if path_obj.suffix.lower() not in supported_extensions:
-            return {
-                "error": f"Unsupported file type. Supported: {', '.join(supported_extensions)}"
-            }
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://")
 
-        # Initialize manager and index
-        mgr = initialize_manager()
-        result = mgr.index_document(str(path_obj))
+    recursive = validate_bool_param(recursive, "recursive")
 
-        logger.info(f"Document indexing completed for {path}: {result}")
-        return result
+    # Validate and limit max_depth
+    original_depth = max_depth
+    max_depth = validate_int_param(max_depth, "max_depth", min_val=1, max_val=3)
 
-    except Exception as e:
-        error_msg = f"Failed to index document at {path}: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg}
+    if original_depth > 3:
+        logger.warning(f"Limited max_depth from {original_depth} to 3 for safety")
+
+    # Initialize manager and index
+    mgr = initialize_manager()
+    result = mgr.index_webpage(url, recursive=recursive, max_depth=max_depth)
+
+    logger.info(f"Webpage indexing completed for {url}: {result}")
+    return result
 
 
 @mcp.tool
@@ -273,37 +464,9 @@ def index_webpage(
     Returns:
         Dictionary with indexing statistics including pages processed and chunks added
     """
-    try:
-        # Validate URL
-        if not url or not isinstance(url, str):
-            return {"error": "URL must be a non-empty string"}
-
-        if not url.startswith(("http://", "https://")):
-            return {"error": "URL must start with http:// or https://"}
-
-        # Validate parameters
-        if not isinstance(recursive, bool):
-            return {"error": "recursive must be a boolean"}
-
-        if not isinstance(max_depth, int) or max_depth < 1:
-            return {"error": "max_depth must be a positive integer"}
-
-        # Limit max_depth to prevent excessive crawling
-        if max_depth > 3:
-            max_depth = 3
-            logger.warning("Limited max_depth to 3 for safety")
-
-        # Initialize manager and index
-        mgr = initialize_manager()
-        result = mgr.index_webpage(url, recursive=recursive, max_depth=max_depth)
-
-        logger.info(f"Webpage indexing completed for {url}: {result}")
-        return result
-
-    except Exception as e:
-        error_msg = f"Failed to index webpage {url}: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg}
+    return handle_mcp_errors(
+        "Webpage indexing", _index_webpage_impl, url, recursive, max_depth
+    )
 
 
 @mcp.tool
@@ -352,14 +515,14 @@ def search(query: str, top_k: int = 5, display_format: str = "structured") -> An
         response = mgr.search(query, top_k, display_format)
 
         # Handle SearchResponse format
-        if hasattr(response, 'success'):
+        if hasattr(response, "success"):
             if not response.success:
                 if display_format == "structured":
                     return []
                 error_msg = f"❌ Search failed: {response.error or 'Unknown error'}"
                 logger.error(f"Search failed: {response.error}")
                 return error_msg
-            
+
             # Return formatted output or structured data
             if display_format == "structured":
                 # Return structured list of result dictionaries for programmatic use
@@ -371,17 +534,36 @@ def search(query: str, top_k: int = 5, display_format: str = "structured") -> An
                         "similarity_score": result.relevance_score,
                         "source_path": result.source_path,
                         "source_type": result.source_type,
-                        "metadata": result.metadata.to_dict() if result.metadata and hasattr(result.metadata, 'to_dict') else (result.metadata if result.metadata else {}),
-                        "scores": result.scores.to_dict() if result.scores and hasattr(result.scores, 'to_dict') else (result.scores if result.scores else {"vector_score": result.relevance_score})
+                        "metadata": (
+                            result.metadata.to_dict()
+                            if result.metadata and hasattr(result.metadata, "to_dict")
+                            else (result.metadata if result.metadata else {})
+                        ),
+                        "scores": (
+                            result.scores.to_dict()
+                            if result.scores and hasattr(result.scores, "to_dict")
+                            else (
+                                result.scores
+                                if result.scores
+                                else {"vector_score": result.relevance_score}
+                            )
+                        ),
                     }
                     structured_results.append(result_dict)
-                
-                logger.info(f"Search completed for '{query}': {len(structured_results)} results")
+
+                logger.info(
+                    f"Search completed for '{query}': {len(structured_results)} results"
+                )
                 return structured_results
             else:
                 # Return human-readable formatted output
-                formatted_output = response.formatted_output or response.format_for_display(display_format)
-                logger.info(f"Search completed for '{query}': {len(response.results)} results")
+                formatted_output = (
+                    response.formatted_output
+                    or response.format_for_display(display_format)
+                )
+                logger.info(
+                    f"Search completed for '{query}': {len(response.results)} results"
+                )
                 return formatted_output
         else:
             # Legacy fallback (shouldn't happen)
@@ -400,7 +582,10 @@ def search(query: str, top_k: int = 5, display_format: str = "structured") -> An
 
 @mcp.tool
 def search_with_context(
-    query: str, top_k: int = 5, include_related: bool = False, display_format: str = "structured"
+    query: str,
+    top_k: int = 5,
+    include_related: bool = False,
+    display_format: str = "structured",
 ) -> Any:
     """Perform enhanced semantic search with optional relationship context.
 
@@ -437,7 +622,7 @@ def search_with_context(
 
         if not isinstance(include_related, bool):
             include_related = False
-            
+
         # Validate display format
         valid_formats = ["readable", "structured", "summary"]
         if display_format not in valid_formats:
@@ -448,17 +633,21 @@ def search_with_context(
 
         # Initialize manager and search
         mgr = initialize_manager()
-        response = mgr.search_with_context(query, top_k, include_related, display_format)
+        response = mgr.search_with_context(
+            query, top_k, include_related, display_format
+        )
 
         # Handle SearchResponse format
-        if hasattr(response, 'success'):
+        if hasattr(response, "success"):
             if not response.success:
                 if display_format == "structured":
                     return []
-                error_msg = f"❌ Context search failed: {response.error or 'Unknown error'}"
+                error_msg = (
+                    f"❌ Context search failed: {response.error or 'Unknown error'}"
+                )
                 logger.error(f"Context search failed: {response.error}")
                 return error_msg
-            
+
             # Return formatted output or structured data
             if display_format == "structured":
                 # Return structured list of result dictionaries for programmatic use
@@ -470,18 +659,32 @@ def search_with_context(
                         "similarity_score": result.relevance_score,
                         "source_path": result.source_path,
                         "source_type": result.source_type,
-                        "metadata": result.metadata.to_dict() if result.metadata and hasattr(result.metadata, 'to_dict') else (result.metadata if result.metadata else {}),
-                        "scores": result.scores.to_dict() if result.scores and hasattr(result.scores, 'to_dict') else (result.scores if result.scores else {"vector_score": result.relevance_score})
+                        "metadata": (
+                            result.metadata.to_dict()
+                            if result.metadata and hasattr(result.metadata, "to_dict")
+                            else (result.metadata if result.metadata else {})
+                        ),
+                        "scores": (
+                            result.scores.to_dict()
+                            if result.scores and hasattr(result.scores, "to_dict")
+                            else (
+                                result.scores
+                                if result.scores
+                                else {"vector_score": result.relevance_score}
+                            )
+                        ),
                     }
-                
+
                 # Add relationship context if available
-                if hasattr(result, 'context') and result.context:
-                    result_dict["relationships"] = result.context.get("relationships", [])
+                if hasattr(result, "context") and result.context:
+                    result_dict["relationships"] = result.context.get(
+                        "relationships", []
+                    )
                     if "related_chunks" in result.context:
                         result_dict["related_chunks"] = result.context["related_chunks"]
-                    
+
                     structured_results.append(result_dict)
-                
+
                 logger.info(
                     f"Context search completed for '{query}': {len(structured_results)} results "
                     f"(include_related={include_related})"
@@ -489,7 +692,10 @@ def search_with_context(
                 return structured_results
             else:
                 # Return human-readable formatted output
-                formatted_output = response.formatted_output or response.format_for_display(display_format)
+                formatted_output = (
+                    response.formatted_output
+                    or response.format_for_display(display_format)
+                )
                 logger.info(
                     f"Context search completed for '{query}': {len(response.results)} results "
                     f"(include_related={include_related})"
@@ -532,7 +738,7 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
                 "success": False,
                 "error": "Reset operation requires explicit confirmation. Set confirm=True to proceed.",
                 "warning": "This operation will permanently delete all indexed content.",
-                "help": "Use reset_index(confirm=True) to proceed with the reset."
+                "help": "Use reset_index(confirm=True) to proceed with the reset.",
             }
 
         # Validate parameters
@@ -544,35 +750,49 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
 
         # Initialize manager to get before-reset stats
         mgr = initialize_manager()
-        
+
         # Capture before-reset statistics
         try:
             before_status = mgr.get_status()
             before_stats = {
-                "total_chunks": before_status.get("index_stats", {}).get("total_chunks", 0),
-                "total_documents": before_status.get("index_stats", {}).get("total_documents", 0),
-                "memory_usage_mb": before_status.get("performance", {}).get("memory_usage_mb", 0)
+                "total_chunks": before_status.get("index_stats", {}).get(
+                    "total_chunks", 0
+                ),
+                "total_documents": before_status.get("index_stats", {}).get(
+                    "total_documents", 0
+                ),
+                "memory_usage_mb": before_status.get("performance", {}).get(
+                    "memory_usage_mb", 0
+                ),
             }
         except Exception:
             # If we can't get stats, provide defaults
-            before_stats = {"total_chunks": 0, "total_documents": 0, "memory_usage_mb": 0}
+            before_stats = {
+                "total_chunks": 0,
+                "total_documents": 0,
+                "memory_usage_mb": 0,
+            }
 
         # Perform the reset operation
         reset_result = mgr.clear_index(remove_files=remove_files)
-        
+
         if not reset_result.get("success", False):
             return {
                 "success": False,
                 "error": f"Reset operation failed: {reset_result.get('error', 'Unknown error')}",
-                "before_reset": before_stats
+                "before_reset": before_stats,
             }
 
         # Capture after-reset statistics
         try:
             after_status = mgr.get_status()
             after_stats = {
-                "total_chunks": after_status.get("index_stats", {}).get("total_chunks", 0),
-                "memory_usage_mb": after_status.get("performance", {}).get("memory_usage_mb", 0)
+                "total_chunks": after_status.get("index_stats", {}).get(
+                    "total_chunks", 0
+                ),
+                "memory_usage_mb": after_status.get("performance", {}).get(
+                    "memory_usage_mb", 0
+                ),
             }
         except Exception:
             after_stats = {"total_chunks": 0, "memory_usage_mb": 0}
@@ -588,19 +808,18 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
             "message": success_message,
             "before_reset": before_stats,
             "after_reset": after_stats,
-            "files_removed": remove_files
+            "files_removed": remove_files,
         }
 
-        logger.info(f"Index reset completed: {before_stats['total_chunks']} chunks removed, files_removed={remove_files}")
+        logger.info(
+            f"Index reset completed: {before_stats['total_chunks']} chunks removed, files_removed={remove_files}"
+        )
         return result
 
     except Exception as e:
         error_msg = f"Failed to reset index: {str(e)}"
         logger.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+        return {"success": False, "error": error_msg}
 
 
 @mcp.tool
@@ -616,8 +835,9 @@ def status() -> Dict[str, Any]:
     """
     try:
         # Try to get status from manager
-        if manager is not None:
-            result = manager.get_status()
+        current_manager = get_manager()
+        if current_manager is not None:
+            result = current_manager.get_status()
         else:
             # Try to initialize manager to get status
             try:
@@ -631,7 +851,7 @@ def status() -> Dict[str, Any]:
                 }
 
         # Add system-level information
-        result["manager_initialized"] = manager is not None
+        result["manager_initialized"] = get_manager() is not None
         result["mcp_server"] = {
             "name": "PyContextify",
             "version": "0.1.0",
@@ -656,19 +876,19 @@ def status() -> Dict[str, Any]:
         return {
             "status": "error",
             "error": error_msg,
-            "manager_initialized": manager is not None,
+            "manager_initialized": get_manager() is not None,
         }
 
 
 def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> None:
     """Perform initial document and codebase indexing if specified in CLI args.
-    
+
     Args:
         args: Parsed command-line arguments
         mgr: Initialized IndexManager instance
     """
     total_indexed = 0
-    
+
     # Index initial documents
     if args.initial_documents:
         logger.info(f"Indexing {len(args.initial_documents)} initial documents...")
@@ -678,11 +898,11 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                 if not path_obj.exists():
                     logger.warning(f"Document not found, skipping: {doc_path}")
                     continue
-                    
+
                 if not path_obj.is_file():
                     logger.warning(f"Path is not a file, skipping: {doc_path}")
                     continue
-                    
+
                 # Check supported extensions
                 supported_extensions = {".pdf", ".md", ".txt"}
                 if path_obj.suffix.lower() not in supported_extensions:
@@ -690,18 +910,22 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                         f"Unsupported file type {path_obj.suffix}, skipping: {doc_path}"
                     )
                     continue
-                    
+
                 result = mgr.index_document(str(path_obj))
                 if "error" not in result:
                     chunks_added = result.get("chunks_added", 0)
                     total_indexed += chunks_added
-                    logger.info(f"Successfully indexed document {doc_path}: {chunks_added} chunks")
+                    logger.info(
+                        f"Successfully indexed document {doc_path}: {chunks_added} chunks"
+                    )
                 else:
-                    logger.error(f"Failed to index document {doc_path}: {result['error']}")
-                    
+                    logger.error(
+                        f"Failed to index document {doc_path}: {result['error']}"
+                    )
+
             except Exception as e:
                 logger.error(f"Error indexing document {doc_path}: {e}")
-    
+
     # Index initial codebases
     if args.initial_codebase:
         logger.info(f"Indexing {len(args.initial_codebase)} initial codebases...")
@@ -709,13 +933,17 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
             try:
                 path_obj = Path(codebase_path).resolve()
                 if not path_obj.exists():
-                    logger.warning(f"Codebase directory not found, skipping: {codebase_path}")
+                    logger.warning(
+                        f"Codebase directory not found, skipping: {codebase_path}"
+                    )
                     continue
-                    
+
                 if not path_obj.is_dir():
-                    logger.warning(f"Path is not a directory, skipping: {codebase_path}")
+                    logger.warning(
+                        f"Path is not a directory, skipping: {codebase_path}"
+                    )
                     continue
-                    
+
                 result = mgr.index_codebase(str(path_obj))
                 if "error" not in result:
                     files_processed = result.get("files_processed", 0)
@@ -725,11 +953,13 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                         f"Successfully indexed codebase {codebase_path}: {files_processed} files, {chunks_added} chunks"
                     )
                 else:
-                    logger.error(f"Failed to index codebase {codebase_path}: {result['error']}")
-                    
+                    logger.error(
+                        f"Failed to index codebase {codebase_path}: {result['error']}"
+                    )
+
             except Exception as e:
                 logger.error(f"Error indexing codebase {codebase_path}: {e}")
-    
+
     # Index initial webpages
     if args.initial_webpages:
         logger.info(f"Indexing {len(args.initial_webpages)} initial webpages...")
@@ -737,19 +967,29 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
             try:
                 # Validate URL
                 if not webpage_url.startswith(("http://", "https://")):
-                    logger.warning(f"Invalid URL (must start with http:// or https://), skipping: {webpage_url}")
+                    logger.warning(
+                        f"Invalid URL (must start with http:// or https://), skipping: {webpage_url}"
+                    )
                     continue
-                
+
                 # Apply crawling settings
-                recursive = args.recursive_crawling if hasattr(args, 'recursive_crawling') else False
-                max_depth = getattr(args, 'max_crawl_depth', 1)
-                
+                recursive = (
+                    args.recursive_crawling
+                    if hasattr(args, "recursive_crawling")
+                    else False
+                )
+                max_depth = getattr(args, "max_crawl_depth", 1)
+
                 # Validate and limit max_depth
                 if max_depth < 1 or max_depth > 3:
                     max_depth = min(max(max_depth, 1), 3)
-                    logger.warning(f"Adjusted max_crawl_depth to {max_depth} (valid range: 1-3)")
-                
-                result = mgr.index_webpage(webpage_url, recursive=recursive, max_depth=max_depth)
+                    logger.warning(
+                        f"Adjusted max_crawl_depth to {max_depth} (valid range: 1-3)"
+                    )
+
+                result = mgr.index_webpage(
+                    webpage_url, recursive=recursive, max_depth=max_depth
+                )
                 if "error" not in result:
                     pages_processed = result.get("pages_processed", 1)
                     chunks_added = result.get("chunks_added", 0)
@@ -759,14 +999,16 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                         f"(recursive={recursive}, max_depth={max_depth})"
                     )
                 else:
-                    logger.error(f"Failed to index webpage {webpage_url}: {result['error']}")
-                    
+                    logger.error(
+                        f"Failed to index webpage {webpage_url}: {result['error']}"
+                    )
+
             except Exception as e:
                 logger.error(f"Error indexing webpage {webpage_url}: {e}")
-    
+
     if total_indexed > 0:
         logger.info(f"Initial indexing completed: {total_indexed} total chunks indexed")
-        
+
         # Save the index if auto-persist is enabled
         try:
             if mgr.config.auto_persist:
@@ -780,43 +1022,43 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
 
 def args_to_config_overrides(args: argparse.Namespace) -> Dict[str, Any]:
     """Convert CLI arguments to configuration overrides dictionary.
-    
+
     Args:
         args: Parsed command-line arguments
-        
+
     Returns:
         Dictionary of configuration overrides
     """
     overrides = {}
-    
+
     # Index configuration
     if args.index_path:
         overrides["index_dir"] = args.index_path
     if args.index_name:
         overrides["index_name"] = args.index_name
-        
+
     # Server configuration
     if args.no_auto_persist:
         overrides["auto_persist"] = False
     if args.no_auto_load:
         overrides["auto_load"] = False
-        
+
     # Embedding configuration
     if args.embedding_provider:
         overrides["embedding_provider"] = args.embedding_provider
     if args.embedding_model:
         overrides["embedding_model"] = args.embedding_model
-        
+
     # Webpage crawling configuration
-    if hasattr(args, 'crawl_delay') and args.crawl_delay is not None:
+    if hasattr(args, "crawl_delay") and args.crawl_delay is not None:
         overrides["crawl_delay_seconds"] = args.crawl_delay
-        
+
     return overrides
 
 
 def setup_logging(args: argparse.Namespace) -> None:
     """Setup logging level based on CLI arguments.
-    
+
     Args:
         args: Parsed command-line arguments
     """
@@ -826,32 +1068,42 @@ def setup_logging(args: argparse.Namespace) -> None:
         level = logging.DEBUG
     else:
         level = logging.INFO
-        
+
     logging.basicConfig(
         level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True  # Reconfigure existing loggers
+        force=True,  # Reconfigure existing loggers
     )
 
 
 def cleanup_handler(signum, frame):
-    """Handle graceful shutdown signals."""
+    """Handle graceful shutdown signals with enhanced resource management."""
+    import sys
+
     logger.info("Received shutdown signal, cleaning up...")
-    if manager:
-        try:
-            # Save index before shutdown if auto-persist is enabled
-            manager.save_index()
-        except Exception as e:
-            logger.warning(f"Failed to save index during shutdown: {e}")
 
-        # Cleanup embedder
+    current_manager = get_manager()
+    if current_manager:
         try:
-            manager.__exit__(None, None, None)
+            # Use context manager for proper cleanup sequence
+            # This will handle auto-save, embedder cleanup, and other resources
+            logger.info("Initiating comprehensive cleanup sequence")
+            current_manager.__exit__(None, None, None)
+            logger.info("Manager cleanup completed successfully")
         except Exception as e:
-            logger.warning(f"Failed to cleanup manager: {e}")
+            logger.error(f"Error during manager cleanup: {e}")
+            # Try individual cleanup steps as fallback
+            try:
+                if hasattr(current_manager, "embedder") and current_manager.embedder:
+                    current_manager.embedder.cleanup()
+                    logger.info("Fallback embedder cleanup completed")
+            except Exception as fallback_e:
+                logger.error(f"Fallback cleanup also failed: {fallback_e}")
+    else:
+        logger.info("No manager instance found, skipping cleanup")
 
-    logger.info("Cleanup completed")
-    os._exit(0)
+    logger.info("Cleanup completed, shutting down gracefully")
+    sys.exit(0)
 
 
 # Register signal handlers for graceful shutdown
@@ -864,10 +1116,10 @@ def main():
     try:
         # Parse command-line arguments
         args = parse_args()
-        
+
         # Setup logging based on CLI args
         setup_logging(args)
-        
+
         logger.info("Starting PyContextify MCP Server...")
         logger.info("Server provides 6 simplified MCP functions:")
         logger.info("  - index_code(path): Index codebase directory")
@@ -878,15 +1130,17 @@ def main():
             "  - search_with_context(query, top_k, include_related): Enhanced search with relationships"
         )
         logger.info("  - status(): Get system status and statistics")
-        
+
         # Convert CLI args to config overrides
         config_overrides = args_to_config_overrides(args)
         if config_overrides:
-            logger.info(f"Using CLI configuration overrides: {list(config_overrides.keys())}")
+            logger.info(
+                f"Using CLI configuration overrides: {list(config_overrides.keys())}"
+            )
 
         # Initialize manager with CLI overrides
         mgr = initialize_manager(config_overrides)
-        
+
         # Perform initial indexing if specified
         if args.initial_documents or args.initial_codebase:
             logger.info("Performing initial indexing...")

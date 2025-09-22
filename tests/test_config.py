@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
 from pycontextify.index.config import Config
@@ -17,7 +18,7 @@ class TestConfig(unittest.TestCase):
         """Test default configuration values."""
         # Clear environment variables and .env file loading for pure defaults
         with patch.dict(os.environ, {}, clear=True):
-            with patch('pycontextify.index.config.load_dotenv'):
+            with patch("pycontextify.index.config.load_dotenv"):
                 config = Config()
 
                 self.assertEqual(config.embedding_provider, "sentence_transformers")
@@ -36,9 +37,9 @@ class TestConfig(unittest.TestCase):
             "PYCONTEXTIFY_OPENAI_API_KEY": "test-api-key",
             "PYCONTEXTIFY_CHUNK_SIZE": "256",
             "PYCONTEXTIFY_AUTO_PERSIST": "false",
-            "PYCONTEXTIFY_ENABLE_RELATIONSHIPS": "false"
+            "PYCONTEXTIFY_ENABLE_RELATIONSHIPS": "false",
         }
-        
+
         with patch.dict(os.environ, env_vars):
             config = Config()
 
@@ -53,16 +54,16 @@ class TestConfig(unittest.TestCase):
         env_vars = {
             "PYCONTEXTIFY_INDEX_NAME": "env_index",
             "PYCONTEXTIFY_AUTO_PERSIST": "true",
-            "PYCONTEXTIFY_EMBEDDING_PROVIDER": "sentence_transformers"
+            "PYCONTEXTIFY_EMBEDDING_PROVIDER": "sentence_transformers",
         }
-        
+
         cli_overrides = {
             "index_name": "cli_index",
             "auto_persist": False,
             "embedding_provider": "openai",
-            "embedding_model": "text-embedding-ada-002"
+            "embedding_model": "text-embedding-ada-002",
         }
-        
+
         with patch.dict(os.environ, env_vars):
             # Patch openai api key to avoid validation error
             with patch.dict(os.environ, {"PYCONTEXTIFY_OPENAI_API_KEY": "test-key"}):
@@ -96,14 +97,11 @@ class TestConfig(unittest.TestCase):
 
     def test_integer_configuration_parsing(self):
         """Test integer value parsing from environment variables."""
-        env_vars = {
-            "PYCONTEXTIFY_CHUNK_SIZE": "1024",
-            "PYCONTEXTIFY_MAX_BACKUPS": "5"
-        }
-        
+        env_vars = {"PYCONTEXTIFY_CHUNK_SIZE": "1024", "PYCONTEXTIFY_MAX_BACKUPS": "5"}
+
         with patch.dict(os.environ, env_vars):
             config = Config()
-            
+
             self.assertEqual(config.chunk_size, 1024)
             self.assertEqual(config.max_backups, 5)
 
@@ -111,7 +109,7 @@ class TestConfig(unittest.TestCase):
         """Test fallback to defaults for invalid integer values."""
         with patch.dict(os.environ, {"PYCONTEXTIFY_CHUNK_SIZE": "invalid"}):
             config = Config()
-            
+
             self.assertEqual(config.chunk_size, 512)  # Default value
 
     def test_path_configuration(self):
@@ -119,7 +117,7 @@ class TestConfig(unittest.TestCase):
         test_dir = "/tmp/test_index"
         with patch.dict(os.environ, {"PYCONTEXTIFY_INDEX_DIR": test_dir}):
             config = Config()
-            
+
             self.assertEqual(str(config.index_dir), str(Path(test_dir).resolve()))
 
     def test_configuration_validation(self):
@@ -131,26 +129,34 @@ class TestConfig(unittest.TestCase):
 
     def test_invalid_embedding_provider(self):
         """Test validation of embedding provider."""
-        with patch.dict(os.environ, {"PYCONTEXTIFY_EMBEDDING_PROVIDER": "invalid_provider"}):
-            with self.assertRaisesRegex(ValueError, "Unsupported embedding provider|Unknown provider"):
+        with patch.dict(
+            os.environ, {"PYCONTEXTIFY_EMBEDDING_PROVIDER": "invalid_provider"}
+        ):
+            with self.assertRaisesRegex(
+                ValueError, "Unsupported embedding provider|Unknown provider"
+            ):
                 Config()
 
     def test_openai_validation_without_api_key(self):
         """Test OpenAI provider requires API key."""
-        with patch.dict(os.environ, {"PYCONTEXTIFY_EMBEDDING_PROVIDER": "openai"}, clear=True):
+        with patch.dict(
+            os.environ, {"PYCONTEXTIFY_EMBEDDING_PROVIDER": "openai"}, clear=True
+        ):
             # Remove any existing API key
             env_dict = os.environ.copy()
             if "PYCONTEXTIFY_OPENAI_API_KEY" in env_dict:
                 del env_dict["PYCONTEXTIFY_OPENAI_API_KEY"]
             with patch.dict(os.environ, env_dict, clear=True):
-                with self.assertRaisesRegex(ValueError, "OpenAI API key is required|Unknown provider"):
+                with self.assertRaisesRegex(
+                    ValueError, "OpenAI API key is required|Unknown provider"
+                ):
                     Config()
 
     def test_openai_validation_with_api_key(self):
         """Test OpenAI provider with API key."""
         env_vars = {
             "PYCONTEXTIFY_EMBEDDING_PROVIDER": "openai",
-            "PYCONTEXTIFY_OPENAI_API_KEY": "test-api-key"
+            "PYCONTEXTIFY_OPENAI_API_KEY": "test-api-key",
         }
         with patch.dict(os.environ, env_vars):
             try:
@@ -180,10 +186,12 @@ class TestConfig(unittest.TestCase):
         """Test chunk overlap must be less than chunk size."""
         env_vars = {
             "PYCONTEXTIFY_CHUNK_SIZE": "100",
-            "PYCONTEXTIFY_CHUNK_OVERLAP": "150"
+            "PYCONTEXTIFY_CHUNK_OVERLAP": "150",
         }
         with patch.dict(os.environ, env_vars):
-            with self.assertRaisesRegex(ValueError, "Chunk overlap must be less than chunk size"):
+            with self.assertRaisesRegex(
+                ValueError, "Chunk overlap must be less than chunk size"
+            ):
                 Config()
 
     def test_provider_availability_check(self):
@@ -287,10 +295,12 @@ class TestConfig(unittest.TestCase):
         try:
             # Clear any existing PyContextify environment variables to ensure clean test
             env_backup = {}
-            pycontextify_keys = [k for k in os.environ.keys() if k.startswith('PYCONTEXTIFY_')]
+            pycontextify_keys = [
+                k for k in os.environ.keys() if k.startswith("PYCONTEXTIFY_")
+            ]
             for key in pycontextify_keys:
                 env_backup[key] = os.environ.pop(key)
-            
+
             try:
                 config = Config(env_file=env_file)
                 # The chunk size should be loaded from the .env file
@@ -309,13 +319,13 @@ class TestEnhancedConfig:
     def test_default_advanced_search_settings(self):
         """Test default values for advanced search settings."""
         config = Config()
-        
+
         assert config.use_hybrid_search is True
         assert config.use_reranking is True
         assert config.keyword_weight == 0.3
         assert config.reranking_model == "cross-encoder/ms-marco-MiniLM-L-6-v2"
         assert config.pdf_engine == "pymupdf"
-    
+
     def test_custom_advanced_search_settings(self, monkeypatch):
         """Test custom advanced search settings from environment."""
         monkeypatch.setenv("PYCONTEXTIFY_USE_HYBRID_SEARCH", "false")
@@ -323,15 +333,15 @@ class TestEnhancedConfig:
         monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", "0.5")
         monkeypatch.setenv("PYCONTEXTIFY_RERANKING_MODEL", "custom-model")
         monkeypatch.setenv("PYCONTEXTIFY_PDF_ENGINE", "pypdf2")
-        
+
         config = Config()
-        
+
         assert config.use_hybrid_search is False
         assert config.use_reranking is False
         assert config.keyword_weight == 0.5
         assert config.reranking_model == "custom-model"
         assert config.pdf_engine == "pypdf2"
-    
+
     def test_keyword_weight_validation(self, monkeypatch):
         """Test validation of keyword weight parameter."""
         # Test valid weights
@@ -339,16 +349,20 @@ class TestEnhancedConfig:
             monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", str(weight))
             config = Config()
             assert config.keyword_weight == weight
-        
+
         # Test invalid weights
         monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", "1.5")
-        with pytest.raises(ValueError, match="Keyword weight must be between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="Keyword weight must be between 0.0 and 1.0"
+        ):
             Config()
-        
+
         monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", "-0.1")
-        with pytest.raises(ValueError, match="Keyword weight must be between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="Keyword weight must be between 0.0 and 1.0"
+        ):
             Config()
-    
+
     def test_pdf_engine_validation(self, monkeypatch):
         """Test validation of PDF engine parameter."""
         # Test valid engines
@@ -356,51 +370,51 @@ class TestEnhancedConfig:
             monkeypatch.setenv("PYCONTEXTIFY_PDF_ENGINE", engine)
             config = Config()
             assert config.pdf_engine == engine
-        
+
         # Test invalid engine
         monkeypatch.setenv("PYCONTEXTIFY_PDF_ENGINE", "invalid_engine")
         with pytest.raises(ValueError, match="Unsupported PDF engine: invalid_engine"):
             Config()
-    
+
     def test_float_config_parsing(self, monkeypatch):
         """Test float configuration parsing."""
         # Test valid float
         monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", "0.75")
         config = Config()
         assert config.keyword_weight == 0.75
-        
+
         # Test invalid float falls back to default
         monkeypatch.setenv("PYCONTEXTIFY_KEYWORD_WEIGHT", "invalid")
         config = Config()
         assert config.keyword_weight == 0.3  # Default value
-    
+
     def test_config_summary_includes_new_settings(self):
         """Test that config summary includes new settings."""
         config = Config()
         summary = config.get_config_summary()
-        
+
         # Check that new settings are included
         assert "use_hybrid_search" in summary
         assert "use_reranking" in summary
         assert "keyword_weight" in summary
         assert "reranking_model" in summary
         assert "pdf_engine" in summary
-        
+
         # Verify values
         assert summary["use_hybrid_search"] is True
         assert summary["use_reranking"] is True
         assert summary["keyword_weight"] == 0.3
         assert summary["reranking_model"] == "cross-encoder/ms-marco-MiniLM-L-6-v2"
         assert summary["pdf_engine"] == "pymupdf"
-    
+
     def test_env_file_loading_with_advanced_settings(self, monkeypatch):
         """Test loading advanced settings from .env file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
             f.write("PYCONTEXTIFY_USE_HYBRID_SEARCH=false\n")
             f.write("PYCONTEXTIFY_KEYWORD_WEIGHT=0.4\n")
             f.write("PYCONTEXTIFY_PDF_ENGINE=pdfplumber\n")
             env_file = f.name
-        
+
         try:
             config = Config(env_file=env_file)
             assert config.use_hybrid_search is False
@@ -408,19 +422,19 @@ class TestEnhancedConfig:
             assert config.pdf_engine == "pdfplumber"
         finally:
             os.unlink(env_file)
-    
+
     def test_backward_compatibility(self):
         """Test that existing configuration still works."""
         config = Config()
-        
+
         # Test that all existing settings are still available
-        assert hasattr(config, 'embedding_provider')
-        assert hasattr(config, 'embedding_model')
-        assert hasattr(config, 'chunk_size')
-        assert hasattr(config, 'chunk_overlap')
-        assert hasattr(config, 'enable_relationships')
-        assert hasattr(config, 'auto_persist')
-        
+        assert hasattr(config, "embedding_provider")
+        assert hasattr(config, "embedding_model")
+        assert hasattr(config, "chunk_size")
+        assert hasattr(config, "chunk_overlap")
+        assert hasattr(config, "enable_relationships")
+        assert hasattr(config, "auto_persist")
+
         # Test existing methods still work
         assert config.get_config_summary() is not None
         assert config.get_embedding_config() is not None

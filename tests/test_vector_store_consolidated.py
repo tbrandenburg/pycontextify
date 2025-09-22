@@ -1,14 +1,15 @@
 """Consolidated vector store tests - combining original and enhanced test approaches."""
 
-import pytest
-import numpy as np
-import tempfile
 import os
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from pycontextify.index.vector_store import VectorStore
+import numpy as np
+import pytest
+
 from pycontextify.index.config import Config
+from pycontextify.index.vector_store import VectorStore
 
 
 class TestVectorStoreConsolidated:
@@ -19,10 +20,11 @@ class TestVectorStoreConsolidated:
         self.test_dir = Path(tempfile.mkdtemp())
         self.config = Config()
         self.config.backup_indices = True
-        
+
     def teardown_method(self):
         """Clean up test environment."""
         import shutil
+
         if self.test_dir.exists():
             shutil.rmtree(self.test_dir)
 
@@ -33,8 +35,8 @@ class TestVectorStoreConsolidated:
         mock_index = MagicMock()
         mock_index.is_trained = True
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=384, config=self.config)
             assert store.dimension == 384
             assert store.get_embedding_dimension() == 384
@@ -42,9 +44,13 @@ class TestVectorStoreConsolidated:
             mock_faiss.IndexFlatIP.assert_called_once_with(384)
 
         # Test FAISS import error
-        with patch('pycontextify.index.vector_store.VectorStore._initialize_index') as mock_init:
-            mock_init.side_effect = ImportError("FAISS not installed. Install with: pip install faiss-cpu")
-            
+        with patch(
+            "pycontextify.index.vector_store.VectorStore._initialize_index"
+        ) as mock_init:
+            mock_init.side_effect = ImportError(
+                "FAISS not installed. Install with: pip install faiss-cpu"
+            )
+
             with pytest.raises(ImportError, match="FAISS not installed"):
                 VectorStore(dimension=128, config=self.config)
 
@@ -54,13 +60,13 @@ class TestVectorStoreConsolidated:
         mock_index = MagicMock()
         mock_index.search.return_value = (
             np.array([[0.9, 0.8, 0.7]]),  # distances
-            np.array([[0, 1, 2]])         # indices
+            np.array([[0, 1, 2]]),  # indices
         )
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
-            
+
             # Test successful vector addition
             vectors = np.random.random((5, 128)).astype(np.float32)
             ids = store.add_vectors(vectors)
@@ -83,7 +89,7 @@ class TestVectorStoreConsolidated:
             store._total_vectors = 10  # Simulate existing vectors
             query = np.random.random(128).astype(np.float32)
             distances, indices = store.search(query, top_k=3)
-            
+
             assert len(distances) == 3
             assert len(indices) == 3
             assert distances[0] == 0.9
@@ -101,15 +107,15 @@ class TestVectorStoreConsolidated:
         mock_index = MagicMock()
         mock_index.is_trained = True
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=384, config=self.config)
-            
+
             # Test empty store
             assert store.get_memory_usage() == 0
             assert store.is_empty()
             assert store.get_total_vectors() == 0
-            
+
             # Test with vectors
             store._total_vectors = 1000
             memory_usage = store.get_memory_usage()
@@ -131,11 +137,11 @@ class TestVectorStoreConsolidated:
         mock_faiss = MagicMock()
         mock_index = MagicMock()
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
             store._total_vectors = 100
-            
+
             assert not store.is_empty()
             store.clear()
             assert store.is_empty()
@@ -154,18 +160,18 @@ class TestVectorStoreConsolidated:
         mock_loaded_index.d = 128
         mock_faiss.IndexFlatIP.return_value = mock_index
         mock_faiss.read_index.return_value = mock_loaded_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
             save_path = self.test_dir / "test_index.faiss"
-            
+
             # Test basic save
             store.save_to_file(str(save_path))
             mock_faiss.write_index.assert_called_once_with(mock_index, str(save_path))
 
             # Test save with backup (create existing file first)
             save_path.write_text("existing index")
-            with patch.object(store, '_create_backup') as mock_backup:
+            with patch.object(store, "_create_backup") as mock_backup:
                 store.save_to_file(str(save_path))
                 mock_backup.assert_called_once_with(save_path)
 
@@ -173,14 +179,14 @@ class TestVectorStoreConsolidated:
             config_no_backup = Config()
             config_no_backup.backup_indices = False
             store_no_backup = VectorStore(dimension=128, config=config_no_backup)
-            with patch.object(store_no_backup, '_create_backup') as mock_backup:
+            with patch.object(store_no_backup, "_create_backup") as mock_backup:
                 store_no_backup.save_to_file(str(save_path))
                 mock_backup.assert_not_called()
 
             # Test successful load
             load_path = self.test_dir / "load_test.faiss"
             load_path.write_text("dummy index")
-            
+
             store.load_from_file(str(load_path))
             mock_faiss.read_index.assert_called_once_with(str(load_path))
             assert store._total_vectors == 50
@@ -194,14 +200,14 @@ class TestVectorStoreConsolidated:
         mock_faiss = MagicMock()
         mock_index = MagicMock()
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
-            
+
             # Test save error handling
             mock_faiss.write_index.side_effect = Exception("Save failed")
             save_path = self.test_dir / "error_test.faiss"
-            
+
             with pytest.raises(Exception, match="Save failed"):
                 store.save_to_file(str(save_path))
 
@@ -209,7 +215,7 @@ class TestVectorStoreConsolidated:
             mock_faiss.read_index.side_effect = Exception("Load failed")
             load_path = self.test_dir / "error_load.faiss"
             load_path.write_text("corrupted index")
-            
+
             with pytest.raises(Exception, match="Load failed"):
                 store.load_from_file(str(load_path))
 
@@ -219,7 +225,7 @@ class TestVectorStoreConsolidated:
             mock_loaded_index.ntotal = 50
             mock_loaded_index.d = 256  # Wrong dimension
             mock_faiss.read_index.return_value = mock_loaded_index
-            
+
             with pytest.raises(ValueError, match="doesn't match expected"):
                 store.load_from_file(str(load_path))
 
@@ -228,17 +234,17 @@ class TestVectorStoreConsolidated:
         mock_faiss = MagicMock()
         mock_index = MagicMock()
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
             original_path = self.test_dir / "test_index.faiss"
-            
+
             # Create original file
             original_path.write_text("original index")
-            
-            with patch('shutil.copy2') as mock_copy:
+
+            with patch("shutil.copy2") as mock_copy:
                 store._create_backup(original_path)
-                
+
                 mock_copy.assert_called_once()
                 backup_path = mock_copy.call_args[0][1]
                 assert str(original_path.stem) in str(backup_path)
@@ -250,11 +256,11 @@ class TestVectorStoreConsolidated:
         mock_index = MagicMock()
         mock_index.reconstruct.return_value = np.array([1.0, 2.0, 3.0])
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=3, config=self.config)
             store._total_vectors = 10
-            
+
             # Test successful vector retrieval
             vector = store.get_vector(5)
             assert len(vector) == 3
@@ -264,7 +270,7 @@ class TestVectorStoreConsolidated:
             # Test invalid vector retrieval (returns None, doesn't raise)
             result = store.get_vector(15)  # Index >= total_vectors
             assert result is None
-            
+
             result = store.get_vector(-1)  # Negative index
             assert result is None
 
@@ -273,10 +279,10 @@ class TestVectorStoreConsolidated:
         mock_faiss = MagicMock()
         mock_index = MagicMock()
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
-            
+
             # Test large batch operations
             large_batch = np.random.random((10000, 128)).astype(np.float32)
             ids = store.add_vectors(large_batch)
@@ -287,17 +293,19 @@ class TestVectorStoreConsolidated:
             # Test search with limited vectors
             mock_index.search.return_value = (
                 np.array([[0.9, 0.8]]),  # Only 2 vectors available
-                np.array([[0, 1]])
+                np.array([[0, 1]]),
             )
             store._total_vectors = 2  # Only 2 vectors in index
-            
+
             query = np.random.random(128).astype(np.float32)
-            distances, indices = store.search(query, top_k=10)  # Request more than available
-            
+            distances, indices = store.search(
+                query, top_k=10
+            )  # Request more than available
+
             # Should only return available vectors
             assert len(distances) == 2
             assert len(indices) == 2
-            
+
             # Verify search was called with limited k
             args = mock_index.search.call_args[0]
             assert args[1] == 2  # min(top_k=10, total_vectors=2)
@@ -307,22 +315,22 @@ class TestVectorStoreConsolidated:
         mock_faiss = MagicMock()
         mock_index = MagicMock()
         mock_faiss.IndexFlatIP.return_value = mock_index
-        
-        with patch.dict('sys.modules', {'faiss': mock_faiss}):
+
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store = VectorStore(dimension=128, config=self.config)
-            
+
             # Test validation method (if it exists)
-            if hasattr(store, 'validate_dimension'):
+            if hasattr(store, "validate_dimension"):
                 # Test 1D vector
                 vector_1d = np.random.random(128)
                 assert store.validate_dimension(vector_1d) is True
-                
+
                 wrong_1d = np.random.random(64)
                 assert store.validate_dimension(wrong_1d) is False
-                
+
                 # Test 2D vectors
                 vectors_2d = np.random.random((5, 128))
                 assert store.validate_dimension(vectors_2d) is True
-                
+
                 wrong_2d = np.random.random((5, 64))
                 assert store.validate_dimension(wrong_2d) is False

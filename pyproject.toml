@@ -41,7 +41,7 @@ openai = ["openai>=1.0.0"]
 # Enhanced NLP capabilities
 nlp = [
     "spacy>=3.7.0",
-    "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl"
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl"
 ]
 # Development dependencies
 dev = [
@@ -66,6 +66,9 @@ Issues = "https://github.com/yourusername/pycontextify/issues"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["pycontextify"]
