@@ -186,23 +186,23 @@ from web development to data science and artificial intelligence.
         ]
         
         for query, description in test_queries:
-            results = index_manager.search(query, top_k=3)
+            response = index_manager.search(query, top_k=3)
             
             # Basic checks
-            assert isinstance(results, list), f"Results should be a list for query '{query}'"
-            assert len(results) <= 3, f"Too many results for query '{query}'"
+            assert hasattr(response, 'success'), f"Response should be SearchResponse for query '{query}'"
+            assert response.success, f"Search should succeed for query '{query}': {response.error}"
+            assert len(response.results) <= 3, f"Too many results for query '{query}'"
             
-            if results:  # If we got results
-                result = results[0]
+            if response.results:  # If we got results
+                result = response.results[0]
                 
-                # Check result structure
-                assert "chunk_text" in result, f"Missing chunk_text in result for '{query}'"
-                # Check for either 'score' or 'similarity_score'
-                assert "score" in result or "similarity_score" in result, f"Missing score in result for '{query}'"
-                assert "source_path" in result, f"Missing source_path in result for '{query}'"
+                # Check result structure (new format)
+                assert hasattr(result, 'text'), f"Missing text in result for '{query}'"
+                assert hasattr(result, 'relevance_score'), f"Missing relevance_score in result for '{query}'"
+                assert hasattr(result, 'source_path'), f"Missing source_path in result for '{query}'"
                 
                 # Check similarity score is reasonable
-                score = result.get("similarity_score", result.get("score", 0))
+                score = result.relevance_score
                 # Different embedding models use different score ranges
                 # Some use [0,1], others use [-1,1], and some use arbitrary ranges
                 assert isinstance(score, (int, float)), f"Score should be numeric for '{query}': {score}"
@@ -211,7 +211,7 @@ from web development to data science and artificial intelligence.
                 import math
                 assert math.isfinite(score), f"Score should be finite for '{query}': {score}"
                 
-                print(f"✅ Query '{query}': {len(results)} results, best score: {score:.4f}")
+                print(f"✅ Query '{query}': {len(response.results)} results, best score: {score:.4f}")
             else:
                 print(f"⚠️  Query '{query}': No results found")
 
@@ -221,21 +221,21 @@ from web development to data science and artificial intelligence.
         query = "Python programming language"
         
         # Basic search
-        basic_results = index_manager.search(query, top_k=5)
+        basic_response = index_manager.search(query, top_k=5)
         
         # Search with context (if supported)
         try:
-            context_results = index_manager.search_with_context(
+            context_response = index_manager.search_with_context(
                 query, top_k=5, include_related=True
             )
             
-            # Both should return results
-            assert isinstance(basic_results, list)
-            assert isinstance(context_results, list)
+            # Both should return SearchResponse objects
+            assert hasattr(basic_response, 'success')
+            assert hasattr(context_response, 'success')
             
             print(f"✅ Relationship search test:")
-            print(f"   - Basic search: {len(basic_results)} results")
-            print(f"   - Context search: {len(context_results)} results")
+            print(f"   - Basic search: {len(basic_response.results)} results")
+            print(f"   - Context search: {len(context_response.results)} results")
             
             # Verify relationship metadata if chunks have it
             sample_chunks = index_manager.metadata_store.get_all_chunks()
@@ -309,8 +309,9 @@ class SearchEngine:
                         pass
         
         # After indexing multiple documents, test cross-document search
-        results = index_manager.search("API documentation", top_k=5)
-        assert len(results) > 0, "Should find results across different document types"
+        response = index_manager.search("API documentation", top_k=5)
+        assert response.success, f"Search should succeed: {response.error}"
+        assert len(response.results) > 0, "Should find results across different document types"
         
         final_status = index_manager.get_status()
         print(f"✅ Final index status: {final_status['metadata']['total_chunks']} chunks, "
@@ -489,11 +490,13 @@ if __name__ == "__main__":
                 ]
                 
                 for query, description in code_queries:
-                    results = index_manager.search(query, top_k=3)
+                    response = index_manager.search(query, top_k=3)
                     
-                    if results:
-                        result = results[0]
-                        score = result.get("similarity_score", result.get("score", 0))
+                    assert response.success, f"Search should succeed for '{query}': {response.error}"
+                    
+                    if response.results:
+                        result = response.results[0]
+                        score = result.relevance_score
                         # For mocked embeddings, just check that we get a valid numeric score
                         import math
                         assert isinstance(score, (int, float)), f"Score should be numeric for '{query}': {score}"
@@ -642,11 +645,13 @@ print(f'Mean Squared Error: {mse}')
                 ]
                 
                 for query, description in webpage_queries:
-                    results = index_manager.search(query, top_k=3)
+                    response = index_manager.search(query, top_k=3)
                     
-                    if results:
-                        result = results[0]
-                        score = result.get("similarity_score", result.get("score", 0))
+                    assert response.success, f"Search should succeed for '{query}': {response.error}"
+                    
+                    if response.results:
+                        result = response.results[0]
+                        score = result.relevance_score
                         # Just check that we get a valid numeric score
                         import math
                         assert isinstance(score, (int, float)), f"Score should be numeric for '{query}': {score}"

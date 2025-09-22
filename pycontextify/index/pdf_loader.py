@@ -159,36 +159,129 @@ class PDFLoader:
         
         return "\n\n".join(text_parts)
     
+    def extract_page_context(self, text: str) -> dict:
+        """Extract page number and section context from text.
+        
+        Args:
+            text: Text content to analyze
+            
+        Returns:
+            Dictionary with page and section information
+        """
+        import re
+        
+        context = {
+            "page_number": None,
+            "section_title": None,
+            "has_page_marker": False
+        }
+        
+        # Look for page markers
+        page_patterns = [
+            r'--- Page (\d+) ---',
+            r'Page (\d+)',
+            r'\[Page (\d+)\]',
+            r'p\. ?(\d+)',
+            r'©.*?(\d+)$'  # Copyright line with page number
+        ]
+        
+        for pattern in page_patterns:
+            match = re.search(pattern, text, re.MULTILINE | re.IGNORECASE)
+            if match:
+                try:
+                    context["page_number"] = int(match.group(1))
+                    context["has_page_marker"] = True
+                    break
+                except (ValueError, IndexError):
+                    continue
+        
+        # Look for section titles (common patterns)
+        section_patterns = [
+            r'^\d+\.\d*\s+(.+)$',  # Numbered sections like "1.2 Introduction"
+            r'^[A-Z][A-Z\s]{5,50}$',  # ALL CAPS headings
+            r'^\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,5})\s*$',  # Title Case headings
+            r'^\s*(Chapter|Section|Part|Annex|Appendix)\s+([\w\s]+)$'  # Explicit chapter/section markers
+        ]
+        
+        # Check first few lines for section titles
+        lines = text.split('\n')[:10]  # Check first 10 lines
+        for line in lines:
+            line = line.strip()
+            if len(line) < 3 or len(line) > 100:  # Skip very short or very long lines
+                continue
+                
+            for pattern in section_patterns:
+                match = re.match(pattern, line)
+                if match:
+                    # Extract the title part
+                    if match.lastindex and match.lastindex > 1:
+                        title = match.group(2).strip()
+                    else:
+                        title = match.group(1).strip()
+                        
+                    if title and len(title) > 2:
+                        context["section_title"] = title
+                        break
+                        
+            if context["section_title"]:
+                break
+        
+        return context
+    
     def get_pdf_info(self, file_path: str) -> dict:
-        """Get PDF metadata information.
+        """Get comprehensive PDF metadata information.
         
         Args:
             file_path: Path to PDF file
             
         Returns:
-            Dictionary with PDF metadata
+            Dictionary with comprehensive PDF metadata
         """
         path = Path(file_path)
+        import os
+        from datetime import datetime
+        
+        stat = path.stat()
         info = {
             "file_path": str(path.absolute()),
             "file_name": path.name,
-            "file_size": path.stat().st_size,
+            "file_size_bytes": stat.st_size,
+            "file_size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             "engine_used": None,
             "page_count": 0,
-            "has_text": False
+            "has_text": False,
+            "document_title": None,
+            "author": None,
+            "subject": None,
+            "creator": None,
+            "producer": None,
+            "creation_date": None,
+            "modification_date": None,
+            "word_count_estimate": 0,
+            "reading_time_minutes": 0
         }
         
         # Try to get metadata with available engines
         for engine in self.available_engines:
             try:
                 if engine == "pymupdf":
-                    info.update(self._get_info_pymupdf(file_path))
+                    engine_info = self._get_info_pymupdf(file_path)
                 elif engine == "pypdf2":
-                    info.update(self._get_info_pypdf2(file_path))
+                    engine_info = self._get_info_pypdf2(file_path)
                 elif engine == "pdfplumber":
-                    info.update(self._get_info_pdfplumber(file_path))
+                    engine_info = self._get_info_pdfplumber(file_path)
+                else:
+                    continue
                     
+                info.update(engine_info)
                 info["engine_used"] = engine
+                
+                # Calculate reading time estimate (average 200 words per minute)
+                if info["word_count_estimate"] > 0:
+                    info["reading_time_minutes"] = max(1, round(info["word_count_estimate"] / 200))
+                
                 break
             except Exception as e:
                 logger.warning(f"Could not get PDF info with {engine}: {e}")
@@ -197,43 +290,105 @@ class PDFLoader:
         return info
     
     def _get_info_pymupdf(self, file_path: str) -> dict:
-        """Get PDF info using PyMuPDF."""
+        """Get comprehensive PDF info using PyMuPDF."""
         import fitz
         
         info = {}
         with fitz.open(file_path) as doc:
             info["page_count"] = len(doc)
-            info["has_text"] = any(doc[i].get_text().strip() for i in range(min(3, len(doc))))
+            
+            # Check if document has text
+            sample_pages = min(3, len(doc))
+            total_text = ""
+            for i in range(sample_pages):
+                page_text = doc[i].get_text()
+                total_text += page_text
+                
+            info["has_text"] = bool(total_text.strip())
+            
+            # Estimate word count from sample
+            if total_text:
+                words_in_sample = len(total_text.split())
+                info["word_count_estimate"] = int((words_in_sample / sample_pages) * len(doc))
+            
+            # Extract metadata
             if doc.metadata:
-                info["metadata"] = doc.metadata
+                metadata = doc.metadata
+                info["document_title"] = metadata.get("title", "").strip() or None
+                info["author"] = metadata.get("author", "").strip() or None
+                info["subject"] = metadata.get("subject", "").strip() or None
+                info["creator"] = metadata.get("creator", "").strip() or None
+                info["producer"] = metadata.get("producer", "").strip() or None
+                info["creation_date"] = metadata.get("creationDate", "").strip() or None
+                info["modification_date"] = metadata.get("modDate", "").strip() or None
         
         return info
     
     def _get_info_pypdf2(self, file_path: str) -> dict:
-        """Get PDF info using PyPDF2."""
+        """Get comprehensive PDF info using PyPDF2."""
         import PyPDF2
         
         info = {}
         with open(file_path, 'rb') as file:
             reader = PyPDF2.PdfReader(file)
             info["page_count"] = len(reader.pages)
-            info["has_text"] = any(reader.pages[i].extract_text().strip() 
-                                 for i in range(min(3, len(reader.pages))))
+            
+            # Check text and estimate word count
+            sample_pages = min(3, len(reader.pages))
+            total_text = ""
+            for i in range(sample_pages):
+                page_text = reader.pages[i].extract_text()
+                total_text += page_text
+                
+            info["has_text"] = bool(total_text.strip())
+            
+            if total_text:
+                words_in_sample = len(total_text.split())
+                info["word_count_estimate"] = int((words_in_sample / sample_pages) * len(reader.pages))
+            
+            # Extract metadata
             if reader.metadata:
-                info["metadata"] = dict(reader.metadata)
+                metadata = reader.metadata
+                info["document_title"] = str(metadata.get("/Title", "")).strip() or None
+                info["author"] = str(metadata.get("/Author", "")).strip() or None
+                info["subject"] = str(metadata.get("/Subject", "")).strip() or None
+                info["creator"] = str(metadata.get("/Creator", "")).strip() or None
+                info["producer"] = str(metadata.get("/Producer", "")).strip() or None
+                info["creation_date"] = str(metadata.get("/CreationDate", "")).strip() or None
+                info["modification_date"] = str(metadata.get("/ModDate", "")).strip() or None
         
         return info
     
     def _get_info_pdfplumber(self, file_path: str) -> dict:
-        """Get PDF info using pdfplumber."""
+        """Get comprehensive PDF info using pdfplumber."""
         import pdfplumber
         
         info = {}
         with pdfplumber.open(file_path) as pdf:
             info["page_count"] = len(pdf.pages)
-            info["has_text"] = any(pdf.pages[i].extract_text() 
-                                 for i in range(min(3, len(pdf.pages))))
+            
+            # Check text and estimate word count
+            sample_pages = min(3, len(pdf.pages))
+            total_text = ""
+            for i in range(sample_pages):
+                page_text = pdf.pages[i].extract_text() or ""
+                total_text += page_text
+                
+            info["has_text"] = bool(total_text.strip())
+            
+            if total_text:
+                words_in_sample = len(total_text.split())
+                info["word_count_estimate"] = int((words_in_sample / sample_pages) * len(pdf.pages))
+            
+            # Extract metadata
             if pdf.metadata:
-                info["metadata"] = pdf.metadata
+                metadata = pdf.metadata
+                info["document_title"] = str(metadata.get("Title", "")).strip() or None
+                info["author"] = str(metadata.get("Author", "")).strip() or None
+                info["subject"] = str(metadata.get("Subject", "")).strip() or None
+                info["creator"] = str(metadata.get("Creator", "")).strip() or None
+                info["producer"] = str(metadata.get("Producer", "")).strip() or None
+                info["creation_date"] = str(metadata.get("CreationDate", "")).strip() or None
+                info["modification_date"] = str(metadata.get("ModDate", "")).strip() or None
         
         return info

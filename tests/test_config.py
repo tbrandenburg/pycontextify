@@ -15,10 +15,13 @@ class TestConfig(unittest.TestCase):
 
     def test_default_configuration(self):
         """Test default configuration values."""
-        config = Config()
+        # Clear environment variables and .env file loading for pure defaults
+        with patch.dict(os.environ, {}, clear=True):
+            with patch('pycontextify.index.config.load_dotenv'):
+                config = Config()
 
-        self.assertEqual(config.embedding_provider, "sentence_transformers")
-        self.assertEqual(config.embedding_model, "all-MiniLM-L6-v2")
+                self.assertEqual(config.embedding_provider, "sentence_transformers")
+                self.assertEqual(config.embedding_model, "all-MiniLM-L6-v2")
         self.assertEqual(config.chunk_size, 512)
         self.assertEqual(config.chunk_overlap, 50)
         self.assertTrue(config.auto_persist)

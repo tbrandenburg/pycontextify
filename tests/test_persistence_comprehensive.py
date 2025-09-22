@@ -85,9 +85,10 @@ More content to ensure we have multiple chunks.
             assert chunks_after > 0
             
             # Verify search works
-            search_results = manager2.search("test", top_k=3)
-            assert len(search_results) > 0
-            assert "chunk_text" in search_results[0]
+            search_response = manager2.search("test", top_k=3)
+            assert search_response.success, f"Search should succeed: {search_response.error}"
+            assert len(search_response.results) > 0
+            assert hasattr(search_response.results[0], 'text')
     
     def test_embedding_model_compatibility(self):
         """Test that index loading handles embedding model compatibility."""
@@ -273,5 +274,6 @@ Content section C for document {i}.
             assert chunks_after >= 20
             
             # Test search still works
-            search_results = manager2.search("document", top_k=5)
-            assert len(search_results) == 5
+            search_response = manager2.search("document", top_k=5)
+            assert search_response.success, f"Search should succeed: {search_response.error}"
+            assert len(search_response.results) <= 5

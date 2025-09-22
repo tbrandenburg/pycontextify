@@ -138,14 +138,20 @@ class TestMCPServerFunctions:
     def test_search_success(self, mock_manager_class):
         """Test successful search."""
         mock_manager = Mock()
-        mock_manager.search.return_value = [
-            {
-                "chunk_id": "test_chunk",
-                "text": "test content",
-                "score": 0.9,
-                "source_path": "/test.py"
-            }
-        ]
+        
+        # Create mock SearchResponse with proper structure
+        mock_response = Mock()
+        mock_response.success = True
+        mock_response.results = [Mock()]
+        mock_response.results[0].chunk_id = "test_chunk"
+        mock_response.results[0].text = "test content"
+        mock_response.results[0].relevance_score = 0.9
+        mock_response.results[0].source_path = "/test.py"
+        mock_response.results[0].source_type = "code"
+        mock_response.results[0].metadata = None
+        mock_response.results[0].scores = None
+        
+        mock_manager.search.return_value = mock_response
         mock_manager_class.return_value = mock_manager
         
         search_fn = mcp_server_module.mcp._tool_manager._tools["search"].fn
@@ -153,8 +159,8 @@ class TestMCPServerFunctions:
         
         assert len(result) == 1
         assert result[0]["chunk_id"] == "test_chunk"
-        assert result[0]["score"] == 0.9
-        mock_manager.search.assert_called_once_with("test query", 5)
+        assert result[0]["similarity_score"] == 0.9
+        mock_manager.search.assert_called_once_with("test query", 5, "structured")
 
     def test_search_empty_query(self):
         """Test search with empty query."""
@@ -166,14 +172,21 @@ class TestMCPServerFunctions:
     def test_search_with_context_success(self, mock_manager_class):
         """Test successful context search."""
         mock_manager = Mock()
-        mock_manager.search_with_context.return_value = [
-            {
-                "chunk_id": "context_chunk",
-                "text": "context content",
-                "score": 0.85,
-                "relationships": ["related_chunk_1"]
-            }
-        ]
+        
+        # Create mock SearchResponse with proper structure
+        mock_response = Mock()
+        mock_response.success = True
+        mock_response.results = [Mock()]
+        mock_response.results[0].chunk_id = "context_chunk"
+        mock_response.results[0].text = "context content"
+        mock_response.results[0].relevance_score = 0.85
+        mock_response.results[0].source_path = "/test.py"
+        mock_response.results[0].source_type = "code"
+        mock_response.results[0].metadata = None
+        mock_response.results[0].scores = None
+        mock_response.results[0].context = {"relationships": ["related_chunk_1"]}
+        
+        mock_manager.search_with_context.return_value = mock_response
         mock_manager_class.return_value = mock_manager
         
         search_with_context_fn = mcp_server_module.mcp._tool_manager._tools["search_with_context"].fn
@@ -182,7 +195,7 @@ class TestMCPServerFunctions:
         assert len(result) == 1
         assert result[0]["chunk_id"] == "context_chunk"
         assert "relationships" in result[0]
-        mock_manager.search_with_context.assert_called_once_with("test query", 3, True)
+        mock_manager.search_with_context.assert_called_once_with("test query", 3, True, "structured")
 
     @patch('pycontextify.mcp_server.IndexManager')
     def test_status_success(self, mock_manager_class):

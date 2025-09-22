@@ -345,15 +345,17 @@ class TestEnhancedIntegration:
                 manager.embedder = mock_embedder
                 
                 # Perform search
-                results = manager.search("test query", top_k=5)
+                response = manager.search("test query", top_k=5)
                 
                 # Verify result format includes hybrid search scores
-                assert len(results) > 0
-                result = results[0]
-                assert "score" in result  # combined score
-                assert "vector_score" in result
-                assert "keyword_score" in result
-                assert result["chunk_id"] == "test-chunk-1"
+                assert response.success, f"Search should succeed: {response.error}"
+                assert len(response.results) > 0
+                result = response.results[0]
+                assert result.relevance_score > 0  # combined score
+                assert result.scores is not None
+                assert "vector" in result.scores
+                assert "keyword" in result.scores
+                assert result.chunk_id == "test-chunk-1"
                 
                 # Verify hybrid search was called
                 assert mock_hybrid_search.search.called
@@ -427,19 +429,20 @@ class TestEnhancedIntegration:
                         manager.embedder = mock_embedder
                         
                         # Perform search
-                        results = manager.search("test query", top_k=3)
+                        response = manager.search("test query", top_k=3)
                         
                         # Verify reranker was called
                         assert mock_reranker.rerank.called
                         
                         # Verify result format includes reranking scores
-                        assert len(results) > 0
-                        result = results[0]
-                        assert "score" in result  # final score
-                        assert "original_score" in result
-                        assert "rerank_score" in result
-                        assert result["chunk_id"] == "reranked-chunk-1"
-                        assert result["score"] == 0.92  # final score
+                        assert response.success, f"Search should succeed: {response.error}"
+                        assert len(response.results) > 0
+                        result = response.results[0]
+                        assert result.relevance_score == 0.92  # final score
+                        assert result.scores is not None
+                        assert "original" in result.scores
+                        assert "rerank" in result.scores
+                        assert result.chunk_id == "reranked-chunk-1"
 
     def test_configuration_integration(self, monkeypatch):
         """Test that configuration settings are properly integrated."""

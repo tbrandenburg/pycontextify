@@ -58,6 +58,7 @@ uv sync --reinstall              # Reset environment
 
 ### Search Result JSON Outline
 
+**Current Structure** (Multiple Shapes - Inconsistent)  
 Both `search` and `search_with_context` return a list of result objects (JSON). The exact shape depends on enabled features.
 
 - Always-present fields (across all modes):
@@ -82,6 +83,62 @@ Both `search` and `search_with_context` return a list of result objects (JSON). 
   - Adds: `related_chunks: array` of up to 3 objects: `{ source_path, chunk_text (truncated), relationship_type }`
 
 - Error behavior: Both functions return `[]` (empty list) on error or no results.
+
+**🚀 Proposed Improved Structure** (Based on analysis of rust-local-rag + mcp-crawl4ai-rag)  
+Consistent response envelope with standardized result objects:
+
+```json
+{
+  "success": true,
+  "query": "user search query",
+  "search_config": {
+    "top_k": 5,
+    "hybrid_search": true,
+    "reranking": true,
+    "relationships": false
+  },
+  "performance": {
+    "search_time_ms": 45,
+    "total_candidates": 50
+  },
+  "results": [{
+    "chunk_id": "chunk_12345",
+    "source_path": "/path/to/file.py", 
+    "source_type": "codebase",
+    "text": "def main():\n    print('Hello')",
+    "relevance_score": 0.847,
+    "position": {
+      "start_char": 150,
+      "end_char": 280
+    },
+    "scores": {
+      "vector": 0.823,
+      "keyword": 0.654,
+      "rerank": 0.891,
+      "combined": 0.847
+    },
+    "metadata": {
+      "created_at": "2025-09-21T18:07:32Z",
+      "embedding_model": "all-MiniLM-L6-v2",
+      "word_count": 45
+    },
+    "context": {
+      "relationships": {...},
+      "related_chunks": [...]
+    }
+  }],
+  "total_results": 5
+}
+```
+
+**Key Improvements:**  
+- Consistent response wrapper with query metadata
+- Unified `relevance_score` field (instead of multiple score names)
+- Structured `scores` object for detailed score breakdown
+- Structured `position` object for location info
+- Consistent `text` field name (not `chunk_text`)
+- Performance metrics and search configuration details
+- Optional `context` object for relationships (cleaner nesting)
 
 ## Configuration
 

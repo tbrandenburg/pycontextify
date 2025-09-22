@@ -307,75 +307,129 @@ def index_webpage(
 
 
 @mcp.tool
-def search(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+def search(query: str, top_k: int = 5, display_format: str = "structured") -> Any:
     """Perform semantic search across all indexed content.
 
     This function searches for content similar to the provided query across
     all indexed codebases, documents, and webpages using vector similarity.
+    The default output format is structured data for programmatic use.
 
     Args:
         query: Search query text
         top_k: Maximum number of results to return (default: 5)
+        display_format: Output format - 'structured' (default), 'readable', or 'summary'
 
     Returns:
-        List of search results with similarity scores and source information
+        Structured search results as list of dictionaries, or formatted text for readable/summary
     """
     try:
         # Validate query
         if not query or not isinstance(query, str):
-            return []
+            if display_format == "structured":
+                return []
+            return "❌ Error: Query must be a non-empty string"
 
         query = query.strip()
         if not query:
-            return []
+            if display_format == "structured":
+                return []
+            return "❌ Error: Query cannot be empty"
 
         # Validate top_k
         if not isinstance(top_k, int) or top_k < 1:
             top_k = 5
+
+        # Validate display format
+        valid_formats = ["readable", "structured", "summary"]
+        if display_format not in valid_formats:
+            display_format = "readable"
 
         # Limit top_k to reasonable range
         top_k = min(max(top_k, 1), 50)
 
         # Initialize manager and search
         mgr = initialize_manager()
-        results = mgr.search(query, top_k)
+        response = mgr.search(query, top_k, display_format)
 
-        logger.info(f"Search completed for '{query}': {len(results)} results")
-        return results
+        # Handle SearchResponse format
+        if hasattr(response, 'success'):
+            if not response.success:
+                if display_format == "structured":
+                    return []
+                error_msg = f"❌ Search failed: {response.error or 'Unknown error'}"
+                logger.error(f"Search failed: {response.error}")
+                return error_msg
+            
+            # Return formatted output or structured data
+            if display_format == "structured":
+                # Return structured list of result dictionaries for programmatic use
+                structured_results = []
+                for result in response.results:
+                    result_dict = {
+                        "chunk_id": result.chunk_id,
+                        "chunk_text": result.text,
+                        "similarity_score": result.relevance_score,
+                        "source_path": result.source_path,
+                        "source_type": result.source_type,
+                        "metadata": result.metadata.to_dict() if result.metadata and hasattr(result.metadata, 'to_dict') else (result.metadata if result.metadata else {}),
+                        "scores": result.scores.to_dict() if result.scores and hasattr(result.scores, 'to_dict') else (result.scores if result.scores else {"vector_score": result.relevance_score})
+                    }
+                    structured_results.append(result_dict)
+                
+                logger.info(f"Search completed for '{query}': {len(structured_results)} results")
+                return structured_results
+            else:
+                # Return human-readable formatted output
+                formatted_output = response.formatted_output or response.format_for_display(display_format)
+                logger.info(f"Search completed for '{query}': {len(response.results)} results")
+                return formatted_output
+        else:
+            # Legacy fallback (shouldn't happen)
+            logger.info(f"Search completed for '{query}': fallback response")
+            if display_format == "structured":
+                return []
+            return str(response)
 
     except Exception as e:
         error_msg = f"Search failed for query '{query}': {str(e)}"
         logger.error(error_msg)
-        return []
+        if display_format == "structured":
+            return []
+        return error_msg
 
 
 @mcp.tool
 def search_with_context(
-    query: str, top_k: int = 5, include_related: bool = False
-) -> List[Dict[str, Any]]:
+    query: str, top_k: int = 5, include_related: bool = False, display_format: str = "structured"
+) -> Any:
     """Perform enhanced semantic search with optional relationship context.
 
     This function provides enhanced search capabilities that can include related
     content based on the lightweight knowledge graph built from indexed content.
     This allows for more comprehensive search results that consider relationships
-    between entities.
+    between entities. The default output format is structured data for programmatic use.
 
     Args:
         query: Search query text
         top_k: Maximum number of results to return (default: 5)
         include_related: Whether to include related chunks based on relationships
+        display_format: Output format - 'structured' (default), 'readable', or 'summary'
 
     Returns:
-        List of enhanced search results with relationship context when enabled
+        Structured search results as list of dictionaries, or formatted text for readable/summary
     """
     try:
         # Validate query
         if not query or not isinstance(query, str):
-            return []
+            if display_format == "structured":
+                return []
+            return "❌ Error: Query must be a non-empty string"
 
         query = query.strip()
         if not query:
-            return []
+            if display_format == "structured":
+                return []
+            return "❌ Error: Query cannot be empty"
 
         # Validate parameters
         if not isinstance(top_k, int) or top_k < 1:
@@ -383,24 +437,77 @@ def search_with_context(
 
         if not isinstance(include_related, bool):
             include_related = False
+            
+        # Validate display format
+        valid_formats = ["readable", "structured", "summary"]
+        if display_format not in valid_formats:
+            display_format = "readable"
 
         # Limit top_k to reasonable range
         top_k = min(max(top_k, 1), 50)
 
         # Initialize manager and search
         mgr = initialize_manager()
-        results = mgr.search_with_context(query, top_k, include_related)
+        response = mgr.search_with_context(query, top_k, include_related, display_format)
 
-        logger.info(
-            f"Context search completed for '{query}': {len(results)} results "
-            f"(include_related={include_related})"
-        )
-        return results
+        # Handle SearchResponse format
+        if hasattr(response, 'success'):
+            if not response.success:
+                if display_format == "structured":
+                    return []
+                error_msg = f"❌ Context search failed: {response.error or 'Unknown error'}"
+                logger.error(f"Context search failed: {response.error}")
+                return error_msg
+            
+            # Return formatted output or structured data
+            if display_format == "structured":
+                # Return structured list of result dictionaries for programmatic use
+                structured_results = []
+                for result in response.results:
+                    result_dict = {
+                        "chunk_id": result.chunk_id,
+                        "chunk_text": result.text,
+                        "similarity_score": result.relevance_score,
+                        "source_path": result.source_path,
+                        "source_type": result.source_type,
+                        "metadata": result.metadata.to_dict() if result.metadata and hasattr(result.metadata, 'to_dict') else (result.metadata if result.metadata else {}),
+                        "scores": result.scores.to_dict() if result.scores and hasattr(result.scores, 'to_dict') else (result.scores if result.scores else {"vector_score": result.relevance_score})
+                    }
+                
+                # Add relationship context if available
+                if hasattr(result, 'context') and result.context:
+                    result_dict["relationships"] = result.context.get("relationships", [])
+                    if "related_chunks" in result.context:
+                        result_dict["related_chunks"] = result.context["related_chunks"]
+                    
+                    structured_results.append(result_dict)
+                
+                logger.info(
+                    f"Context search completed for '{query}': {len(structured_results)} results "
+                    f"(include_related={include_related})"
+                )
+                return structured_results
+            else:
+                # Return human-readable formatted output
+                formatted_output = response.formatted_output or response.format_for_display(display_format)
+                logger.info(
+                    f"Context search completed for '{query}': {len(response.results)} results "
+                    f"(include_related={include_related})"
+                )
+                return formatted_output
+        else:
+            # Legacy fallback (shouldn't happen)
+            logger.info(f"Context search completed for '{query}': fallback response")
+            if display_format == "structured":
+                return []
+            return str(response)
 
     except Exception as e:
         error_msg = f"Context search failed for query '{query}': {str(e)}"
         logger.error(error_msg)
-        return []
+        if display_format == "structured":
+            return []
+        return error_msg
 
 
 @mcp.tool
