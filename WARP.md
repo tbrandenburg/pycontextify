@@ -156,7 +156,7 @@ Consistent response envelope with standardized result objects:
 **Lightweight approach** - no external database required
 
 **Relationship types**: function_call, import, reference, link, hierarchy, tag  
-**Access**: Relationships are extracted but simplified API focuses on core search
+**Access**: Relationships are automatically extracted during indexing and included in all search result metadata. Access via `display_format="structured"` or direct MetadataStore queries.
 
 ## Testing
 
