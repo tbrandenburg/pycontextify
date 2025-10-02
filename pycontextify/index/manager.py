@@ -122,7 +122,6 @@ class IndexManager:
             logger.warning(f"Could not initialize hybrid search: {e}")
             self.hybrid_search = None
 
-
     def _generate_query_suggestions(
         self, query: str, word_count: int, intent: str
     ) -> List[str]:
@@ -976,8 +975,6 @@ class IndexManager:
             final_results.append(result)
 
         return final_results
-
-
 
     def get_performance_summary(self) -> Dict[str, Any]:
         """Get search performance statistics summary.

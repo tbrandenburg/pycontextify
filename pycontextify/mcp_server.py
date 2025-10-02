@@ -983,7 +983,7 @@ def main():
         setup_logging(args)
 
         logger.info("Starting PyContextify MCP Server...")
-        logger.info("Server provides 5 simplified MCP functions:")
+        logger.info("Server provides 6 essential MCP functions:")
         logger.info("  - index_code(path): Index codebase directory")
         logger.info("  - index_document(path): Index document")
         logger.info("  - index_webpage(url, recursive, max_depth): Index web content")

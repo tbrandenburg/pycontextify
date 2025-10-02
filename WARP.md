@@ -36,8 +36,8 @@ uv sync --reinstall              # Reset environment
 - **VectorStore**: FAISS wrapper with persistence (`vector_store.py`)
 - **EmbedderFactory**: Provider system (`embedders/factory.py`)
 - **HybridSearchEngine**: Vector + keyword search (`hybrid_search.py`)
-- **RelationshipStore**: Lightweight knowledge graph storage (`relationship_store.py`)
 - **Content Chunkers**: Code/document/web-aware processing (`chunker.py`)
+- **Relationship Extraction**: Lightweight knowledge graph integrated into `chunker.py` and `models.py`
 
 ### Pipeline: Load → Chunk → Embed → Store → Search
 
@@ -59,7 +59,7 @@ uv sync --reinstall              # Reset environment
 ### Search Result JSON Outline
 
 **Current Structure** (Multiple Shapes - Inconsistent)  
-Both `search` and `search_with_context` return a list of result objects (JSON). The exact shape depends on enabled features.
+The `search` function returns a list of result objects (JSON). The exact shape depends on enabled features.
 
 - Always-present fields (across all modes):
   - `score: float` – primary relevance score
@@ -78,11 +78,11 @@ Both `search` and `search_with_context` return a list of result objects (JSON). 
 - Reranking (cross-encoder), when enabled:
   - Adds: `original_score: float`, `rerank_score: float` (and `score` becomes the final combined score)
 
-- Context enrichment via `search_with_context(..., include_related=True)` (if relationships are enabled):
+- Context enrichment (if relationship features are enabled internally):
   - Adds: `relationships: object` (e.g., `references`, `imports`, `entities`)
   - Adds: `related_chunks: array` of up to 3 objects: `{ source_path, chunk_text (truncated), relationship_type }`
 
-- Error behavior: Both functions return `[]` (empty list) on error or no results.
+- Error behavior: The search function returns `[]` (empty list) on error or no results.
 
 **🚀 Proposed Improved Structure** (Based on analysis of rust-local-rag + mcp-crawl4ai-rag)  
 Consistent response envelope with standardized result objects:
@@ -160,12 +160,12 @@ Consistent response envelope with standardized result objects:
 
 ## Testing
 
-**247 tests, 67% coverage - 100% pass rate**
+**247 tests, 69% coverage - 100% pass rate**
 - Core components: 85-87% coverage
 - Run: `uv run pytest --cov=pycontextify`
 - MCP test runner: `uv run python scripts/run_mcp_tests.py`
 - Quick smoke test: `uv run python scripts/run_mcp_tests.py --smoke`
-- Consolidated test files: 13 focused test modules
+- Consolidated test files: 15 test files
 - All persistence tests passing after auto-load fixes
 
 ## File Support
