@@ -2,11 +2,11 @@
 
 ## Executive Summary
 
-PyContextify addresses the challenge of efficiently finding relevant information across diverse knowledge sources. Knowledge workers struggle to connect related information between codebases, documentation, and web resources, leading to missed insights and duplicated research.
+Knowledge workers face the challenge of finding relevant information scattered across codebases, documentation, and web resources. Traditional search tools miss semantic connections between related concepts, forcing users to manually connect information from disconnected knowledge silos. This leads to missed insights, duplicated research, and reduced productivity.
 
-Our solution provides a unified semantic search platform that indexes and connects information from multiple sources while extracting meaningful relationships between concepts. By leveraging vector search with relationship awareness, PyContextify delivers more contextually relevant results than traditional search tools.
+PyContextify provides an intelligent semantic search server that indexes multiple knowledge sources and discovers meaningful relationships between concepts. Through vector similarity search combined with lightweight knowledge graph features, it delivers contextually relevant results that connect related information across diverse content types.
 
-PyContextify targets software developers, technical writers, and researchers who work with mixed information sources and need to quickly find contextually relevant content across these disconnected knowledge silos.
+The solution targets software developers, technical writers, and researchers who need to quickly discover contextually relevant information across codebases, documentation, and web resources. By providing relationship-aware discovery, PyContextify transforms isolated search results into connected insights that accelerate understanding and decision-making.
 
 ## User Stories
 
@@ -22,11 +22,11 @@ PyContextify targets software developers, technical writers, and researchers who
 ### 2. Context-Aware Code Understanding
 **As a** developer new to a codebase,  
 **I want to** understand how different code components relate to each other,  
-**So that** I can quickly grasp the project's architecture and dependencies.
+**So that** I can reduce onboarding time and make informed changes without breaking dependencies.
 
 **Acceptance Criteria:**
-- Given an indexed codebase, when searching for a specific component, then results show related components with their relationship type
-- Given multiple related code files, when using relationship-enhanced search, then results are organized by relevance and relationship strength
+- Given an indexed codebase, when searching for a specific component, then results show related components with clear relationship indicators
+- Given search results, when exploring code relationships, then I can understand component dependencies without manual code analysis
 
 ### 3. Technical Research
 **As a** technical researcher,  
@@ -64,14 +64,23 @@ PyContextify targets software developers, technical writers, and researchers who
 - Given configuration options, when changing settings, then search behavior adapts accordingly without requiring code changes
 - Given different content types, when configuring the system, then processing can be customized per content type
 
-### 7. Integration with Workflows
-**As a** team lead,  
-**I want to** integrate semantic search into our existing tools,  
-**So that** team members can access search functionality within their normal workflows.
+### 7. AI Assistant Integration
+**As an** AI assistant user,  
+**I want to** leverage PyContextify's search capabilities within my AI workflows,  
+**So that** I can get contextually relevant information from my organization's knowledge base.
 
 **Acceptance Criteria:**
-- Given a standard protocol interface, when connecting to the system, then third-party tools can perform searches
-- Given search functionality, when integrated with other tools, then results maintain their relationship context
+- Given an MCP-compatible AI assistant, when connecting to PyContextify, then the assistant can search across indexed content
+- Given search results from PyContextify, when used in AI conversations, then relationship context enhances the quality of responses
+
+### 8. Integration with Development Tools
+**As a** team lead,  
+**I want to** integrate semantic search into our existing development workflows,  
+**So that** team members can access search functionality within their normal tools.
+
+**Acceptance Criteria:**
+- Given a standard protocol interface, when connecting development tools to the system, then searches can be performed programmatically
+- Given search functionality, when integrated with IDEs and documentation tools, then results maintain their relationship context
 
 ## Functional Requirements
 
@@ -124,26 +133,26 @@ PyContextify targets software developers, technical writers, and researchers who
 
 ## Technical Approach
 
-PyContextify will be built as a Python-based MCP (Model Context Protocol) server with a modular architecture. The system will leverage FAISS for vector search and sentence-transformers for embeddings, with design patterns that allow for alternative embedding providers.
+PyContextify follows a self-hosted architecture using Python with modular design principles. The system employs vector search technology with support for multiple embedding providers, enabling flexible deployment options.
 
-The platform will be self-hosted and deployable within a team's infrastructure. Search capabilities will be accessible through a standardized protocol interface, enabling integration with various client applications and tools.
+The platform integrates with existing workflows through standardized protocol interfaces, allowing various client applications to access search functionality. All processing occurs within the organization's infrastructure, ensuring data privacy and control.
 
 ## Success Metrics
 
-✅ **Achieved:**
-1. **Test Coverage**: 100% test success rate with 244 passing tests and 67% code coverage
-2. **Indexing Reliability**: Successfully processes all supported file formats without critical errors
+✅ **Current Achievement:**
+1. **System Reliability**: 100% test success rate with 247 passing tests and 69% code coverage
+2. **Content Processing**: Successfully indexes code, documents (PDF/MD/TXT), and web pages without critical errors
 3. **Performance**: Fast startup with lazy loading and optimized component initialization
-4. **Persistence**: Robust auto-save/auto-load functionality with 100% data integrity
-5. **API Stability**: 7 well-tested MCP functions with comprehensive error handling
+4. **Data Persistence**: Robust auto-save/auto-load functionality with 100% data integrity
+5. **Protocol Interface**: 6 stable MCP functions with comprehensive error handling
 
-📊 **Target Metrics:**
+📊 **Success Metrics:**
 6. **Search Relevance**: Average precision of top 5 search results improves by 35% compared to keyword-only search
-7. **Discovery Rate**: Users find relevant information they weren't explicitly searching for in 40% of searches
-8. **Cross-Reference Discovery**: System identifies at least 70% of explicit references between documents
-9. **Search Time Reduction**: Average time to find relevant information decreases by 50% compared to manual searching
-10. **Relationship Accuracy**: Correctly identifies at least 65% of semantic relationships between content
-11. **User Satisfaction**: >80% of users report improved information discovery compared to previous methods
+7. **Context Discovery**: Users discover relevant contextual information in 40% of searches they wouldn't find with traditional search
+8. **Relationship Identification**: System correctly identifies at least 70% of explicit relationships between indexed content
+9. **Time Efficiency**: Average time to find relevant information decreases by 50% compared to manual searching across multiple sources
+10. **Cross-Source Connections**: Users successfully find connections between different content types (code-to-docs, docs-to-web) in 60% of searches
+11. **User Adoption**: >80% of users report improved productivity in information discovery tasks
 
 ## Risks & Assumptions
 
