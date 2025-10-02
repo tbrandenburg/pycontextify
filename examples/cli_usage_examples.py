@@ -65,7 +65,7 @@ def example_research_project():
         "./research_index",
         "--initial-documents",
         "research_paper_1.pdf",
-        "research_paper_2.pdf", 
+        "research_paper_2.pdf",
         "notes.md",
         "references.txt",
         "--initial-webpages",
@@ -319,9 +319,11 @@ def main():
     print("Notes:")
     print("- Replace example URLs with your actual documentation sites")
     print("- Adjust file paths to match your project structure")
-    print("- Use specific file paths (not glob patterns like *.pdf) for --initial-documents")
+    print(
+        "- Use specific file paths (not glob patterns like *.pdf) for --initial-documents"
+    )
     print("- Directories work fine for --initial-codebase arguments")
-    print("- Consider using environment variables for sensitive configurations") 
+    print("- Consider using environment variables for sensitive configurations")
     print("- Test with small datasets before indexing large amounts of content")
     print("- The system provides semantic search with relationship extraction")
 
