@@ -1,8 +1,16 @@
-# PyContextify ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
+# PyContextify ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Tests](https://img.shields.io/badge/tests-247_passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-69%25-green)
 
 **One-line:** Semantic search server with relationship-aware discovery across codebases, documents, and webpages.
 
 PyContextify is a Python-based MCP (Model Context Protocol) server that provides intelligent semantic search capabilities over diverse knowledge sources. It combines vector similarity search with lightweight knowledge graph features to help developers, researchers, and technical writers discover contextually relevant information across codebases, documentation, and web resources.
+
+**Main Features:**
+- 🔍 **Semantic Search**: Vector similarity with FAISS + hybrid keyword search
+- 📚 **Multi-Source**: Index code, documents (PDF/MD/TXT), and webpages
+- 🧠 **Smart Chunking**: Content-aware processing (code boundaries, document hierarchy)
+- ⚡ **Fast Startup**: Lazy loading with optimized component initialization
+- 🔗 **Knowledge Graph**: Lightweight relationship extraction and context discovery
+- 🛠️ **MCP Protocol**: 6 essential functions for seamless AI assistant integration
 
 ---
 
@@ -57,26 +65,26 @@ Minimal example:
 # Start the MCP server
 uv run pycontextify
 
-# Index a codebase (in another terminal or via MCP client)
+# Index content (via MCP client/AI assistant)
 # The server exposes 6 MCP functions:
-# - index_code(path)
-# - index_document(path) 
-# - index_webpage(url, recursive=False, max_depth=1)
-# - search(query, top_k=5)
-# - reset_index(remove_files=True, confirm=False)
-# - status()
+# - index_code(path) - Index codebase directory
+# - index_document(path) - Index documents (PDF, MD, TXT)
+# - index_webpage(url, recursive=False, max_depth=1) - Index web content
+# - search(query, top_k=5) - Semantic search
+# - reset_index(remove_files=True, confirm=False) - Clear index data
+# - status() - Get system status and statistics
 ```
 
 Expected output:
 
 ```
-🚀 Starting PyContextify MCP Server...
-Server provides 6 MCP functions:
+Starting PyContextify MCP Server...
+Server provides 6 essential MCP functions:
   - index_code(path): Index codebase directory
-  - index_document(path): Index document files (PDF, MD, TXT)
+  - index_document(path): Index document
   - index_webpage(url, recursive, max_depth): Index web content
-  - search(query, top_k): Semantic search
-  - reset_index(remove_files, confirm): Clear index data
+  - search(query, top_k): Basic semantic search
+  - reset_index(confirm=True): Clear all indexed content
   - status(): Get system status and statistics
 MCP server ready and listening for requests...
 ```
@@ -136,15 +144,28 @@ max_relationships_per_chunk: int  # Limit relationships to avoid noise
 
 Required environment variables / config:
 - `PYCONTEXTIFY_EMBEDDING_MODEL` — string — default: `all-MiniLM-L6-v2` — Embedding model for semantic search
+- `PYCONTEXTIFY_EMBEDDING_PROVIDER` — string — default: `sentence_transformers` — Embedding provider (sentence_transformers, ollama, openai)
 - `PYCONTEXTIFY_INDEX_DIR` — string — default: `./index_data` — Directory for storing search indices
 - `PYCONTEXTIFY_AUTO_PERSIST` — boolean — default: `true` — Automatically save after indexing
+- `PYCONTEXTIFY_AUTO_LOAD` — boolean — default: `true` — Automatically load index on startup
 - `PYCONTEXTIFY_CHUNK_SIZE` — integer — default: `512` — Text chunk size for processing
+- `PYCONTEXTIFY_USE_HYBRID_SEARCH` — boolean — default: `false` — Enable hybrid vector + keyword search
+
+**Priority**: CLI arguments > Environment variables > Defaults
 
 Copy `.env.example` to `.env` and customize as needed.
 
 ## API Reference
 
 PyContextify exposes 6 MCP (Model Context Protocol) functions for semantic search and indexing:
+
+1. **`index_code(path)`** - Index codebase directory with relationship extraction
+2. **`index_document(path)`** - Index documents (PDF, MD, TXT) 
+3. **`index_webpage(url, recursive=False, max_depth=1)`** - Index web content with optional recursion
+4. **`search(query, top_k=5)`** - Hybrid semantic + keyword search
+5. **`reset_index(remove_files=True, confirm=False)`** - Clear index data
+6. **`status()`** - Get system statistics and health
+
 Full docs: See [WARP.md](./WARP.md) for development guidance and architecture details
 
 ## Tests & CI
@@ -162,7 +183,7 @@ uv run python scripts/run_mcp_tests.py
 uv run python scripts/run_mcp_tests.py --smoke
 ```
 
-CI: Manual testing ![Tests](https://img.shields.io/badge/tests-100%25_pass-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-67%25-yellow)
+CI: Manual testing ![Tests](https://img.shields.io/badge/tests-247_passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-69%25-green)
 
 ## Contributing
 
