@@ -2,14 +2,14 @@
 
 **One-line:** Semantic search server with relationship-aware discovery across codebases, documents, and webpages.
 
-PyContextify is a Python-based MCP (Model Context Protocol) server that provides intelligent semantic search capabilities over diverse knowledge sources. It combines vector similarity search with lightweight knowledge graph features to help developers, researchers, and technical writers discover contextually relevant information across codebases, documentation, and web resources.
+PyContextify is a Python-based MCP (Model Context Protocol) server that provides intelligent semantic search capabilities over diverse knowledge sources. It combines vector similarity search with basic relationship tracking to help developers, researchers, and technical writers discover contextually relevant information across codebases, documentation, and web resources.
 
 **Main Features:**
 - 🔍 **Semantic Search**: Vector similarity with FAISS + hybrid keyword search
 - 📚 **Multi-Source**: Index code, documents (PDF/MD/TXT), and webpages
 - 🧠 **Smart Chunking**: Content-aware processing (code boundaries, document hierarchy)
 - ⚡ **Fast Startup**: Lazy loading with optimized component initialization
-- 🔗 **Knowledge Graph**: Lightweight relationship extraction and context discovery
+- 🔗 **Relationship Tracking**: Basic relationship extraction (tags, references, code symbols)
 - 🛠️ **MCP Protocol**: 6 essential functions for seamless AI assistant integration
 
 ---

@@ -4,7 +4,7 @@
 
 Knowledge workers face the challenge of finding relevant information scattered across codebases, documentation, and web resources. Traditional search tools miss semantic connections between related concepts, forcing users to manually connect information from disconnected knowledge silos. This leads to missed insights, duplicated research, and reduced productivity.
 
-PyContextify provides an intelligent semantic search server that indexes multiple knowledge sources and discovers meaningful relationships between concepts. Through vector similarity search combined with lightweight knowledge graph features, it delivers contextually relevant results that connect related information across diverse content types.
+PyContextify provides an intelligent semantic search server that indexes multiple knowledge sources and extracts basic relationship information from content. Through vector similarity search combined with simple relationship tracking (tags, references, and code symbols), it delivers contextually relevant results that connect related information across diverse content types.
 
 The solution targets software developers, technical writers, and researchers who need to quickly discover contextually relevant information across codebases, documentation, and web resources. By providing relationship-aware discovery, PyContextify transforms isolated search results into connected insights that accelerate understanding and decision-making.
 
@@ -92,13 +92,13 @@ The solution targets software developers, technical writers, and researchers who
 - Parse webpage content with awareness of HTML structure
 - Filter out boilerplate web content (navigation, footers, ads)
 
-### Relationship Extraction
-- Automatically identify relationships between content chunks
-- Extract code references (function calls, imports, inheritance)
-- Recognize document cross-references and citations
-- Map hierarchical relationships between content sections
-- Identify webpage links and navigation structures
-- Calculate relationship strength between related entities
+### Basic Relationship Tracking
+- Extract simple tags and references from content chunks
+- Identify code symbols (functions, classes, variables) through pattern matching
+- Recognize basic document structures and section hierarchies
+- Extract links and citations using simple regex patterns
+- Track imports and basic code references
+- Store relationship information as metadata for search enhancement
 
 ### Search Capabilities
 - Provide semantic search across all indexed content
