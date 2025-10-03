@@ -1,10 +1,7 @@
 [project]
 name = "pycontextify"
 version = "0.1.0"
-description = "A Python-based MCP server for semantic search over codebases, documents, and webpages"
-authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
+description = "Relationship-aware semantic search MCP server"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -15,8 +12,18 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 keywords = ["mcp", "semantic-search", "embeddings", "faiss", "rag", "vector-search"]
+license = {file = "LICENSE"}
+authors = [
+    {name = "PyContextify Maintainers", email = "maintainers@pycontextify.dev"},
+]
+maintainers = [
+    {name = "PyContextify Community", email = "maintainers@pycontextify.dev"},
+]
 
 dependencies = [
     "fastmcp>=1.0.0",
@@ -51,6 +58,8 @@ dev = [
     "isort>=5.12.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "build>=1.0.3",
+    "twine>=4.0.0",
 ]
 # GPU support
 gpu = ["faiss-gpu>=1.7.0"]
@@ -59,9 +68,11 @@ gpu = ["faiss-gpu>=1.7.0"]
 pycontextify = "pycontextify.mcp_server:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/pycontextify"
-Repository = "https://github.com/yourusername/pycontextify"
-Issues = "https://github.com/yourusername/pycontextify/issues"
+Homepage = "https://github.com/pycontextify/pycontextify"
+Documentation = "https://github.com/pycontextify/pycontextify#readme"
+Repository = "https://github.com/pycontextify/pycontextify"
+Issues = "https://github.com/pycontextify/pycontextify/issues"
+Changelog = "https://github.com/pycontextify/pycontextify/releases"
 
 [build-system]
 requires = ["hatchling"]

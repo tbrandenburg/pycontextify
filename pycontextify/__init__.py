@@ -1,17 +1,18 @@
-"""PyContextify - A Python-based MCP server for semantic search.
+"""PyContextify - a relationship-aware semantic search MCP server."""
 
-This package provides semantic search capabilities over codebases, documents,
-and webpages using FAISS vector similarity search, various embedding providers,
-and lightweight knowledge graph capabilities.
-"""
-
-__version__ = "0.1.0"
-__author__ = "Your Name"
-__email__ = "your.email@example.com"
+from importlib import metadata as _metadata
 
 from .index.config import Config
-
-# Main exports
 from .index.manager import IndexManager
 
-__all__ = ["IndexManager", "Config", "__version__"]
+
+try:  # pragma: no cover - exercised when installed as a package
+    __version__ = _metadata.version("pycontextify")
+except _metadata.PackageNotFoundError:  # pragma: no cover - local editable installs
+    __version__ = "0.1.0"
+
+__author__ = "PyContextify Maintainers"
+__email__ = "maintainers@pycontextify.dev"
+__license__ = "MIT"
+
+__all__ = ["IndexManager", "Config", "__version__", "__author__", "__email__"]

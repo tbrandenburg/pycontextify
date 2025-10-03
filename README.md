@@ -33,6 +33,7 @@ uv run pycontextify --verbose
 - [Configuration](#configuration)
 - [API Reference](#api-reference)
 - [Tests & CI](#tests--ci)
+- [Changelog](#changelog)
 - [Contributing](#contributing)
 - [License](#license)
 - [Security](#security)
@@ -40,22 +41,36 @@ uv run pycontextify --verbose
 
 ## Installation
 
-**Requirements:** Python 3.10+ and UV package manager
+### PyPI (recommended)
+
+```bash
+pip install pycontextify
+```
+
+Extras are available for specific workflows:
+
+- `pip install "pycontextify[dev]"` – testing, linting, and packaging helpers
+- `pip install "pycontextify[nlp]"` – optional spaCy language model
+- `pip install "pycontextify[ollama]"` / `[openai]` – alternative embedding providers
+
+### From Source with UV
+
+**Requirements:** Python 3.10+ and the [UV](https://github.com/astral-sh/uv) package manager
 
 ```bash
 # Install UV package manager
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone and install dependencies
-git clone <repository-url>
+git clone https://github.com/pycontextify/pycontextify.git
 cd pycontextify
 uv sync
 
-# Optional: Install development tools
+# Optional: Install development + release tooling
 uv sync --extra dev
 ```
 
-(Alternative: build from source: `uv sync --reinstall`)
+To update dependencies from scratch use `uv sync --reinstall`.
 
 ## Usage
 
@@ -184,6 +199,30 @@ uv run python scripts/run_mcp_tests.py --smoke
 ```
 
 CI: Manual testing ![Tests](https://img.shields.io/badge/tests-247_passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-69%25-green)
+
+## Publishing to PyPI
+
+Use the dedicated release checklist in [RELEASING.md](./RELEASING.md) when preparing a public build.
+
+Quick reference:
+
+1. Bump `version` in `pyproject.toml` (and ensure changelog coverage)
+2. Run the full test suite or `uv run python scripts/run_mcp_tests.py --smoke`
+3. Build distributables and run metadata checks:
+
+   ```bash
+   python scripts/build_package.py
+   ```
+
+4. Upload to TestPyPI or PyPI with Twine once validation passes:
+
+   ```bash
+   twine upload dist/*
+   ```
+
+## Changelog
+
+Detailed release history lives in [CHANGELOG.md](./CHANGELOG.md). Update the changelog alongside any version bump so users can track notable changes between releases.
 
 ## Contributing
 

@@ -27,7 +27,18 @@ uv run mypy pycontextify
 uv add package-name              # Runtime
 uv add --dev package-name        # Development
 uv sync --reinstall              # Reset environment
+
+# Packaging & release validation
+python scripts/build_package.py   # Build wheel/sdist + twine check
 ```
+
+## Release Workflow
+
+1. Update the project version in `pyproject.toml` and document the changes in `CHANGELOG.md`
+2. Run `uv sync --extra dev` to install packaging helpers (`build`, `twine`)
+3. Execute `python scripts/build_package.py` to produce `dist/` artifacts and validate metadata
+4. Upload to TestPyPI/PyPI with `twine upload dist/*`
+5. Tag the release and push (`git tag vX.Y.Z && git push --tags`)
 
 ## Architecture
 
