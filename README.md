@@ -173,8 +173,8 @@ Full docs: See [WARP.md](./WARP.md) for development guidance and architecture de
 Run tests:
 
 ```bash
-# Run all tests with coverage
-uv run pytest --cov=pycontextify
+# Run all tests with coverage (requires the dev dependency group for pytest-cov)
+uv run --with dev pytest --cov=pycontextify
 
 # Run MCP-specific tests
 uv run python scripts/run_mcp_tests.py
