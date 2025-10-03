@@ -125,7 +125,7 @@ class HybridSearchEngine:
         results = []
         for faiss_id, vector_score in vector_scores[
             : top_k * 2
-        ]:  # Get more candidates for reranking
+        ]:  # Get extra candidates for keyword rescoring
             try:
                 chunk_metadata = metadata_store.get_chunk(faiss_id)
                 if not chunk_metadata:
