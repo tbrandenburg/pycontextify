@@ -41,6 +41,25 @@ uv sync --reinstall              # Reset environment
 
 ### Pipeline: Load → Chunk → Embed → Store → Search
 
+## Chunking Strategies by Resource Type
+
+- **Code files** → `CodeChunker`
+  - Detects natural boundaries using function/class signatures and visibility keywords before falling back to token windows, ensuring structural cohesion for languages such as Python, JS/TS, Java, C-family, and Go.【F:pycontextify/index/chunker.py†L208-L315】
+  - Captures relationships like function/class names, imports, and simple variable declarations to enrich the lightweight knowledge graph for downstream search.【F:pycontextify/index/chunker.py†L317-L359】
+
+- **Documents (Markdown/Text/PDF)** → `DocumentChunker`
+  - Breaks content along Markdown-style headers while enforcing minimum section length, with token-based fallback for unstructured prose.【F:pycontextify/index/chunker.py†L361-L475】
+  - Extracts contextual relationships from links, citations, emphasized terms, and section titles; PDF files are first converted to text via `DocumentLoader`/`PDFLoader` and then treated like other documents.【F:pycontextify/index/chunker.py†L477-L525】【F:pycontextify/index/loaders.py†L178-L262】
+
+- **Web pages** → `WebPageChunker`
+  - Reuses the document strategy after HTML cleanup, augmenting each chunk with metadata such as external links, domain, and URL path segments.【F:pycontextify/index/chunker.py†L528-L613】
+  - Adds web-specific relationship tags (domains, external links, contacts) on top of document-level extraction for richer search pivots.【F:pycontextify/index/chunker.py†L646-L683】
+
+- **Fallback/Unknown sources** → `SimpleChunker`
+  - Applies configurable token windows with overlap and basic capitalized-entity extraction when the source type is not recognized or lacks structure.【F:pycontextify/index/chunker.py†L168-L205】
+
+`IndexManager` selects the appropriate strategy at runtime through `ChunkerFactory`, and all chunkers honor the shared configuration for chunk size, overlap, and relationship extraction limits defined in `Config`.【F:pycontextify/index/manager.py†L571-L602】【F:pycontextify/index/chunker.py†L685-L707】【F:pycontextify/index/config.py†L85-L95】
+
 ### Search Methods
 - **Vector**: FAISS IndexFlatIP (cosine similarity)
 - **Keyword**: TF-IDF + BM25 with configurable weighting
