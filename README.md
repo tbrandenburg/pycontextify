@@ -25,6 +25,16 @@ uv sync
 uv run pycontextify --verbose
 ```
 
+## System Requirements
+
+- **Python**: Python 3.10 or newer for the MCP server core (full test suite currently targets Python 3.13+).【F:pyproject.toml†L1-L35】【F:tests/README.md†L57-L63】
+- **Package management**: Ability to install dependencies via [UV](https://docs.astral.sh/uv/) and resolve all runtime libraries, including FAISS, sentence-transformers, PDF processors, and supporting utilities.【F:README.md†L18-L55】【F:pyproject.toml†L21-L35】
+- **CPU**: 64-bit multi-core processor (4+ cores recommended) so FAISS vector search and sentence-transformers embedding generation can run locally without bottlenecks.【F:pyproject.toml†L21-L35】【F:WARP.md†L122-L150】
+- **Memory**: 8 GB RAM minimum (16 GB recommended for larger corpora) because embeddings and FAISS indexes reside in-process and scale with corpus size; switch to the lighter `all-MiniLM-L6-v2` model if constrained.【F:WARP.md†L122-L141】
+- **Network access**: Internet connectivity on first run to download sentence-transformers models and other remote assets.【F:WARP.md†L139-L150】
+- **Storage & filesystem**: At least 5 GB of free disk space to install Python dependencies, download embedding models, and persist FAISS indexes in `PYCONTEXTIFY_INDEX_DIR`, along with write access for temporary working folders during indexing and testing.【F:pyproject.toml†L21-L35】【F:tests/README.md†L57-L66】【F:README.md†L130-L162】
+- **Optional acceleration**: CUDA-capable GPU support is available by installing the optional `gpu` dependency group (`faiss-gpu`) alongside the default CPU build.【F:pyproject.toml†L37-L56】【F:WARP.md†L148-L150】
+
 ## Table of Contents
 - [Quickstart](#quickstart)
 - [Installation](#installation)
