@@ -264,20 +264,20 @@ class TestSearchResponse:
             results=results,
             search_config={"top_k": 5},
             performance={"search_time_ms": 100},
-            degradation_reason="Reranking failed",
-            failed_components=["reranker"],
+            degradation_reason="Keyword search failed",
+            failed_components=["keyword_search"],
         )
 
         assert response.success is True  # Still successful with partial results
         assert response.query == "test query"
         assert response.results == results
-        assert response.error == "Degraded search: Reranking failed"
+        assert response.error == "Degraded search: Keyword search failed"
         assert response.error_code == "DEGRADED_SEARCH"
 
         # Check degradation info in performance
         assert "degradation" in response.performance
-        assert response.performance["degradation"]["reason"] == "Reranking failed"
-        assert response.performance["degradation"]["failed_components"] == ["reranker"]
+        assert response.performance["degradation"]["reason"] == "Keyword search failed"
+        assert response.performance["degradation"]["failed_components"] == ["keyword_search"]
 
 
 class TestSearchResponseFormatting:
@@ -449,16 +449,15 @@ class TestUtilityFunctions:
 
         perf_info = create_search_performance_info(
             start_time=start_time,
-            search_mode="hybrid_reranked",
+            search_mode="hybrid",
             total_candidates=100,
-            rerank_time=0.1,
             vector_time=0.2,
             keyword_time=0.15,
             embedding_time=0.05,
         )
 
         assert "search_time_ms" in perf_info
-        assert perf_info["search_mode"] == "hybrid_reranked"
+        assert perf_info["search_mode"] == "hybrid"
         assert perf_info["total_candidates"] == 100
         assert "timestamp" in perf_info
         assert "components_used" in perf_info
@@ -466,7 +465,6 @@ class TestUtilityFunctions:
 
         # Check timing breakdown
         timing = perf_info["timing_breakdown"]
-        assert timing["rerank_ms"] == 100  # 0.1 * 1000
         assert timing["vector_search_ms"] == 200  # 0.2 * 1000
         assert timing["keyword_search_ms"] == 150  # 0.15 * 1000
         assert timing["embedding_ms"] == 50  # 0.05 * 1000
@@ -476,7 +474,6 @@ class TestUtilityFunctions:
         assert "embedding" in components
         assert "vector_search" in components
         assert "keyword_search" in components
-        assert "reranking" in components
 
     def test_create_search_performance_info_minimal(self):
         """Test create_search_performance_info with minimal parameters."""
@@ -520,13 +517,11 @@ class TestUtilityFunctions:
         scores = create_structured_scores(
             vector_score=0.8,
             keyword_score=0.7,
-            rerank_score=0.9,
             original_score=0.85,
             combined_score=0.87,
         )
         assert scores["vector"] == 0.8
         assert scores["keyword"] == 0.7
-        assert scores["rerank"] == 0.9
         assert scores["original"] == 0.85
         assert scores["combined"] == 0.87
 
@@ -570,13 +565,13 @@ class TestUtilityFunctions:
     def test_create_search_provenance(self):
         """Test create_search_provenance function."""
         provenance = create_search_provenance(
-            search_features=["vector", "keyword", "rerank"],
+            search_features=["vector", "keyword"],
             ranking_factors={"boost": 1.2},
             search_stage="final",
             confidence=0.85,
         )
 
-        assert provenance["features_used"] == ["vector", "keyword", "rerank"]
+        assert provenance["features_used"] == ["vector", "keyword"]
         assert provenance["search_stage"] == "final"
         assert provenance["ranking_factors"] == {"boost": 1.2}
         assert provenance["confidence"] == 0.85

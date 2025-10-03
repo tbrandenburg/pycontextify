@@ -789,7 +789,7 @@ class IndexManager:
                     self._ensure_hybrid_search_index()
                     hybrid_results = self.hybrid_search.search(query, top_k * 2)
 
-                    # Combine and rerank results
+                    # Combine semantic and keyword results
                     combined_results = self._combine_hybrid_results(
                         search_results, hybrid_results
                     )
@@ -1057,8 +1057,6 @@ class IndexManager:
             if self.hybrid_search:
                 hybrid_search_info = self.hybrid_search.get_stats()
 
-            reranking_info = {}  # Reranker feature removed
-
             # System performance metrics
             cpu_percent = psutil.cpu_percent(interval=0.1)
             memory_info = psutil.virtual_memory()
@@ -1082,7 +1080,6 @@ class IndexManager:
                 "vector_store": vector_stats,
                 "embedding": embedding_info,
                 "hybrid_search": hybrid_search_info,
-                "reranking": reranking_info,
                 "performance": performance_info,
                 "persistence": persistence_info,
                 "configuration": self.config.get_config_summary(),
@@ -1103,7 +1100,6 @@ class IndexManager:
                     "is_available": False,
                 },
                 "hybrid_search": {},
-                "reranking": {},
                 "performance": {},
                 "persistence": {},
                 "configuration": {},

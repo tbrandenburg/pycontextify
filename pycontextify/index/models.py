@@ -30,7 +30,6 @@ class SearchErrorCode(Enum):
     EMBEDDER_UNAVAILABLE = "EMBEDDER_UNAVAILABLE"
     VECTOR_STORE_ERROR = "VECTOR_STORE_ERROR"
     HYBRID_SEARCH_FAILED = "HYBRID_SEARCH_FAILED"
-    RERANKER_FAILED = "RERANKER_FAILED"
     RELATIONSHIP_ERROR = "RELATIONSHIP_ERROR"
 
     # Performance/Resource Errors
@@ -49,7 +48,7 @@ class SearchResult:
     """Standardized search result object.
 
     This structure provides consistent formatting regardless of which
-    search features are enabled (hybrid, reranking, relationships).
+    search features are enabled (vector-only or hybrid keyword blending).
     """
 
     # Core fields (always present)
@@ -65,7 +64,7 @@ class SearchResult:
     )
 
     # Score breakdown (detailed when available)
-    scores: Optional[Dict[str, float]] = None  # vector, keyword, rerank, combined
+    scores: Optional[Dict[str, float]] = None  # vector, keyword, combined
 
     # Enhanced metadata (structured with categories)
     metadata: Optional[Dict[str, Any]] = None
@@ -545,22 +544,18 @@ def create_search_performance_info(
     start_time: float,
     search_mode: str,
     total_candidates: int = 0,
-    rerank_time: Optional[float] = None,
     vector_time: Optional[float] = None,
     keyword_time: Optional[float] = None,
-    relationship_time: Optional[float] = None,
     embedding_time: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Create enhanced performance information dictionary.
 
     Args:
         start_time: Start time from time.time()
-        search_mode: Search mode used ("vector", "hybrid", "hybrid_reranked", etc.)
+        search_mode: Search mode used ("vector", "hybrid", etc.)
         total_candidates: Number of candidates before filtering
-        rerank_time: Time spent on reranking (seconds)
         vector_time: Time spent on vector search (seconds)
         keyword_time: Time spent on keyword search (seconds)
-        relationship_time: Time spent processing relationships (seconds)
         embedding_time: Time spent generating query embedding (seconds)
 
     Returns:
@@ -592,14 +587,6 @@ def create_search_performance_info(
     if keyword_time is not None:
         timing_breakdown["keyword_search_ms"] = int(keyword_time * 1000)
         components_used.append("keyword_search")
-
-    if rerank_time is not None:
-        timing_breakdown["rerank_ms"] = int(rerank_time * 1000)
-        components_used.append("reranking")
-
-    if relationship_time is not None:
-        timing_breakdown["relationship_processing_ms"] = int(relationship_time * 1000)
-        components_used.append("relationships")
 
     if timing_breakdown:
         perf_info["timing_breakdown"] = timing_breakdown
@@ -658,7 +645,6 @@ def create_structured_position(
 def create_structured_scores(
     vector_score: Optional[float] = None,
     keyword_score: Optional[float] = None,
-    rerank_score: Optional[float] = None,
     original_score: Optional[float] = None,
     combined_score: Optional[float] = None,
 ) -> Optional[Dict[str, float]]:
@@ -667,8 +653,7 @@ def create_structured_scores(
     Args:
         vector_score: Semantic similarity score
         keyword_score: Keyword/lexical match score
-        rerank_score: Cross-encoder reranking score
-        original_score: Original score before reranking
+        original_score: Original score before any adjustments
         combined_score: Final combined score
 
     Returns:
@@ -680,8 +665,6 @@ def create_structured_scores(
         scores["vector"] = float(vector_score)
     if keyword_score is not None:
         scores["keyword"] = float(keyword_score)
-    if rerank_score is not None:
-        scores["rerank"] = float(rerank_score)
     if original_score is not None:
         scores["original"] = float(original_score)
     if combined_score is not None:
@@ -761,9 +744,9 @@ def create_search_provenance(
     """Create search provenance information.
 
     Args:
-        search_features: List of features used (vector, keyword, rerank, etc.)
+        search_features: List of features used (vector, keyword, etc.)
         ranking_factors: Factors that influenced ranking
-        search_stage: Stage of search (initial, reranked, filtered, etc.)
+        search_stage: Stage of search (initial, filtered, etc.)
         confidence: Confidence in the result matching
 
     Returns:
@@ -1205,10 +1188,7 @@ def enhance_search_results_with_ranking(
 def _determine_match_type(result: "SearchResult") -> str:
     """Determine the primary match type based on result scores and provenance."""
     if result.scores:
-        # Check if reranking was used
-        if "rerank" in result.scores:
-            return "hybrid"  # Hybrid + reranked
-        elif "vector" in result.scores and "keyword" in result.scores:
+        if "vector" in result.scores and "keyword" in result.scores:
             return "hybrid"  # Hybrid search
         elif "vector" in result.scores:
             return "semantic"  # Vector/semantic only
@@ -1218,9 +1198,7 @@ def _determine_match_type(result: "SearchResult") -> str:
     # Check provenance for features used
     if result.provenance and "features_used" in result.provenance:
         features = result.provenance["features_used"]
-        if "rerank" in features:
-            return "hybrid"
-        elif "vector" in features and "keyword" in features:
+        if "vector" in features and "keyword" in features:
             return "hybrid"
         elif "vector" in features:
             return "semantic"
