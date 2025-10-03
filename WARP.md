@@ -44,21 +44,21 @@ uv sync --reinstall              # Reset environment
 ## Chunking Strategies by Resource Type
 
 - **Code files** → `CodeChunker`
-  - Detects natural boundaries using function/class signatures and visibility keywords before falling back to token windows, ensuring structural cohesion for languages such as Python, JS/TS, Java, C-family, and Go.【F:pycontextify/index/chunker.py†L208-L315】
-  - Captures relationships like function/class names, imports, and simple variable declarations to enrich the lightweight knowledge graph for downstream search.【F:pycontextify/index/chunker.py†L317-L359】
+  - Detects natural boundaries using function/class signatures and visibility keywords before falling back to token windows, ensuring structural cohesion for languages such as Python, JS/TS, Java, C-family, and Go.
+  - Captures relationships like function/class names, imports, and simple variable declarations to enrich the lightweight knowledge graph for downstream search.
 
 - **Documents (Markdown/Text/PDF)** → `DocumentChunker`
-  - Breaks content along Markdown-style headers while enforcing minimum section length, with token-based fallback for unstructured prose.【F:pycontextify/index/chunker.py†L361-L475】
-  - Extracts contextual relationships from links, citations, emphasized terms, and section titles; PDF files are first converted to text via `DocumentLoader`/`PDFLoader` and then treated like other documents.【F:pycontextify/index/chunker.py†L477-L525】【F:pycontextify/index/loaders.py†L178-L262】
+  - Breaks content along Markdown-style headers while enforcing minimum section length, with token-based fallback for unstructured prose.
+  - Extracts contextual relationships from links, citations, emphasized terms, and section titles; PDF files are first converted to text via `DocumentLoader`/`PDFLoader` and then treated like other documents.
 
 - **Web pages** → `WebPageChunker`
-  - Reuses the document strategy after HTML cleanup, augmenting each chunk with metadata such as external links, domain, and URL path segments.【F:pycontextify/index/chunker.py†L528-L613】
-  - Adds web-specific relationship tags (domains, external links, contacts) on top of document-level extraction for richer search pivots.【F:pycontextify/index/chunker.py†L646-L683】
+  - Reuses the document strategy after HTML cleanup, augmenting each chunk with metadata such as external links, domain, and URL path segments.
+  - Adds web-specific relationship tags (domains, external links, contacts) on top of document-level extraction for richer search pivots.
 
 - **Fallback/Unknown sources** → `SimpleChunker`
-  - Applies configurable token windows with overlap and basic capitalized-entity extraction when the source type is not recognized or lacks structure.【F:pycontextify/index/chunker.py†L168-L205】
+  - Applies configurable token windows with overlap and basic capitalized-entity extraction when the source type is not recognized or lacks structure.
 
-`IndexManager` selects the appropriate strategy at runtime through `ChunkerFactory`, and all chunkers honor the shared configuration for chunk size, overlap, and relationship extraction limits defined in `Config`.【F:pycontextify/index/manager.py†L571-L602】【F:pycontextify/index/chunker.py†L685-L707】【F:pycontextify/index/config.py†L85-L95】
+`IndexManager` selects the appropriate strategy at runtime through `ChunkerFactory`, and all chunkers honor the shared configuration for chunk size, overlap, and relationship extraction limits defined in `Config`.
 
 ### Search Methods
 - **Vector**: FAISS IndexFlatIP (cosine similarity)
@@ -155,12 +155,44 @@ uv sync --reinstall              # Reset environment
 
 ## Troubleshooting
 
-**Model loading**: Ensure internet for first download  
-**Memory issues**: Use `all-MiniLM-L6-v2` model  
-**Dependencies**: `uv sync --reinstall`  
-**Permissions**: Check index directory write access  
+**Model loading**: Ensure internet for first download
+**Memory issues**: Use `all-MiniLM-L6-v2` model
+**Dependencies**: `uv sync --reinstall`
+**Permissions**: Check index directory write access
 **Debug**: Use `--verbose` flag for detailed logging
 **Windows**: Set `$env:PYTHONPATH = "."` before running scripts
+
+## File-Level Summary
+
+### Markdown Documentation
+- **README.md** – Provides project overview, setup, configuration guidance, and API usage instructions.
+- **WARP.md** – Acts as a developer handbook covering environment setup, architecture, MCP interface, configuration priorities, and troubleshooting tips.
+- **PRD.md** – Captures product requirements, user stories, functional scope, and success metrics for the platform.
+- **scripts/README.md** – Catalogs available utility scripts, their purposes, and execution notes.
+
+### Python Sources
+- **examples/cli_usage_examples.py** – Demonstrates command-line indexing and searching workflows across representative project types.
+- **pycontextify/__init__.py** – Exposes the package’s primary configuration and indexing interfaces for external consumers.
+- **pycontextify/index/__init__.py** – Re-exports core indexing classes so they can be imported from a single module.
+- **pycontextify/index/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
+- **pycontextify/index/metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.
+- **pycontextify/index/embedders/base.py** – Specifies the abstract embedder contract, error types, and shared embedding utilities.
+- **pycontextify/index/embedders/sentence_transformers_embedder.py** – Implements embeddings via Sentence Transformers with batching, device selection, and cleanup.
+- **pycontextify/index/embedders/factory.py** – Registers embedding providers, validates configuration, and constructs embedder instances.
+- **pycontextify/index/chunker.py** – Provides base and specialized chunkers for code, documents, and web pages, handling splitting and metadata extraction.
+- **pycontextify/index/loaders.py** – Supplies loaders for code, documents, and web pages, orchestrating ingestion workflows per source type.
+- **pycontextify/index/manager.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
+- **pycontextify/index/hybrid_search.py** – Implements keyword-based hybrid search that complements vector similarity results.
+- **pycontextify/index/vector_store.py** – Wraps FAISS vector storage operations, including persistence, backup, and validation routines.
+- **pycontextify/index/models.py** – Defines search-related data structures, response formatting helpers, and analytics utilities.
+- **pycontextify/index/pdf_loader.py** – Handles PDF extraction via multiple backends and enriches pages with contextual metadata.
+- **pycontextify/mcp_server.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
+- **scripts/debug_lazy_loading.py** – Prints diagnostics to inspect lazy-loading behavior of the index manager.
+- **scripts/detailed_perf.py** – Measures fine-grained startup timings for key indexing components.
+- **scripts/fast_startup_test.py** – Benchmarks configuration options and lazy-loading strategies for faster startup.
+- **scripts/measure_startup_time.py** – Records startup, indexing, and search timings to monitor performance regressions.
+- **scripts/run_mcp_tests.py** – Runs comprehensive or smoke MCP test suites and reports results.
+- **scripts/test_hf_connectivity.py** – Validates connectivity and compatibility with Hugging Face services and models.
 
 ## Design Decisions
 
