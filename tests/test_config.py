@@ -23,6 +23,7 @@ class TestConfig(unittest.TestCase):
 
                 self.assertEqual(config.embedding_provider, "sentence_transformers")
                 self.assertEqual(config.embedding_model, "all-MiniLM-L6-v2")
+                self.assertIsNone(config.bootstrap_archive_url)
         self.assertEqual(config.chunk_size, 512)
         self.assertEqual(config.chunk_overlap, 50)
         self.assertTrue(config.auto_persist)
@@ -48,6 +49,28 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(config.chunk_size, 256)
             self.assertFalse(config.auto_persist)
             self.assertFalse(config.enable_relationships)
+
+    def test_bootstrap_configuration_validation(self):
+        """Test validation of bootstrap archive configuration."""
+        env_vars = {
+            "PYCONTEXTIFY_INDEX_BOOTSTRAP_ARCHIVE_URL": "ftp://example.com/index.zip"
+        }
+        with patch.dict(os.environ, env_vars):
+            with self.assertRaisesRegex(ValueError, "http://, https://, or file://"):
+                Config()
+
+        valid_env = {
+            "PYCONTEXTIFY_INDEX_BOOTSTRAP_ARCHIVE_URL": "https://example.com/index.tar.gz"
+        }
+        with patch.dict(os.environ, valid_env):
+            config = Config()
+            self.assertEqual(
+                config.bootstrap_archive_url, "https://example.com/index.tar.gz"
+            )
+            self.assertEqual(
+                config.bootstrap_checksum_url,
+                "https://example.com/index.tar.gz.sha256",
+            )
 
     def test_cli_override_priority(self):
         """Test that CLI overrides take priority over environment variables."""

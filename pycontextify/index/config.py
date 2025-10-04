@@ -49,6 +49,20 @@ class Config:
             "PYCONTEXTIFY_INDEX_NAME", "semantic_index", override_key="index_name"
         )
 
+        raw_bootstrap_url = self._get_config(
+            "PYCONTEXTIFY_INDEX_BOOTSTRAP_ARCHIVE_URL",
+            None,
+            override_key="bootstrap_archive_url",
+        )
+        self.bootstrap_archive_url = (
+            raw_bootstrap_url.strip() if isinstance(raw_bootstrap_url, str) else None
+        )
+        self.bootstrap_checksum_url = (
+            self._derive_checksum_url(self.bootstrap_archive_url)
+            if self.bootstrap_archive_url
+            else None
+        )
+
         # Persistence settings (CLI overrides have priority)
         self.auto_persist = self._get_bool_config(
             "PYCONTEXTIFY_AUTO_PERSIST", True, override_key="auto_persist"
@@ -250,6 +264,59 @@ class Config:
                 "Crawl delay must be at least 1 second for respectful crawling"
             )
 
+        self._validate_bootstrap_config()
+
+    def _validate_bootstrap_config(self) -> None:
+        """Validate HTTP bootstrap configuration if provided."""
+        if not self.bootstrap_archive_url:
+            return
+
+        from urllib.parse import urlparse
+
+        parsed = urlparse(self.bootstrap_archive_url)
+        # Allow http for testing, but https is recommended for production
+        if parsed.scheme not in {"http", "https", "file"}:
+            raise ValueError(
+                "Bootstrap archive URL must use http://, https://, or file:// scheme"
+            )
+
+        archive_path = parsed.path or ""
+        normalized_name = archive_path.lower()
+        if not (
+            normalized_name.endswith(".zip")
+            or normalized_name.endswith(".tar.gz")
+            or normalized_name.endswith(".tgz")
+        ):
+            raise ValueError("Bootstrap archive must be a .zip, .tar.gz, or .tgz file")
+
+        if parsed.scheme in ("http", "https") and not parsed.netloc:
+            raise ValueError("HTTP(S) bootstrap archive URL must include a hostname")
+
+        if parsed.scheme == "file" and not archive_path:
+            raise ValueError(
+                "File bootstrap archive URL must include a filesystem path"
+            )
+
+    def _derive_checksum_url(self, archive_url: Optional[str]):
+        """Derive checksum URL from archive URL."""
+        if not archive_url:
+            return None
+
+        from urllib.parse import urlparse, urlunparse
+
+        parsed = urlparse(archive_url)
+        checksum_path = f"{parsed.path}.sha256"
+        return urlunparse(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                checksum_path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+
     def validate_provider_config(self) -> bool:
         """Validate provider-specific configuration."""
         if self.embedding_provider == "sentence_transformers":
@@ -275,6 +342,16 @@ class Config:
         """Ensure index directory exists."""
         self.index_dir.mkdir(parents=True, exist_ok=True)
 
+    def get_bootstrap_sources(self) -> Optional[Dict[str, str]]:
+        """Return bootstrap archive and checksum URLs when configured."""
+        if not self.bootstrap_archive_url:
+            return None
+
+        return {
+            "archive": self.bootstrap_archive_url,
+            "checksum": self.bootstrap_checksum_url,
+        }
+
     def get_config_summary(self) -> Dict[str, Any]:
         """Get configuration summary for logging and status reporting."""
         return {
@@ -292,6 +369,7 @@ class Config:
             "use_hybrid_search": self.use_hybrid_search,
             "keyword_weight": self.keyword_weight,
             "pdf_engine": self.pdf_engine,
+            "bootstrap_archive_url": self.bootstrap_archive_url,
         }
 
     def is_provider_available(self, provider: str) -> bool:

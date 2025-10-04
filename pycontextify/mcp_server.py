@@ -154,28 +154,31 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the MCP server."""
     parser = argparse.ArgumentParser(
         prog="pycontextify",
-        description="PyContextify MCP Server - Semantic search over codebases, documents, and webpages",
+        description=(
+            "PyContextify MCP Server - Semantic search over codebases, "
+            "documents, and webpages"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   # Start server with custom index path
   pycontextify --index-path ./my_index
-  
+
   # Start with initial documents
   pycontextify --initial-documents ./docs/readme.md ./docs/api.md
-  
+
   # Start with initial codebase and custom index
   pycontextify --index-path ./project_index --initial-codebase ./src
-  
+
   # Start with initial webpages
-  pycontextify --initial-webpages https://docs.python.org https://github.com/user/repo
-  
+  pycontextify --initial-webpages https://docs.python.org
+
   # Recursive webpage crawling with depth limit
   pycontextify --initial-webpages https://docs.example.com \
                --recursive-crawling --max-crawl-depth 2 --crawl-delay 2
-  
+
   # Full example with all content types
   pycontextify --index-path ./my_index --index-name project_search \
-               --initial-documents ./README.md --initial-codebase ./src ./tests \
+               --initial-documents ./README.md --initial-codebase ./src \
                --initial-webpages https://api-docs.com --recursive-crawling
 
 Configuration priority: CLI arguments > Environment variables > Defaults
@@ -188,12 +191,26 @@ Environment variables can still be used for all settings. Use --help for details
     parser.add_argument(
         "--index-path",
         type=str,
-        help="Directory path for vector storage and index files (overrides PYCONTEXTIFY_INDEX_DIR)",
+        help=(
+            "Directory path for vector storage and index files "
+            "(overrides PYCONTEXTIFY_INDEX_DIR)"
+        ),
     )
     parser.add_argument(
         "--index-name",
         type=str,
-        help="Custom index name (overrides PYCONTEXTIFY_INDEX_NAME, default: semantic_index)",
+        help=(
+            "Custom index name "
+            "(overrides PYCONTEXTIFY_INDEX_NAME, default: semantic_index)"
+        ),
+    )
+    parser.add_argument(
+        "--index-bootstrap-archive-url",
+        type=str,
+        help=(
+            "Optional HTTPS or file URL to an index bootstrap archive "
+            "(overrides PYCONTEXTIFY_INDEX_BOOTSTRAP_ARCHIVE_URL)"
+        ),
     )
 
     # Initial indexing
@@ -231,31 +248,42 @@ Environment variables can still be used for all settings. Use --help for details
     parser.add_argument(
         "--crawl-delay",
         type=int,
-        help="Delay between web requests in seconds (overrides PYCONTEXTIFY_CRAWL_DELAY_SECONDS)",
+        help=(
+            "Delay between web requests in seconds "
+            "(overrides PYCONTEXTIFY_CRAWL_DELAY_SECONDS)"
+        ),
     )
 
     # Server configuration
     parser.add_argument(
         "--no-auto-persist",
         action="store_true",
-        help="Disable automatic index persistence (overrides PYCONTEXTIFY_AUTO_PERSIST)",
+        help=(
+            "Disable automatic index persistence "
+            "(overrides PYCONTEXTIFY_AUTO_PERSIST)"
+        ),
     )
     parser.add_argument(
         "--no-auto-load",
         action="store_true",
-        help="Disable automatic index loading on startup (overrides PYCONTEXTIFY_AUTO_LOAD)",
+        help=(
+            "Disable automatic index loading on startup "
+            "(overrides PYCONTEXTIFY_AUTO_LOAD)"
+        ),
     )
 
     # Embedding configuration
     parser.add_argument(
         "--embedding-provider",
         choices=["sentence_transformers", "ollama", "openai"],
-        help="Embedding provider to use (overrides PYCONTEXTIFY_EMBEDDING_PROVIDER)",
+        help=(
+            "Embedding provider to use " "(overrides PYCONTEXTIFY_EMBEDDING_PROVIDER)"
+        ),
     )
     parser.add_argument(
         "--embedding-model",
         type=str,
-        help="Embedding model name (overrides PYCONTEXTIFY_EMBEDDING_MODEL)",
+        help=("Embedding model name (overrides PYCONTEXTIFY_EMBEDDING_MODEL)"),
     )
 
     # Verbose logging
@@ -299,9 +327,8 @@ def initialize_manager(
                 _manager_instance = IndexManager(config)
                 logger.info("IndexManager initialized successfully")
                 if config_overrides:
-                    logger.info(
-                        f"Applied CLI configuration overrides: {list(config_overrides.keys())}"
-                    )
+                    override_keys = list(config_overrides.keys())
+                    logger.info(f"Applied CLI configuration overrides: {override_keys}")
             except Exception as e:
                 logger.error(f"Failed to initialize IndexManager: {e}")
                 _manager_instance = None  # Reset on failure
@@ -479,10 +506,12 @@ def search(query: str, top_k: int = 5, display_format: str = "structured") -> An
     Args:
         query: Search query text
         top_k: Maximum number of results to return (default: 5)
-        display_format: Output format - 'structured' (default), 'readable', or 'summary'
+        display_format: Output format - 'structured' (default), 'readable',
+            or 'summary'
 
     Returns:
-        Structured search results as list of dictionaries, or formatted text for readable/summary
+        Structured search results as list of dictionaries, or formatted text
+        for readable/summary
     """
     try:
         # Validate query
@@ -599,8 +628,13 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
         if not confirm:
             return {
                 "success": False,
-                "error": "Reset operation requires explicit confirmation. Set confirm=True to proceed.",
-                "warning": "This operation will permanently delete all indexed content.",
+                "error": (
+                    "Reset operation requires explicit confirmation. "
+                    "Set confirm=True to proceed."
+                ),
+                "warning": (
+                    "This operation will permanently delete all indexed content."
+                ),
                 "help": "Use reset_index(confirm=True) to proceed with the reset.",
             }
 
@@ -640,9 +674,10 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
         reset_result = mgr.clear_index(remove_files=remove_files)
 
         if not reset_result.get("success", False):
+            error_detail = reset_result.get("error", "Unknown error")
             return {
                 "success": False,
-                "error": f"Reset operation failed: {reset_result.get('error', 'Unknown error')}",
+                "error": f"Reset operation failed: {error_detail}",
                 "before_reset": before_stats,
             }
 
@@ -660,7 +695,7 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
         except Exception:
             after_stats = {"total_chunks": 0, "memory_usage_mb": 0}
 
-        success_message = f"Index reset completed successfully. "
+        success_message = "Index reset completed successfully. "
         if remove_files:
             success_message += "All indexed data and files have been removed."
         else:
@@ -674,8 +709,10 @@ def reset_index(remove_files: bool = True, confirm: bool = False) -> Dict[str, A
             "files_removed": remove_files,
         }
 
+        chunks_removed = before_stats["total_chunks"]
         logger.info(
-            f"Index reset completed: {before_stats['total_chunks']} chunks removed, files_removed={remove_files}"
+            f"Index reset completed: {chunks_removed} chunks removed, "
+            f"files_removed={remove_files}"
         )
         return result
 
@@ -778,7 +815,8 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                     chunks_added = result.get("chunks_added", 0)
                     total_indexed += chunks_added
                     logger.info(
-                        f"Successfully indexed document {doc_path}: {chunks_added} chunks"
+                        f"Successfully indexed document {doc_path}: "
+                        f"{chunks_added} chunks"
                     )
                 else:
                     logger.error(
@@ -812,7 +850,8 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                     chunks_added = result.get("chunks_added", 0)
                     total_indexed += chunks_added
                     logger.info(
-                        f"Successfully indexed codebase {codebase_path}: {files_processed} files, {chunks_added} chunks"
+                        f"Successfully indexed codebase {codebase_path}: "
+                        f"{files_processed} files, {chunks_added} chunks"
                     )
                 else:
                     logger.error(
@@ -830,7 +869,8 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                 # Validate URL
                 if not webpage_url.startswith(("http://", "https://")):
                     logger.warning(
-                        f"Invalid URL (must start with http:// or https://), skipping: {webpage_url}"
+                        "Invalid URL (must start with http:// or https://), "
+                        f"skipping: {webpage_url}"
                     )
                     continue
 
@@ -857,7 +897,8 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                     chunks_added = result.get("chunks_added", 0)
                     total_indexed += chunks_added
                     logger.info(
-                        f"Successfully indexed webpage {webpage_url}: {pages_processed} pages, {chunks_added} chunks "
+                        f"Successfully indexed webpage {webpage_url}: "
+                        f"{pages_processed} pages, {chunks_added} chunks "
                         f"(recursive={recursive}, max_depth={max_depth})"
                     )
                 else:
@@ -898,6 +939,8 @@ def args_to_config_overrides(args: argparse.Namespace) -> Dict[str, Any]:
         overrides["index_dir"] = args.index_path
     if args.index_name:
         overrides["index_name"] = args.index_name
+    if getattr(args, "index_bootstrap_archive_url", None):
+        overrides["bootstrap_archive_url"] = args.index_bootstrap_archive_url
 
     # Server configuration
     if args.no_auto_persist:

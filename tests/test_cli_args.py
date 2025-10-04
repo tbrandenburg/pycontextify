@@ -32,6 +32,11 @@ def parse_args_with_custom_argv(argv):
         type=str,
         help="Custom index name",
     )
+    parser.add_argument(
+        "--index-bootstrap-archive-url",
+        type=str,
+        help="Optional HTTPS or file URL for bootstrapping the index",
+    )
 
     # Initial indexing
     parser.add_argument(
@@ -96,6 +101,8 @@ def args_to_config_overrides(args):
         overrides["index_dir"] = args.index_path
     if args.index_name:
         overrides["index_name"] = args.index_name
+    if getattr(args, "index_bootstrap_archive_url", None):
+        overrides["bootstrap_archive_url"] = args.index_bootstrap_archive_url
 
     # Server configuration
     if args.no_auto_persist:
@@ -134,6 +141,7 @@ class TestCLIArguments(unittest.TestCase):
         )
         self.assertEqual(args.index_path, "./custom_index")
         self.assertEqual(args.index_name, "my_search")
+        self.assertIsNone(args.index_bootstrap_archive_url)
 
     def test_initial_documents(self):
         """Test initial document arguments."""
@@ -141,6 +149,7 @@ class TestCLIArguments(unittest.TestCase):
             ["--initial-documents", "doc1.pdf", "doc2.md", "doc3.txt"]
         )
         self.assertEqual(args.initial_documents, ["doc1.pdf", "doc2.md", "doc3.txt"])
+        self.assertIsNone(args.index_bootstrap_archive_url)
 
     def test_initial_codebase(self):
         """Test initial codebase arguments."""
@@ -148,6 +157,7 @@ class TestCLIArguments(unittest.TestCase):
             ["--initial-codebase", "src", "tests", "lib"]
         )
         self.assertEqual(args.initial_codebase, ["src", "tests", "lib"])
+        self.assertIsNone(args.index_bootstrap_archive_url)
 
     def test_server_configuration(self):
         """Test server configuration flags."""
@@ -193,6 +203,8 @@ class TestCLIArguments(unittest.TestCase):
                 "./my_index",
                 "--index-name",
                 "project_search",
+                "--index-bootstrap-archive-url",
+                "https://example.com/bootstrap.tar.gz",
                 "--initial-documents",
                 "README.md",
                 "docs/api.md",
@@ -210,6 +222,9 @@ class TestCLIArguments(unittest.TestCase):
 
         self.assertEqual(args.index_path, "./my_index")
         self.assertEqual(args.index_name, "project_search")
+        self.assertEqual(
+            args.index_bootstrap_archive_url, "https://example.com/bootstrap.tar.gz"
+        )
         self.assertEqual(args.initial_documents, ["README.md", "docs/api.md"])
         self.assertEqual(args.initial_codebase, ["src", "tests"])
         self.assertTrue(args.no_auto_persist)
@@ -230,11 +245,21 @@ class TestConfigOverrides(unittest.TestCase):
     def test_index_overrides(self):
         """Test index configuration overrides."""
         args = parse_args_with_custom_argv(
-            ["--index-path", "./custom", "--index-name", "test_search"]
+            [
+                "--index-path",
+                "./custom",
+                "--index-name",
+                "test_search",
+                "--index-bootstrap-archive-url",
+                "file:///tmp/archive.tar.gz",
+            ]
         )
         overrides = args_to_config_overrides(args)
         self.assertEqual(overrides["index_dir"], "./custom")
         self.assertEqual(overrides["index_name"], "test_search")
+        self.assertEqual(
+            overrides["bootstrap_archive_url"], "file:///tmp/archive.tar.gz"
+        )
 
     def test_server_overrides(self):
         """Test server configuration overrides."""
