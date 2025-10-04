@@ -121,6 +121,20 @@ $env:PYTHONPATH = "."; python scripts/test_hf_connectivity.py
 - ✅ Model download testing
 - ✅ Tokenizer loading verification
 
+### 📦 **build_package.py**
+Builds distributable artifacts and validates package metadata prior to publishing.
+
+**Usage:**
+```bash
+python scripts/build_package.py
+```
+
+**Features:**
+- ✅ Cleans previous `build/` and `dist/` directories
+- ✅ Creates both wheel and sdist via `python -m build`
+- ✅ Runs `twine check` for metadata validation
+- ✅ Provides actionable output for release automation
+
 ## Adding New Scripts
 
 When adding new utility scripts:
