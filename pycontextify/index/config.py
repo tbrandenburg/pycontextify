@@ -274,9 +274,10 @@ class Config:
         from urllib.parse import urlparse
 
         parsed = urlparse(self.bootstrap_archive_url)
-        if parsed.scheme not in {"https", "file"}:
+        # Allow http for testing, but https is recommended for production
+        if parsed.scheme not in {"http", "https", "file"}:
             raise ValueError(
-                "Bootstrap archive URL must use https:// or file:// scheme"
+                "Bootstrap archive URL must use http://, https://, or file:// scheme"
             )
 
         archive_path = parsed.path or ""
@@ -286,15 +287,15 @@ class Config:
             or normalized_name.endswith(".tar.gz")
             or normalized_name.endswith(".tgz")
         ):
-            raise ValueError(
-                "Bootstrap archive must be a .zip, .tar.gz, or .tgz file"
-            )
+            raise ValueError("Bootstrap archive must be a .zip, .tar.gz, or .tgz file")
 
-        if parsed.scheme == "https" and not parsed.netloc:
-            raise ValueError("HTTPS bootstrap archive URL must include a hostname")
+        if parsed.scheme in ("http", "https") and not parsed.netloc:
+            raise ValueError("HTTP(S) bootstrap archive URL must include a hostname")
 
         if parsed.scheme == "file" and not archive_path:
-            raise ValueError("File bootstrap archive URL must include a filesystem path")
+            raise ValueError(
+                "File bootstrap archive URL must include a filesystem path"
+            )
 
     def _derive_checksum_url(self, archive_url: Optional[str]):
         """Derive checksum URL from archive URL."""

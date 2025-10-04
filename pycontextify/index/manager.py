@@ -10,11 +10,13 @@ import os
 import shutil
 import tarfile
 import threading
+import time
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional
 from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 import psutil
 import requests
@@ -296,10 +298,14 @@ class IndexManager:
             paths = self.config.get_index_paths()
 
             essential_paths = {
-                key: value for key, value in paths.items() if key in ["metadata", "index"]
+                key: value
+                for key, value in paths.items()
+                if key in ["metadata", "index"]
             }
             missing_paths = {
-                key: value for key, value in essential_paths.items() if not value.exists()
+                key: value
+                for key, value in essential_paths.items()
+                if not value.exists()
             }
 
             if missing_paths:
@@ -355,9 +361,7 @@ class IndexManager:
                         f"Loaded {self.vector_store.get_total_vectors()} vectors"
                     )
                 else:
-                    logger.error(
-                        "Vector store not initialized, cannot load vectors"
-                    )
+                    logger.error("Vector store not initialized, cannot load vectors")
             else:
                 logger.info("No chunks in metadata, skipping vector loading")
 
@@ -412,10 +416,14 @@ class IndexManager:
 
         try:
             essential_paths = {
-                key: value for key, value in paths.items() if key in ["metadata", "index"]
+                key: value
+                for key, value in paths.items()
+                if key in ["metadata", "index"]
             }
             missing_paths = {
-                key: value for key, value in essential_paths.items() if not value.exists()
+                key: value
+                for key, value in essential_paths.items()
+                if not value.exists()
             }
             if not missing_paths:
                 logger.info("Bootstrap skipped because index artifacts already exist")
@@ -446,7 +454,9 @@ class IndexManager:
                 self._move_bootstrap_artifacts(extract_dir, paths)
 
             remaining_missing = {
-                key: value for key, value in essential_paths.items() if not value.exists()
+                key: value
+                for key, value in essential_paths.items()
+                if not value.exists()
             }
             if remaining_missing:
                 logger.warning(
@@ -460,16 +470,35 @@ class IndexManager:
         except Exception as exc:
             logger.warning(f"Failed to bootstrap index from {archive_url}: {exc}")
 
-    def _download_to_path(self, url: str, destination_dir: Path) -> Path:
-        """Download or copy the given URL into destination_dir."""
+    def _download_to_path(
+        self, url: str, destination_dir: Path, max_retries: int = 3
+    ) -> Path:
+        """Download or copy the given URL into destination_dir with retry logic.
 
+        Args:
+            url: URL to download from (http://, https://, or file://)
+            destination_dir: Directory to save the downloaded file
+            max_retries: Maximum number of retry attempts (default: 3)
+
+        Returns:
+            Path to the downloaded file
+
+        Raises:
+            FileNotFoundError: If file:// URL points to non-existent file
+            ValueError: If URL scheme is not supported
+            Exception: After max retries exhausted for transient errors
+        """
         parsed = urlparse(url)
         filename = Path(unquote(parsed.path or "")).name or "bootstrap_archive"
         destination_dir.mkdir(parents=True, exist_ok=True)
         target_path = destination_dir / filename
 
+        # Handle file:// URLs without retry (local filesystem)
         if parsed.scheme == "file":
-            source_path = Path(unquote(parsed.path))
+            # Use url2pathname to handle Windows paths properly
+            # (e.g., file:///C:/path becomes C:\path on Windows)
+            local_path = url2pathname(parsed.path)
+            source_path = Path(local_path)
             if not source_path.exists():
                 raise FileNotFoundError(
                     f"Bootstrap archive file not found: {source_path}"
@@ -478,38 +507,202 @@ class IndexManager:
             shutil.copy2(source_path, target_path)
             return target_path
 
-        if parsed.scheme == "https":
-            logger.info("Downloading bootstrap archive from %s", url)
-            response = requests.get(url, stream=True, timeout=30)
-            response.raise_for_status()
-            with target_path.open("wb") as handle:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        handle.write(chunk)
-            return target_path
+        # Handle http:// and https:// URLs with retry logic
+        if parsed.scheme in ("http", "https"):
+            last_exception = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    if attempt > 1:
+                        # Exponential backoff: 1s, 2s, 4s, ...
+                        delay = 2 ** (attempt - 2)
+                        logger.info(
+                            f"Retrying download after {delay}s delay (attempt "
+                            f"{attempt}/{max_retries})"
+                        )
+                        time.sleep(delay)
+
+                    logger.info(
+                        f"Downloading bootstrap archive from {url} "
+                        f"(attempt {attempt}/{max_retries})"
+                    )
+                    response = requests.get(url, stream=True, timeout=30)
+                    response.raise_for_status()
+
+                    # Write to temporary file first, then rename atomically
+                    temp_path = target_path.with_suffix(".tmp")
+                    with temp_path.open("wb") as handle:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                handle.write(chunk)
+
+                    # Atomic rename
+                    os.replace(temp_path, target_path)
+                    logger.info("Download completed successfully")
+                    return target_path
+
+                except requests.exceptions.Timeout as e:
+                    last_exception = e
+                    logger.warning(
+                        f"Download timeout on attempt {attempt}/{max_retries}: {e}"
+                    )
+                    # Retry on timeout
+                    continue
+
+                except requests.exceptions.ConnectionError as e:
+                    last_exception = e
+                    logger.warning(
+                        f"Connection error on attempt {attempt}/{max_retries}: {e}"
+                    )
+                    # Retry on connection errors
+                    continue
+
+                except requests.exceptions.HTTPError as e:
+                    # Check if error is retriable (408, 429, 5xx)
+                    if e.response is not None:
+                        status_code = e.response.status_code
+                        if status_code in (408, 429) or status_code >= 500:
+                            last_exception = e
+                            logger.warning(
+                                f"Retriable HTTP error {status_code} on attempt "
+                                f"{attempt}/{max_retries}: {e}"
+                            )
+                            continue  # Retry
+                        else:
+                            # Non-retriable 4xx error
+                            logger.error(f"Non-retriable HTTP error {status_code}: {e}")
+                            raise
+                    else:
+                        # No response, treat as retriable
+                        last_exception = e
+                        logger.warning(
+                            f"HTTP error on attempt {attempt}/{max_retries}: {e}"
+                        )
+                        continue
+
+                except Exception as e:
+                    # Unexpected errors - log and re-raise immediately
+                    logger.error(
+                        f"Unexpected error during download (attempt "
+                        f"{attempt}/{max_retries}): {e}"
+                    )
+                    raise
+
+            # All retries exhausted
+            error_msg = (
+                f"Failed to download {url} after {max_retries} attempts. "
+                f"Last error: {last_exception}"
+            )
+            logger.error(error_msg)
+            raise Exception(error_msg)
 
         raise ValueError(f"Unsupported bootstrap scheme: {parsed.scheme}")
 
-    def _fetch_checksum(self, url: str) -> str:
-        """Retrieve checksum text from the provided URL."""
+    def _fetch_checksum(self, url: str, max_retries: int = 3) -> str:
+        """Retrieve checksum text from the provided URL with retry logic.
 
+        Args:
+            url: URL to fetch checksum from (http://, https://, or file://)
+            max_retries: Maximum number of retry attempts (default: 3)
+
+        Returns:
+            The SHA256 checksum as a hex string
+
+        Raises:
+            FileNotFoundError: If file:// URL points to non-existent file
+            ValueError: If checksum file is empty or malformed
+            Exception: After max retries exhausted for transient errors
+        """
         parsed = urlparse(url)
+
+        # Handle file:// URLs
         if parsed.scheme == "file":
-            checksum_path = Path(unquote(parsed.path))
+            # Use url2pathname to handle Windows paths properly
+            local_path = url2pathname(parsed.path)
+            checksum_path = Path(local_path)
             if not checksum_path.exists():
                 raise FileNotFoundError(
                     f"Bootstrap checksum file not found: {checksum_path}"
                 )
             content = checksum_path.read_text(encoding="utf-8")
-        else:
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
-            content = response.text
+        # Handle http:// and https:// URLs with retry
+        elif parsed.scheme in ("http", "https"):
+            last_exception = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    if attempt > 1:
+                        delay = 2 ** (attempt - 2)
+                        logger.info(
+                            f"Retrying checksum fetch after {delay}s "
+                            f"(attempt {attempt}/{max_retries})"
+                        )
+                        time.sleep(delay)
 
+                    logger.debug(f"Fetching checksum from {url}")
+                    response = requests.get(url, timeout=30)
+                    response.raise_for_status()
+                    content = response.text
+                    break
+
+                except (
+                    requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError,
+                ) as e:
+                    last_exception = e
+                    logger.warning(
+                        f"Error fetching checksum on attempt "
+                        f"{attempt}/{max_retries}: {e}"
+                    )
+                    if attempt == max_retries:
+                        raise Exception(
+                            f"Failed to fetch checksum after {max_retries} attempts. "
+                            f"Last error: {e}"
+                        )
+                    continue
+
+                except requests.exceptions.HTTPError as e:
+                    if e.response is not None:
+                        status_code = e.response.status_code
+                        if status_code in (408, 429) or status_code >= 500:
+                            last_exception = e
+                            logger.warning(
+                                f"Retriable HTTP error {status_code} "
+                                f"(attempt {attempt}/{max_retries})"
+                            )
+                            if attempt == max_retries:
+                                raise Exception(
+                                    f"Failed to fetch checksum after "
+                                    f"{max_retries} attempts"
+                                )
+                            continue
+                        else:
+                            logger.error(f"Non-retriable HTTP error {status_code}")
+                            raise
+                    raise
+        else:
+            raise ValueError(f"Unsupported checksum URL scheme: {parsed.scheme}")
+
+        # Parse checksum from content
         if not content.strip():
             raise ValueError("Bootstrap checksum file is empty")
 
-        return content.strip().split()[0]
+        # Support two formats:
+        # 1. "<hex_digest>" (just the hash)
+        # 2. "<hex_digest>  <filename>" (hash with filename)
+        parts = content.strip().split()
+        if not parts:
+            raise ValueError("Bootstrap checksum file is empty")
+
+        checksum = parts[0].lower()
+
+        # Validate it's a valid hex string
+        if len(checksum) != 64 or not all(c in "0123456789abcdef" for c in checksum):
+            raise ValueError(
+                f"Invalid SHA256 checksum format: {checksum[:20]}... "
+                "(expected 64 hex characters)"
+            )
+
+        logger.info(f"Fetched checksum: {checksum[:16]}...")
+        return checksum
 
     def _verify_checksum(self, archive_path: Path, expected_checksum: str) -> None:
         """Verify archive SHA256 checksum."""
@@ -542,7 +735,9 @@ class IndexManager:
 
         raise ValueError(f"Unsupported bootstrap archive format: {archive_path}")
 
-    def _move_bootstrap_artifacts(self, extract_dir: Path, paths: Dict[str, Path]) -> None:
+    def _move_bootstrap_artifacts(
+        self, extract_dir: Path, paths: Dict[str, Path]
+    ) -> None:
         """Move extracted files into their final locations if missing."""
 
         for key in ["metadata", "index"]:

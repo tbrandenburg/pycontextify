@@ -56,7 +56,7 @@ class TestConfig(unittest.TestCase):
             "PYCONTEXTIFY_INDEX_BOOTSTRAP_ARCHIVE_URL": "ftp://example.com/index.zip"
         }
         with patch.dict(os.environ, env_vars):
-            with self.assertRaisesRegex(ValueError, "https:// or file://"):
+            with self.assertRaisesRegex(ValueError, "http://, https://, or file://"):
                 Config()
 
         valid_env = {
