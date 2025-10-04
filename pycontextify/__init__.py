@@ -11,8 +11,8 @@ try:  # pragma: no cover - exercised when installed as a package
 except _metadata.PackageNotFoundError:  # pragma: no cover - local editable installs
     __version__ = "0.1.0"
 
-__author__ = "PyContextify Maintainers"
-__email__ = "maintainers@pycontextify.dev"
+__author__ = "Tom Brandenburg"
+__email__ = "kabelkaspertom@googlemail.com"
 __license__ = "MIT"
 
 __all__ = ["IndexManager", "Config", "__version__", "__author__", "__email__"]
