@@ -226,14 +226,10 @@ class VectorStore:
         for backup_path in backups:
             try:
                 shutil.copy2(backup_path, filepath)
-                logger.info(
-                    "Restored backup %s to %s", backup_path.name, filepath.name
-                )
+                logger.info("Restored backup %s to %s", backup_path.name, filepath.name)
                 return True
             except Exception as exc:
-                logger.warning(
-                    "Failed to restore backup %s: %s", backup_path.name, exc
-                )
+                logger.warning("Failed to restore backup %s: %s", backup_path.name, exc)
         return False
 
     def load_from_file(self, filepath: str) -> None:
