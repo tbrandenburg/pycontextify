@@ -208,6 +208,34 @@ class VectorStore:
             logger.error(f"Failed to save FAISS index: {e}")
             raise
 
+    @staticmethod
+    def restore_latest_backup(filepath: Path) -> bool:
+        """Restore the most recent backup for the given artifact if available."""
+
+        directory = filepath.parent
+        if not directory.exists():
+            return False
+
+        pattern = f"{filepath.stem}_backup_*{filepath.suffix}"
+        backups = sorted(
+            directory.glob(pattern),
+            key=lambda candidate: candidate.stat().st_mtime,
+            reverse=True,
+        )
+
+        for backup_path in backups:
+            try:
+                shutil.copy2(backup_path, filepath)
+                logger.info(
+                    "Restored backup %s to %s", backup_path.name, filepath.name
+                )
+                return True
+            except Exception as exc:
+                logger.warning(
+                    "Failed to restore backup %s: %s", backup_path.name, exc
+                )
+        return False
+
     def load_from_file(self, filepath: str) -> None:
         """Load FAISS index from disk.
 

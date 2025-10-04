@@ -4,10 +4,20 @@ This module implements the main coordination system that orchestrates all
 components for indexing operations, persistence, and search functionality.
 """
 
+import hashlib
 import logging
-from typing import Any, Dict, List
+import os
+import shutil
+import tarfile
+import threading
+import zipfile
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Dict, List, Optional
+from urllib.parse import unquote, urlparse
 
 import psutil
+import requests
 
 from .chunker import ChunkerFactory
 from .config import Config
@@ -49,6 +59,9 @@ class IndexManager:
         # Store embedder configuration for lazy loading
         self._embedder_config = None
         self._embedder_initialized = False
+        self._bootstrap_thread: Optional[threading.Thread] = None
+        self._bootstrap_lock = threading.Lock()
+        self._load_lock = threading.Lock()
 
         # Initialize performance logger
         self.performance_logger = SearchPerformanceLogger()
@@ -282,62 +295,274 @@ class IndexManager:
         try:
             paths = self.config.get_index_paths()
 
-            # Check if essential index files exist (metadata and vector index)
             essential_paths = {
-                k: v for k, v in paths.items() if k in ["metadata", "index"]
+                key: value for key, value in paths.items() if key in ["metadata", "index"]
             }
-            if all(path.exists() for path in essential_paths.values()):
-                logger.info("Loading existing index...")
+            missing_paths = {
+                key: value for key, value in essential_paths.items() if not value.exists()
+            }
 
-                # First load metadata to get embedding info
-                self.metadata_store.load_from_file(str(paths["metadata"]))
+            if missing_paths:
+                logger.info(
+                    "Detected missing index artifacts: %s",
+                    ", ".join(sorted(path.name for path in missing_paths.values())),
+                )
+                if self._restore_from_backups(missing_paths):
+                    missing_paths = {
+                        key: value
+                        for key, value in essential_paths.items()
+                        if not value.exists()
+                    }
 
-                # Check if we have chunks to load
-                if self.metadata_store.get_stats().get("total_chunks", 0) > 0:
-                    # Get embedding info from stored metadata
-                    embedding_info = self.metadata_store.get_embedding_info()
-                    if embedding_info and embedding_info.get("models"):
-                        # Extract provider and model from stored info
-                        first_model = embedding_info["models"][
-                            0
-                        ]  # Format: "provider:model"
-                        if ":" in first_model:
-                            stored_provider, stored_model = first_model.split(":", 1)
+            if not missing_paths:
+                self._load_existing_index(paths)
+                return
 
-                            # Override config temporarily to match stored embeddings
-                            original_provider = self.config.embedding_provider
-                            original_model = self.config.embedding_model
-                            self.config.embedding_provider = stored_provider
-                            self.config.embedding_model = stored_model
-
-                            logger.info(
-                                f"Loading with stored embedding settings: {stored_provider}:{stored_model}"
-                            )
-
-                    # Now ensure embedder is loaded (this will create vector store with correct dimensions)
-                    self._ensure_embedder_loaded()
-
-                    # Load vector store after embedder initialization
-                    if self.vector_store is not None:
-                        self.vector_store.load_from_file(str(paths["index"]))
-                        logger.info(
-                            f"Loaded {self.vector_store.get_total_vectors()} vectors"
-                        )
-                    else:
-                        logger.error(
-                            "Vector store not initialized, cannot load vectors"
-                        )
-                else:
-                    logger.info("No chunks in metadata, skipping vector loading")
-
-                logger.info("Successfully loaded existing index")
-            else:
-                logger.info("No existing index found, starting fresh")
+            logger.info("No existing index found, starting fresh")
+            self._schedule_bootstrap(paths)
         except Exception as e:
             logger.warning(f"Failed to load existing index: {e}")
             import traceback
 
             logger.debug(traceback.format_exc())
+
+    def _load_existing_index(self, paths: Dict[str, Path]) -> None:
+        """Load existing index artifacts into memory."""
+        with self._load_lock:
+            logger.info("Loading existing index...")
+
+            self.metadata_store.load_from_file(str(paths["metadata"]))
+
+            if self.metadata_store.get_stats().get("total_chunks", 0) > 0:
+                embedding_info = self.metadata_store.get_embedding_info()
+                if embedding_info and embedding_info.get("models"):
+                    first_model = embedding_info["models"][0]
+                    if ":" in first_model:
+                        stored_provider, stored_model = first_model.split(":", 1)
+                        self.config.embedding_provider = stored_provider
+                        self.config.embedding_model = stored_model
+                        logger.info(
+                            "Loading with stored embedding settings: %s:%s",
+                            stored_provider,
+                            stored_model,
+                        )
+
+                self._ensure_embedder_loaded()
+
+                if self.vector_store is not None:
+                    self.vector_store.load_from_file(str(paths["index"]))
+                    logger.info(
+                        f"Loaded {self.vector_store.get_total_vectors()} vectors"
+                    )
+                else:
+                    logger.error(
+                        "Vector store not initialized, cannot load vectors"
+                    )
+            else:
+                logger.info("No chunks in metadata, skipping vector loading")
+
+            logger.info("Successfully loaded existing index")
+
+    def _restore_from_backups(self, missing_paths: Dict[str, Path]) -> bool:
+        """Attempt to restore missing artifacts from VectorStore backups."""
+
+        restored_any = False
+        for path in missing_paths.values():
+            if VectorStore.restore_latest_backup(path):
+                restored_any = True
+
+        if restored_any:
+            logger.info("Restored one or more index artifacts from backups")
+
+        return restored_any
+
+    def _schedule_bootstrap(self, paths: Dict[str, Path]) -> None:
+        """Schedule asynchronous bootstrap of index artifacts when configured."""
+
+        sources = self.config.get_bootstrap_sources()
+        if not sources:
+            logger.info("Bootstrap archive URL not configured; skipping bootstrap")
+            return
+
+        with self._bootstrap_lock:
+            if self._bootstrap_thread and self._bootstrap_thread.is_alive():
+                logger.debug("Bootstrap worker already running; skipping reschedule")
+                return
+
+            logger.info("Scheduling bootstrap download for missing index artifacts")
+            self._bootstrap_thread = threading.Thread(
+                target=self._bootstrap_index_from_archive,
+                args=(paths, sources),
+                name="pycontextify-index-bootstrap",
+                daemon=True,
+            )
+            self._bootstrap_thread.start()
+
+    def _bootstrap_index_from_archive(
+        self, paths: Dict[str, Path], sources: Dict[str, str]
+    ) -> None:
+        """Download, verify, and extract bootstrap archive into place."""
+
+        archive_url = sources.get("archive")
+        checksum_url = sources.get("checksum")
+
+        if not archive_url or not checksum_url:
+            logger.warning("Bootstrap sources incomplete, skipping bootstrap")
+            return
+
+        try:
+            essential_paths = {
+                key: value for key, value in paths.items() if key in ["metadata", "index"]
+            }
+            missing_paths = {
+                key: value for key, value in essential_paths.items() if not value.exists()
+            }
+            if not missing_paths:
+                logger.info("Bootstrap skipped because index artifacts already exist")
+                return
+
+            if self._restore_from_backups(missing_paths):
+                missing_paths = {
+                    key: value
+                    for key, value in essential_paths.items()
+                    if not value.exists()
+                }
+                if not missing_paths:
+                    logger.info(
+                        "Bootstrap cancelled after restoring artifacts from backups"
+                    )
+                    self._load_existing_index(paths)
+                    return
+
+            with TemporaryDirectory(prefix="pycontextify-bootstrap-") as tmpdir:
+                temp_dir = Path(tmpdir)
+                archive_path = self._download_to_path(archive_url, temp_dir)
+                checksum_value = self._fetch_checksum(checksum_url)
+                self._verify_checksum(archive_path, checksum_value)
+
+                extract_dir = temp_dir / "extracted"
+                extract_dir.mkdir(parents=True, exist_ok=True)
+                self._extract_archive(archive_path, extract_dir)
+                self._move_bootstrap_artifacts(extract_dir, paths)
+
+            remaining_missing = {
+                key: value for key, value in essential_paths.items() if not value.exists()
+            }
+            if remaining_missing:
+                logger.warning(
+                    "Bootstrap archive did not provide all required artifacts: %s",
+                    ", ".join(sorted(path.name for path in remaining_missing.values())),
+                )
+                return
+
+            logger.info("Bootstrap archive applied successfully; loading index")
+            self._load_existing_index(paths)
+        except Exception as exc:
+            logger.warning(f"Failed to bootstrap index from {archive_url}: {exc}")
+
+    def _download_to_path(self, url: str, destination_dir: Path) -> Path:
+        """Download or copy the given URL into destination_dir."""
+
+        parsed = urlparse(url)
+        filename = Path(unquote(parsed.path or "")).name or "bootstrap_archive"
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        target_path = destination_dir / filename
+
+        if parsed.scheme == "file":
+            source_path = Path(unquote(parsed.path))
+            if not source_path.exists():
+                raise FileNotFoundError(
+                    f"Bootstrap archive file not found: {source_path}"
+                )
+            logger.info("Copying bootstrap archive from %s", source_path)
+            shutil.copy2(source_path, target_path)
+            return target_path
+
+        if parsed.scheme == "https":
+            logger.info("Downloading bootstrap archive from %s", url)
+            response = requests.get(url, stream=True, timeout=30)
+            response.raise_for_status()
+            with target_path.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        handle.write(chunk)
+            return target_path
+
+        raise ValueError(f"Unsupported bootstrap scheme: {parsed.scheme}")
+
+    def _fetch_checksum(self, url: str) -> str:
+        """Retrieve checksum text from the provided URL."""
+
+        parsed = urlparse(url)
+        if parsed.scheme == "file":
+            checksum_path = Path(unquote(parsed.path))
+            if not checksum_path.exists():
+                raise FileNotFoundError(
+                    f"Bootstrap checksum file not found: {checksum_path}"
+                )
+            content = checksum_path.read_text(encoding="utf-8")
+        else:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            content = response.text
+
+        if not content.strip():
+            raise ValueError("Bootstrap checksum file is empty")
+
+        return content.strip().split()[0]
+
+    def _verify_checksum(self, archive_path: Path, expected_checksum: str) -> None:
+        """Verify archive SHA256 checksum."""
+
+        digest = hashlib.sha256()
+        with archive_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+
+        actual_checksum = digest.hexdigest()
+        if actual_checksum.lower() != expected_checksum.lower():
+            raise ValueError(
+                "Bootstrap archive checksum mismatch: "
+                f"expected {expected_checksum}, got {actual_checksum}"
+            )
+
+    def _extract_archive(self, archive_path: Path, destination: Path) -> None:
+        """Extract supported archive formats into destination directory."""
+
+        lower_name = archive_path.name.lower()
+        if lower_name.endswith(".zip"):
+            with zipfile.ZipFile(archive_path) as zip_ref:
+                zip_ref.extractall(destination)
+            return
+
+        if lower_name.endswith(".tar.gz") or lower_name.endswith(".tgz"):
+            with tarfile.open(archive_path, "r:gz") as tar_ref:
+                tar_ref.extractall(destination)
+            return
+
+        raise ValueError(f"Unsupported bootstrap archive format: {archive_path}")
+
+    def _move_bootstrap_artifacts(self, extract_dir: Path, paths: Dict[str, Path]) -> None:
+        """Move extracted files into their final locations if missing."""
+
+        for key in ["metadata", "index"]:
+            destination = paths[key]
+            if destination.exists():
+                continue
+
+            matches = list(extract_dir.rglob(destination.name))
+            if not matches:
+                logger.warning(
+                    "Bootstrap archive missing expected %s file %s",
+                    key,
+                    destination.name,
+                )
+                continue
+
+            source_path = matches[0]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(source_path, destination)
+            logger.info("Bootstrapped %s", destination.name)
 
     def _validate_embedding_compatibility(self) -> bool:
         """Validate that existing index is compatible with current embedding settings."""

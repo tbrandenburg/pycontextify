@@ -195,6 +195,11 @@ Environment variables can still be used for all settings. Use --help for details
         type=str,
         help="Custom index name (overrides PYCONTEXTIFY_INDEX_NAME, default: semantic_index)",
     )
+    parser.add_argument(
+        "--index-bootstrap-archive-url",
+        type=str,
+        help="Optional HTTPS or file URL to an index bootstrap archive (overrides PYCONTEXTIFY_INDEX_BOOTSTRAP_ARCHIVE_URL)",
+    )
 
     # Initial indexing
     parser.add_argument(
@@ -898,6 +903,8 @@ def args_to_config_overrides(args: argparse.Namespace) -> Dict[str, Any]:
         overrides["index_dir"] = args.index_path
     if args.index_name:
         overrides["index_name"] = args.index_name
+    if getattr(args, "index_bootstrap_archive_url", None):
+        overrides["bootstrap_archive_url"] = args.index_bootstrap_archive_url
 
     # Server configuration
     if args.no_auto_persist:
