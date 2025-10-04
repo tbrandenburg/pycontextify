@@ -19,10 +19,10 @@ classifiers = [
 keywords = ["mcp", "semantic-search", "embeddings", "faiss", "rag", "vector-search"]
 license = {file = "LICENSE"}
 authors = [
-    {name = "PyContextify Maintainers", email = "maintainers@pycontextify.dev"},
+    {name = "Tom Brandenburg", email = "kabelkaspertom@googlemail.com"},
 ]
 maintainers = [
-    {name = "PyContextify Community", email = "maintainers@pycontextify.dev"},
+    {name = "Tom Brandenburg", email = "kabelkaspertom@googlemail.com"},
 ]
 
 dependencies = [
