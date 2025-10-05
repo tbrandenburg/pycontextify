@@ -13,6 +13,11 @@ This document captures the steps required to publish a new version of PyContexti
 3. **Verify dependencies**
    - Run `uv sync --extra dev` to install the `dev` extra (includes `build` and `twine`)
    - Review `pyproject.toml` for any dependency adjustments needed for the release
+4. **Sanity check CLI entry point**
+   - After building (or once the package is live on TestPyPI/PyPI), confirm the
+     console script is discoverable with `uvx pycontextify -- --help`
+   - This verifies the `pycontextify` entry point remains correctly exposed for
+     users invoking the tool via `uvx`
 
 ## Quality Gates
 

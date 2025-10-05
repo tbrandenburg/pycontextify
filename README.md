@@ -25,6 +25,20 @@ uv sync
 uv run pycontextify --verbose
 ```
 
+### Run with `uvx`
+
+If you want to execute the published CLI without modifying your current
+environment, `uvx` can resolve `pycontextify` from PyPI and run its console
+entry point directly:
+
+```bash
+uvx pycontextify -- --help
+```
+
+The double dash (`--`) ensures any following arguments are forwarded to
+PyContextify itself. This requires a released version of the package to be
+available on PyPI, which the manual publishing workflow now provides.
+
 ## System Requirements
 
 - **Python**: Python 3.10 or newer for the MCP server core (full test suite currently targets Python 3.13+).【F:pyproject.toml†L1-L35】【F:tests/README.md†L57-L63】
