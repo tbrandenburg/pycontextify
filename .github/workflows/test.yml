@@ -27,6 +27,8 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v1
+        with:
+          version: "0.4.20"
 
       - name: Run tests
         run: uv run --extra dev --group dev pytest --cov=pycontextify
