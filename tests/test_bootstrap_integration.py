@@ -30,7 +30,6 @@ import pytest
 from pycontextify.index.config import Config
 from pycontextify.index.manager import IndexManager
 
-
 # ============================================================================
 # Fixtures for Archive Creation
 # ============================================================================
@@ -603,10 +602,108 @@ class TestBootstrapIntegration:
         self,
         tmp_path,
         minimal_index_files,
+        create_zip_archive,
+        create_checksum_file,
+        http_server,
         clean_bootstrap_env,
     ):
         """Test that backup restoration takes priority over download."""
-        pytest.skip("To be implemented")
+        from datetime import datetime
+
+        base_url, serve_dir = http_server
+
+        # Setup: Create index directory with backup files
+        index_dir = tmp_path / "index_data"
+        index_dir.mkdir(parents=True, exist_ok=True)
+
+        # Store original backup content for verification
+        backup_faiss_content = b"BACKUP_FAISS_DATA"
+        backup_pkl_content = b"BACKUP_PKL_DATA"
+
+        # Create backup files with proper naming (semantic_index_backup_TIMESTAMP.ext)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_faiss = index_dir / f"semantic_index_backup_{timestamp}.faiss"
+        backup_pkl = index_dir / f"semantic_index_backup_{timestamp}.pkl"
+
+        backup_faiss.write_bytes(backup_faiss_content)
+        backup_pkl.write_bytes(backup_pkl_content)
+
+        # Ensure current index files do NOT exist (so bootstrap is triggered)
+        current_faiss = index_dir / "semantic_index.faiss"
+        current_pkl = index_dir / "semantic_index.pkl"
+
+        assert (
+            not current_faiss.exists()
+        ), "Current FAISS file should not exist initially"
+        assert not current_pkl.exists(), "Current PKL file should not exist initially"
+
+        # Create HTTP archive with DIFFERENT content that should NOT be used
+        archive_files = {
+            "faiss": tmp_path / "semantic_index.faiss",
+            "pkl": tmp_path / "semantic_index.pkl",
+        }
+        archive_files["faiss"].write_bytes(b"ARCHIVE_FAISS_DATA")
+        archive_files["pkl"].write_bytes(b"ARCHIVE_PKL_DATA")
+
+        archive_path = create_zip_archive(archive_files, "test_index.zip")
+        checksum_path = create_checksum_file(archive_path)
+
+        # Copy archive and checksum to HTTP server directory
+        shutil.copy2(archive_path, serve_dir / archive_path.name)
+        shutil.copy2(checksum_path, serve_dir / checksum_path.name)
+
+        # Configure bootstrap URL
+        archive_url = f"{base_url}/{archive_path.name}"
+
+        # Track if HTTP download is attempted (it should NOT be)
+        http_download_attempted = False
+
+        def mock_download_to_path(original_func):
+            def wrapper(self, url, *args, **kwargs):
+                nonlocal http_download_attempted
+                if url.startswith("http://") or url.startswith("https://"):
+                    http_download_attempted = True
+                return original_func(self, url, *args, **kwargs)
+
+            return wrapper
+
+        # Patch the download method to track HTTP attempts
+        from pycontextify.index.manager import IndexManager
+
+        original_download = IndexManager._download_to_path
+        IndexManager._download_to_path = mock_download_to_path(original_download)
+
+        try:
+            # Create manager with bootstrap configuration
+            manager = create_manager_with_bootstrap(
+                tmp_path, archive_url, index_name="semantic_index"
+            )
+
+            # Wait for bootstrap to complete
+            assert wait_for_bootstrap_completion(
+                manager, timeout=10.0
+            ), "Bootstrap did not complete in time"
+
+            # Verify files were restored from backups, NOT downloaded
+            assert current_faiss.exists(), "FAISS file should exist after restoration"
+            assert current_pkl.exists(), "PKL file should exist after restoration"
+
+            # Verify content matches backups, not archive
+            assert (
+                current_faiss.read_bytes() == backup_faiss_content
+            ), "FAISS content should match backup, not HTTP archive"
+            assert (
+                current_pkl.read_bytes() == backup_pkl_content
+            ), "PKL content should match backup, not HTTP archive"
+
+            # Verify HTTP download was NOT attempted
+            assert (
+                not http_download_attempted
+            ), "HTTP download should not occur when backups exist"
+
+        finally:
+            # Restore original method
+            IndexManager._download_to_path = original_download
 
     def test_concurrent_bootstrap_locking(
         self,

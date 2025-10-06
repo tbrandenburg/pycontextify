@@ -448,7 +448,9 @@ def index_document(path: str) -> Dict[str, Any]:
     return handle_mcp_errors("Document indexing", _index_document_impl, path)
 
 
-def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, Any]:
+def _index_webpage_impl(
+    url: str, recursive: bool, max_depth: int, max_links_per_page: int
+) -> Dict[str, Any]:
     """Implementation for index_webpage with validation and business logic."""
     # Validate parameters
     url = validate_string_param(url, "url")
@@ -465,9 +467,19 @@ def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, 
     if original_depth > 3:
         logger.warning(f"Limited max_depth from {original_depth} to 3 for safety")
 
+    # Validate max_links_per_page
+    max_links_per_page = validate_int_param(
+        max_links_per_page, "max_links_per_page", min_val=1, max_val=100
+    )
+
     # Initialize manager and index
     mgr = initialize_manager()
-    result = mgr.index_webpage(url, recursive=recursive, max_depth=max_depth)
+    result = mgr.index_webpage(
+        url,
+        recursive=recursive,
+        max_depth=max_depth,
+        max_links_per_page=max_links_per_page,
+    )
 
     logger.info(f"Webpage indexing completed for {url}: {result}")
     return result
@@ -475,7 +487,10 @@ def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, 
 
 @mcp.tool
 def index_webpage(
-    url: str, recursive: bool = False, max_depth: int = 1
+    url: str,
+    recursive: bool = False,
+    max_depth: int = 1,
+    max_links_per_page: int = 50,
 ) -> Dict[str, Any]:
     """Index web content for semantic search with optional recursive crawling.
 
@@ -485,13 +500,23 @@ def index_webpage(
     Args:
         url: URL of the webpage to index
         recursive: Whether to follow links and index linked pages
-        max_depth: Maximum depth for recursive crawling (ignored if recursive=False)
+        max_depth: Maximum depth for recursive crawling (inclusive).
+                  1 = starting URL only, 2 = starting URL + direct children, etc.
+                  Ignored if recursive=False. Max allowed: 3
+        max_links_per_page: Maximum number of links to follow per page.
+                           Higher values increase crawl breadth but take longer.
+                           Range: 1-100, default: 50
 
     Returns:
         Dictionary with indexing statistics including pages processed and chunks added
     """
     return handle_mcp_errors(
-        "Webpage indexing", _index_webpage_impl, url, recursive, max_depth
+        "Webpage indexing",
+        _index_webpage_impl,
+        url,
+        recursive,
+        max_depth,
+        max_links_per_page,
     )
 
 

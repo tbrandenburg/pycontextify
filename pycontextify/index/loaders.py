@@ -263,17 +263,31 @@ class DocumentLoader(BaseLoader):
 
 
 class WebpageLoader(BaseLoader):
-    """Loader for web content with link extraction."""
+    """Loader for web content with link extraction.
 
-    def __init__(self, delay_seconds: int = 1, max_depth: int = 2):
+    Follows Scrapy-inspired best practices:
+    - Depth limit is inclusive (max_depth=2 means starting URL + 1 level)
+    - Configurable max links per page
+    - Transparent logging when limits are reached
+    """
+
+    def __init__(
+        self,
+        delay_seconds: int = 1,
+        max_depth: int = 2,
+        max_links_per_page: int = 50,
+    ):
         """Initialize webpage loader.
 
         Args:
-            delay_seconds: Delay between requests
-            max_depth: Maximum crawl depth
+            delay_seconds: Delay between requests in seconds
+            max_depth: Maximum crawl depth (0 = no limit, 1 = starting URL only,
+                      2 = starting URL + direct children, etc.)
+            max_links_per_page: Maximum number of links to follow per page
         """
         self.delay_seconds = delay_seconds
         self.max_depth = max_depth
+        self.max_links_per_page = max_links_per_page
         self.visited_urls: Set[str] = set()
         self.session = requests.Session()
         self.session.headers.update(
@@ -288,7 +302,9 @@ class WebpageLoader(BaseLoader):
         Args:
             url: URL to load
             recursive: Whether to follow links
-            max_depth: Maximum depth for recursive loading
+            max_depth: Maximum depth for recursive loading (inclusive).
+                      1 = starting URL only, 2 = starting URL + direct children, etc.
+                      0 = unlimited depth (use with caution)
 
         Returns:
             List of (url, content) tuples
@@ -297,35 +313,69 @@ class WebpageLoader(BaseLoader):
         pages = []
 
         if recursive:
-            pages = self._crawl_recursive(url, max_depth, 0)
+            # Start at depth 1 (the starting URL is at depth 1)
+            pages = self._crawl_recursive(url, max_depth, 1)
         else:
-            content = self._load_single_page(url)
+            soup, content = self._fetch_and_parse(url)
             if content:
                 pages = [(url, content)]
 
-        logger.info(f"Loaded {len(pages)} web pages")
+        logger.info(f"Loaded {len(pages)} web pages from {url}")
         return pages
 
     def _crawl_recursive(
         self, url: str, max_depth: int, current_depth: int
     ) -> List[Tuple[str, str]]:
-        """Recursively crawl web pages."""
-        if current_depth >= max_depth or url in self.visited_urls:
+        """Recursively crawl web pages.
+
+        Args:
+            url: URL to crawl
+            max_depth: Maximum depth allowed (inclusive)
+            current_depth: Current depth in the crawl tree (starts at 1 for root)
+
+        Returns:
+            List of (url, content) tuples
+        """
+        # Check depth limit (inclusive) - depth 1 is the starting URL
+        if max_depth > 0 and current_depth > max_depth:
+            logger.debug(
+                f"Skipping {url}: depth {current_depth} exceeds max_depth {max_depth}"
+            )
+            return []
+
+        # Check if already visited
+        if url in self.visited_urls:
+            logger.debug(f"Skipping {url}: already visited")
             return []
 
         self.visited_urls.add(url)
         pages = []
 
-        # Load current page
-        content = self._load_single_page(url)
+        # Load current page - get both soup (for links) and content (for indexing)
+        logger.info(f"Crawling {url} at depth {current_depth}")
+        soup, content = self._fetch_and_parse(url)
         if content:
             pages.append((url, content))
 
-            # Extract links if we haven't reached max depth
-            if current_depth < max_depth - 1:
-                links = self._extract_links(content, url)
+            # Extract and follow links if we haven't reached max depth
+            # (depth check: continue only if we're below max_depth or max_depth is unlimited)
+            if soup and (max_depth == 0 or current_depth < max_depth):
+                links = self._extract_links_from_soup(soup, url)
+                total_links = len(links)
 
-                for link in links[:10]:  # Limit links to avoid excessive crawling
+                # Apply link limit
+                links_to_crawl = links[: self.max_links_per_page]
+
+                if total_links > self.max_links_per_page:
+                    logger.warning(
+                        f"Found {total_links} links on {url}, "
+                        f"but limiting to first {self.max_links_per_page} "
+                        f"(set max_links_per_page to increase)"
+                    )
+                else:
+                    logger.info(f"Found {total_links} links on {url}")
+
+                for link in links_to_crawl:
                     if self._should_follow_link(link, url):
                         time.sleep(self.delay_seconds)  # Rate limiting
                         sub_pages = self._crawl_recursive(
@@ -335,8 +385,18 @@ class WebpageLoader(BaseLoader):
 
         return pages
 
-    def _load_single_page(self, url: str) -> Optional[str]:
-        """Load single web page content with improved extraction strategy."""
+    def _fetch_and_parse(
+        self, url: str
+    ) -> Tuple[Optional[BeautifulSoup], Optional[str]]:
+        """Fetch and parse a web page, returning both soup and extracted text.
+
+        Args:
+            url: URL to fetch
+
+        Returns:
+            Tuple of (BeautifulSoup object, extracted text content)
+            Returns (None, None) on error
+        """
         try:
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
@@ -457,22 +517,29 @@ class WebpageLoader(BaseLoader):
                 logger.info(
                     f"Selected content from '{source}': {len(final_text)} characters"
                 )
-                return final_text
+                return soup, final_text
             else:
                 logger.warning("No suitable content found")
-                return None
+                return soup, None
 
         except requests.RequestException as e:
             logger.warning(f"Failed to load {url}: {e}")
-            return None
+            return None, None
         except Exception as e:
             logger.warning(f"Error processing {url}: {e}")
-            return None
+            return None, None
 
-    def _extract_links(self, content: str, base_url: str) -> List[str]:
-        """Extract links from HTML content."""
+    def _extract_links_from_soup(self, soup: BeautifulSoup, base_url: str) -> List[str]:
+        """Extract links from BeautifulSoup object.
+
+        Args:
+            soup: BeautifulSoup parsed HTML
+            base_url: Base URL for resolving relative links
+
+        Returns:
+            List of absolute URLs
+        """
         try:
-            soup = BeautifulSoup(content, "html.parser")
             links = []
 
             for link in soup.find_all("a", href=True):

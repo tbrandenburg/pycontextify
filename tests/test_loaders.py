@@ -172,7 +172,9 @@ class TestWebpageLoaderSimple:
         """
 
         loader = WebpageLoader()
-        links = loader._extract_links(html, "https://example.com")
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "html.parser")
+        links = loader._extract_links_from_soup(soup, "https://example.com")
 
         # Should convert relative URLs to absolute and exclude non-HTTP links
         http_links = [
@@ -199,7 +201,7 @@ class TestWebpageLoaderSimple:
         loader = WebpageLoader()
         loader.visited_urls.add("https://old.com")
 
-        with patch.object(loader, "_load_single_page", return_value=None):
+        with patch.object(loader, "_fetch_and_parse", return_value=(None, None)):
             loader.load("https://new.com")
 
         # Should not contain old URL after new load
@@ -282,14 +284,17 @@ class TestIntegration:
         loader = WebpageLoader()
 
         # Mock the methods to avoid actual HTTP requests
-        with patch.object(loader, "_load_single_page") as mock_load:
-            with patch.object(loader, "_extract_links") as mock_links:
+        from bs4 import BeautifulSoup
+        test_soup = BeautifulSoup("<html><body>Test content</body></html>", "html.parser")
+        
+        with patch.object(loader, "_fetch_and_parse") as mock_fetch:
+            with patch.object(loader, "_extract_links_from_soup") as mock_links:
                 with patch.object(loader, "_should_follow_link") as mock_should:
-                    mock_load.return_value = "Test content"
+                    mock_fetch.return_value = (test_soup, "Test content")
                     mock_links.return_value = []
                     mock_should.return_value = False
 
-                    result = loader._crawl_recursive("https://example.com", 2, 0)
+                    result = loader._crawl_recursive("https://example.com", 2, 1)
 
                     assert len(result) == 1
                     assert result[0][0] == "https://example.com"

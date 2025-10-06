@@ -5,7 +5,6 @@ from importlib import metadata as _metadata
 from .index.config import Config
 from .index.manager import IndexManager
 
-
 try:  # pragma: no cover - exercised when installed as a package
     __version__ = _metadata.version("pycontextify")
 except _metadata.PackageNotFoundError:  # pragma: no cover - local editable installs

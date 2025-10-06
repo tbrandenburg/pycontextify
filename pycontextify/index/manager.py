@@ -890,26 +890,35 @@ class IndexManager:
             return {"error": error_msg}
 
     def index_webpage(
-        self, url: str, recursive: bool = False, max_depth: int = 1
+        self,
+        url: str,
+        recursive: bool = False,
+        max_depth: int = 1,
+        max_links_per_page: int = 50,
     ) -> Dict[str, Any]:
         """Index web content.
 
         Args:
             url: URL to index
             recursive: Whether to follow links
-            max_depth: Maximum crawl depth
+            max_depth: Maximum crawl depth (inclusive). 1 = starting URL only,
+                     2 = starting URL + direct children, etc. 0 = unlimited
+            max_links_per_page: Maximum number of links to follow per page
 
         Returns:
             Statistics about the indexing operation
         """
         logger.info(
-            f"Starting webpage indexing: {url} (recursive={recursive}, max_depth={max_depth})"
+            f"Starting webpage indexing: {url} "
+            f"(recursive={recursive}, max_depth={max_depth}, max_links_per_page={max_links_per_page})"
         )
 
         try:
             # Load content
             loader = LoaderFactory.get_loader(
-                SourceType.WEBPAGE, delay_seconds=self.config.crawl_delay_seconds
+                SourceType.WEBPAGE,
+                delay_seconds=self.config.crawl_delay_seconds,
+                max_links_per_page=max_links_per_page,
             )
             pages = loader.load(url, recursive=recursive, max_depth=max_depth)
 
