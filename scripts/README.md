@@ -4,6 +4,27 @@ This directory contains utility scripts and runners for the PyContextify project
 
 ## Scripts
 
+### 🌍 **crawl_url.py**
+Quickly crawl a URL using PyContextify's Crawl4AI-backed webpage loader.
+
+**Usage:**
+```bash
+PYTHONPATH=. python scripts/crawl_url.py https://example.com --max-depth 2
+```
+
+**Features:**
+- ✅ Respects Crawl4AI's breadth-first depth handling (`--max-depth 0` disables the limit)
+- ✅ Streams Crawl4AI markdown output for each discovered page
+- ✅ Accepts custom crawl delays, browser modes, and headless toggles
+- ✅ `--single-page` flag for quick one-off fetches without deep crawling
+
+**Troubleshooting:**
+- ⚠️ `net::ERR_TUNNEL_CONNECTION_FAILED` means Chromium (bundled with Crawl4AI)
+  could not create a HTTPS tunnel through the active proxy. This occurs in
+  locked-down environments—such as the evaluation sandbox—where outbound
+  browser traffic is blocked. Running the script from an unrestricted machine
+  resolves the error without code changes.
+
 ### 🧪 **run_mcp_tests.py**
 Comprehensive test runner for the PyContextify MCP server.
 
