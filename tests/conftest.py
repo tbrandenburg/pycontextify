@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-
 @pytest.fixture(autouse=True)
 def mock_sentence_transformers(request):
     """Mock sentence-transformers to avoid model loading.
