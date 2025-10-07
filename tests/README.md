@@ -2,29 +2,33 @@
 
 This directory contains the automated regression tests for PyContextify.
 They are organised by scope so contributors can quickly discover the
-appropriate place to add coverage.
+appropriate place to add coverage. Two sub-packages now separate the
+fast unit suite from slower integration coverage, and each directory
+applies the appropriate `@pytest.mark.unit` or `@pytest.mark.integration`
+marker via a local `conftest.py`.
 
-## Test file overview
+## Directory overview
 
-### 🎯 End-to-end MCP coverage
-- **`test_mcp_server.py`** – Consolidated MCP tests that exercise
-  validation helpers, tool wiring, and a smoke-test workflow running
-  through the FastMCP interface. These tests replace the earlier
-  `test_mcp_system_*` modules while remaining lightweight and easy to
-  maintain.
+```
+tests/
+├── unit/          # Fast component-level checks marked as unit tests
+└── integration/   # Scenario and system tests marked as integration tests
+```
 
-### 🔧 Integration tests
-- **`test_integration.py`** – Exercises the indexing pipeline and search
-  stack directly through the `IndexManager` to verify chunking, embedding,
-  and retrieval logic with realistic content. Document and relationship
-  scenarios live here while code ingestion is validated via the MCP suite.
+### 📦 Unit tests (`tests/unit`)
+- `test_chunker.py`, `test_cli_args.py`, `test_config.py`,
+  `test_embeddings.py`, `test_loaders.py`, `test_metadata.py`,
+  `test_models.py`, `test_pdf_loader.py`, `test_persistence.py`,
+  `test_vector_store.py`, and related helpers cover the focused
+  components that make up the indexing runtime.
 
-### 📦 Unit tests
-- **`test_chunker.py`**, **`test_cli_args.py`**, **`test_config.py`**,
-  **`test_embeddings.py`**, **`test_loaders.py`**, **`test_metadata.py`**,
-  **`test_models.py`**, **`test_pdf_loader.py`**, **`test_persistence.py`**,
-  **`test_vector_store.py`**, and others cover the focused components that
-  make up the indexing runtime.
+### 🔧 Integration tests (`tests/integration`)
+- `test_bootstrap_integration.py`, `test_hybrid_search.py`,
+  `test_integration.py`, `test_loaders.py`, `test_mcp_server.py`,
+  `test_persistence.py`, and
+  `test_recursive_crawling.py` exercise end-to-end behaviour such as
+  bootstrap archives, metadata-backed search, MCP workflows, and
+  real-world crawling scenarios.
 
 ## Running the suite
 
@@ -32,11 +36,11 @@ appropriate place to add coverage.
 # Run every test
 uv run python -m pytest tests -v
 
-# Run only the MCP tests
-uv run python -m pytest tests/test_mcp_server.py -v
+# Run only the unit suite
+uv run python -m pytest tests/unit -v
 
-# Run the integration pipeline checks
-uv run python -m pytest tests/test_integration.py -v
+# Run only the integration scenarios
+uv run python -m pytest tests/integration -v
 ```
 
 ## Conventions

@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from pycontextify.index.hybrid_search import HybridSearchEngine, SearchResult
-from pycontextify.index.metadata import ChunkMetadata, MetadataStore, SourceType
+from pycontextify.index.metadata import ChunkMetadata, SourceType
 
 
 class TestHybridSearchEngine:
@@ -124,37 +124,6 @@ class TestHybridSearchEngine:
             # add_documents should not raise, but skip indexing
             engine.add_documents(["doc1"], ["text1"])
             assert engine.bm25_index is None
-
-
-class TestHybridSearchIntegration:
-    """Integration tests for hybrid search with real components."""
-
-    def test_integration_with_metadata_store(self):
-        """Test integration with actual MetadataStore."""
-        metadata_store = MetadataStore()
-
-        # Add test chunks
-        chunk1 = ChunkMetadata(
-            chunk_id="chunk1",
-            source_path="/test.py",
-            chunk_text="Python programming language",
-            source_type=SourceType.CODE,
-        )
-        chunk2 = ChunkMetadata(
-            chunk_id="chunk2",
-            source_path="/test.py",
-            chunk_text="JavaScript web development",
-            source_type=SourceType.CODE,
-        )
-
-        faiss_id1 = metadata_store.add_chunk(chunk1)
-        faiss_id2 = metadata_store.add_chunk(chunk2)
-
-        retrieved1 = metadata_store.get_chunk(faiss_id1)
-        retrieved2 = metadata_store.get_chunk(faiss_id2)
-
-        assert retrieved1.chunk_text == "Python programming language"
-        assert retrieved2.chunk_text == "JavaScript web development"
 
 
 if __name__ == "__main__":
