@@ -4,20 +4,139 @@ This module implements content loaders for different source types with
 relationship extraction capabilities.
 """
 
+import asyncio
+import inspect
 import logging
+import math
+import os
 import re
-import time
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
-from urllib.parse import urljoin, urlparse
+from typing import Any, Callable, List, Optional, Set, Tuple, TYPE_CHECKING
 
-import requests
-from bs4 import BeautifulSoup
+if TYPE_CHECKING:  # pragma: no cover - import for type checkers only
+    from crawl4ai import (
+        AsyncWebCrawler as AsyncWebCrawlerType,
+        BrowserConfig as BrowserConfigType,
+        CacheMode as CacheModeType,
+        CrawlResult as CrawlResultType,
+        CrawlerRunConfig as CrawlerRunConfigType,
+    )
+    from crawl4ai.deep_crawling import (
+        BFSDeepCrawlStrategy as BFSDeepCrawlStrategyType,
+    )
+    from crawl4ai.models import (
+        CrawlResultContainer as CrawlResultContainerType,
+    )
+else:  # pragma: no cover - runtime fallbacks populated lazily
+    AsyncWebCrawlerType = BrowserConfigType = CacheModeType = CrawlResultType = (
+        CrawlerRunConfigType
+    ) = BFSDeepCrawlStrategyType = CrawlResultContainerType = Any
 
 from .metadata import SourceType
 
 logger = logging.getLogger(__name__)
+
+
+_async_crawler_cls: Optional[type] = None
+_browser_config_cls: Optional[type] = None
+_cache_mode_cls: Optional[type] = None
+_crawl_result_cls: Optional[type] = None
+_crawler_run_config_cls: Optional[type] = None
+_deep_crawl_strategy_cls: Optional[type] = None
+_crawl_result_container_cls: Optional[type] = None
+_html2text_fn: Optional[Callable[[str], str]] = None
+
+
+def _require_crawl4ai() -> None:
+    """Load Crawl4AI lazily and provide a clear error if unavailable."""
+
+    global _async_crawler_cls
+    global _browser_config_cls
+    global _cache_mode_cls
+    global _crawl_result_cls
+    global _crawler_run_config_cls
+    global _deep_crawl_strategy_cls
+    global _crawl_result_container_cls
+    global _html2text_fn
+
+    if _async_crawler_cls is not None:
+        return
+
+    try:
+        from crawl4ai import (
+            AsyncWebCrawler as _AsyncWebCrawler,
+            BrowserConfig as _BrowserConfig,
+            CacheMode as _CacheMode,
+            CrawlResult as _CrawlResult,
+            CrawlerRunConfig as _CrawlerRunConfig,
+            html2text as _html2text,
+        )
+        from crawl4ai.deep_crawling import (
+            BFSDeepCrawlStrategy as _BFSDeepCrawlStrategy,
+        )
+        from crawl4ai.models import (
+            CrawlResultContainer as _CrawlResultContainer,
+        )
+    except ModuleNotFoundError as exc:  # pragma: no cover - exercised in import guard tests
+        raise ModuleNotFoundError(
+            "crawl4ai is required for web crawling support. "
+            "Install it with 'pip install crawl4ai' or reinstall PyContextify with its web extras."
+        ) from exc
+
+    _async_crawler_cls = _AsyncWebCrawler
+    _browser_config_cls = _BrowserConfig
+    _cache_mode_cls = _CacheMode
+    _crawl_result_cls = _CrawlResult
+    _crawler_run_config_cls = _CrawlerRunConfig
+    _deep_crawl_strategy_cls = _BFSDeepCrawlStrategy
+    _crawl_result_container_cls = _CrawlResultContainer
+    _html2text_fn = _html2text
+
+
+def _playwright_browsers_installed(browser: str = "chromium") -> bool:
+    """Return True if the requested Playwright browser is present locally."""
+
+    browsers_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if browsers_path:
+        base_dir = Path(browsers_path).expanduser()
+    else:
+        base_dir = Path.home() / ".cache" / "ms-playwright"
+
+    pattern = f"{browser}-*"
+    try:
+        return any(base_dir.glob(pattern))
+    except OSError:
+        # If the cache folder cannot be inspected we assume browsers are missing
+        return False
+
+
+def _install_crawl4ai_browsers() -> bool:
+    """Install Crawl4AI's Playwright runtime if available."""
+
+    try:
+        from crawl4ai import install as crawl4ai_install  # type: ignore
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.debug("Crawl4AI installation helpers unavailable: %s", exc)
+        return False
+
+    try:
+        crawl4ai_install.install_playwright()
+    except Exception as exc:
+        logger.warning(
+            "Automatic Crawl4AI Playwright install failed: %s", exc
+        )
+        return False
+
+    if _playwright_browsers_installed():
+        logger.info("Installed Playwright Chromium runtime for Crawl4AI")
+        return True
+
+    logger.warning(
+        "Playwright install command completed but Chromium was not detected"
+    )
+    return False
 
 
 class BaseLoader(ABC):
@@ -266,307 +385,306 @@ class WebpageLoader(BaseLoader):
     """Loader for web content with link extraction.
 
     Follows Scrapy-inspired best practices:
-    - Depth limit is inclusive (max_depth=2 means starting URL + 1 level)
-    - Configurable max links per page
+    - Depth limit follows Crawl4AI's breadth-first strategy semantics
     - Transparent logging when limits are reached
     """
+
+    _playwright_ready: bool = False
+    _playwright_install_attempted: bool = False
 
     def __init__(
         self,
         delay_seconds: int = 1,
         max_depth: int = 2,
-        max_links_per_page: int = 50,
+        *,
+        headless: bool = True,
+        browser_mode: str = "dedicated",
+        cache_mode: Optional["CacheModeType"] = None,
+        excluded_tags: Optional[List[str]] = None,
     ):
         """Initialize webpage loader.
 
         Args:
             delay_seconds: Delay between requests in seconds
-            max_depth: Maximum crawl depth (0 = no limit, 1 = starting URL only,
-                      2 = starting URL + direct children, etc.)
-            max_links_per_page: Maximum number of links to follow per page
+            max_depth: Maximum crawl depth (0 = no limit, 1 = starting URL +
+                      direct children, 2 = children + grandchildren, etc.)
+            headless: Whether to run the crawl browser in headless mode
+            browser_mode: Browser mode used by Crawl4AI (e.g. "dedicated", "builtin")
+            cache_mode: Cache mode for Crawl4AI requests (defaults to bypass)
+            excluded_tags: HTML tags excluded when generating page content
         """
+        _require_crawl4ai()
+
+        if _browser_config_cls is None or _crawler_run_config_cls is None:
+            raise RuntimeError("Crawl4AI dependencies failed to initialize")
+
         self.delay_seconds = delay_seconds
         self.max_depth = max_depth
-        self.max_links_per_page = max_links_per_page
         self.visited_urls: Set[str] = set()
-        self.session = requests.Session()
-        self.session.headers.update(
-            {"User-Agent": "PyContextify/1.0 (Educational MCP Server)"}
+        self._browser_config = _browser_config_cls(
+            browser_mode=browser_mode,
+            headless=headless,
+            verbose=False,
         )
+        default_cache_mode = None
+        if _cache_mode_cls is not None:
+            default_cache_mode = getattr(_cache_mode_cls, "BYPASS", None)
+
+        effective_cache_mode = cache_mode
+        if effective_cache_mode is None:
+            effective_cache_mode = default_cache_mode
+
+        self._crawler_config = _crawler_run_config_cls(
+            cache_mode=effective_cache_mode,
+            excluded_tags=excluded_tags or ["nav", "footer", "aside"],
+            remove_overlay_elements=True,
+            verbose=False,
+        )
+        self._crawler_config.mean_delay = max(0.0, float(self.delay_seconds))
+        self._crawler_config.max_range = 0.0
 
     def load(
-        self, url: str, recursive: bool = False, max_depth: int = 1
+        self,
+        url: str,
+        recursive: bool = False,
+        max_depth: Optional[int] = None,
     ) -> List[Tuple[str, str]]:
-        """Load webpage content.
+        """Load webpage content."""
 
-        Args:
-            url: URL to load
-            recursive: Whether to follow links
-            max_depth: Maximum depth for recursive loading (inclusive).
-                      1 = starting URL only, 2 = starting URL + direct children, etc.
-                      0 = unlimited depth (use with caution)
-
-        Returns:
-            List of (url, content) tuples
-        """
         self.visited_urls.clear()
-        pages = []
+        effective_depth = self.max_depth if max_depth is None else max_depth
 
-        if recursive:
-            # Start at depth 1 (the starting URL is at depth 1)
-            pages = self._crawl_recursive(url, max_depth, 1)
-        else:
-            soup, content = self._fetch_and_parse(url)
-            if content:
-                pages = [(url, content)]
+        try:
+            if recursive:
+                run_config = self._build_run_config(
+                    deep_crawl_strategy=self._create_deep_crawl_strategy(effective_depth),
+                    stream=False,
+                )
+                results = self._execute_crawl(url, run_config)
+                pages = self._results_to_pages(results, url)
+            else:
+                run_config = self._build_run_config()
+                results = self._execute_crawl(url, run_config)
+                pages = self._results_to_pages(results, url, stop_after_first=True)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            message = str(exc)
+            hint = ""
+            if "playwright" in message.lower() or "browser" in message.lower():
+                hint = " Ensure Playwright browsers are installed via 'playwright install'."
+            logger.warning(f"Error processing {url}: {exc}.{hint}")
+            pages = []
 
         logger.info(f"Loaded {len(pages)} web pages from {url}")
         return pages
 
-    def _crawl_recursive(
-        self, url: str, max_depth: int, current_depth: int
-    ) -> List[Tuple[str, str]]:
-        """Recursively crawl web pages.
+    def _extract_text(self, result: "CrawlResultType") -> Optional[str]:
+        """Extract text content from a Crawl4AI result."""
 
-        Args:
-            url: URL to crawl
-            max_depth: Maximum depth allowed (inclusive)
-            current_depth: Current depth in the crawl tree (starts at 1 for root)
-
-        Returns:
-            List of (url, content) tuples
-        """
-        # Check depth limit (inclusive) - depth 1 is the starting URL
-        if max_depth > 0 and current_depth > max_depth:
-            logger.debug(
-                f"Skipping {url}: depth {current_depth} exceeds max_depth {max_depth}"
+        markdown_result = getattr(result, "markdown", None)
+        if markdown_result:
+            markdown_text = getattr(markdown_result, "fit_markdown", None) or getattr(
+                markdown_result, "raw_markdown", None
             )
+            if not markdown_text and isinstance(markdown_result, str):
+                markdown_text = str(markdown_result)
+
+            if markdown_text:
+                stripped = markdown_text.strip()
+                if stripped:
+                    return stripped
+
+        extracted = getattr(result, "extracted_content", None)
+        if extracted:
+            stripped = extracted.strip()
+            if stripped:
+                return stripped
+
+        html_content = (
+            getattr(result, "cleaned_html", None)
+            or getattr(result, "html", None)
+        )
+
+        if not html_content:
+            return None
+
+        converter = _html2text_fn
+        if converter is None:
+            converter = lambda value: re.sub(r"<[^>]+>", " ", value)
+
+        try:
+            converted = converter(html_content)
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.debug("html2text fallback failed for %s: %s", result.url, exc)
+            converted = re.sub(r"<[^>]+>", " ", html_content)
+
+        stripped = converted.strip()
+        return stripped or None
+
+    def _execute_crawl(
+        self, url: str, run_config: "CrawlerRunConfigType"
+    ) -> List["CrawlResultType"]:
+        """Execute a Crawl4AI crawl synchronously."""
+
+        self._ensure_runtime()
+
+        try:
+            return self._run_crawl(url, run_config)
+        except Exception as exc:
+            if self._retry_after_runtime_error(exc):
+                return self._run_crawl(url, run_config)
+            raise
+
+    def _run_crawl(
+        self, url: str, run_config: "CrawlerRunConfigType"
+    ) -> List["CrawlResultType"]:
+        if _async_crawler_cls is None or _crawl_result_cls is None:
+            raise RuntimeError("Crawl4AI runtime not initialized")
+
+        async def _crawl(target_url: str, config: "CrawlerRunConfigType"):
+            async with _async_crawler_cls(config=self._browser_config) as crawler:
+                response = crawler.arun(url=target_url, config=config)
+                if inspect.isasyncgen(response):
+                    return [item async for item in response]
+
+                result = await response
+                return self._coerce_results(result)
+
+        try:
+            return asyncio.run(_crawl(url, run_config))
+        except RuntimeError as exc:
+            if "event loop is already running" in str(exc).lower():
+                loop = asyncio.new_event_loop()
+                try:
+                    return loop.run_until_complete(_crawl(url, run_config))
+                finally:
+                    loop.close()
+            raise
+
+    def _coerce_results(self, result: Any) -> List["CrawlResultType"]:
+        """Convert Crawl4AI return values into a list of results."""
+
+        if result is None:
             return []
 
-        # Check if already visited
-        if url in self.visited_urls:
-            logger.debug(f"Skipping {url}: already visited")
-            return []
+        if isinstance(result, list):
+            return result
 
-        self.visited_urls.add(url)
-        pages = []
+        if _crawl_result_cls is not None and isinstance(result, _crawl_result_cls):
+            return [result]
 
-        # Load current page - get both soup (for links) and content (for indexing)
-        logger.info(f"Crawling {url} at depth {current_depth}")
-        soup, content = self._fetch_and_parse(url)
-        if content:
-            pages.append((url, content))
+        if (
+            _crawl_result_container_cls is not None
+            and isinstance(result, _crawl_result_container_cls)
+        ):
+            return list(result)
 
-            # Extract and follow links if we haven't reached max depth
-            # (depth check: continue only if we're below max_depth or max_depth is unlimited)
-            if soup and (max_depth == 0 or current_depth < max_depth):
-                links = self._extract_links_from_soup(soup, url)
-                total_links = len(links)
+        if isinstance(result, Iterable):
+            return list(result)
 
-                # Apply link limit
-                links_to_crawl = links[: self.max_links_per_page]
+        return []
 
-                if total_links > self.max_links_per_page:
-                    logger.warning(
-                        f"Found {total_links} links on {url}, "
-                        f"but limiting to first {self.max_links_per_page} "
-                        f"(set max_links_per_page to increase)"
-                    )
-                else:
-                    logger.info(f"Found {total_links} links on {url}")
+    def _build_run_config(self, **overrides: Any) -> "CrawlerRunConfigType":
+        return self._crawler_config.clone(**overrides)
 
-                for link in links_to_crawl:
-                    if self._should_follow_link(link, url):
-                        time.sleep(self.delay_seconds)  # Rate limiting
-                        sub_pages = self._crawl_recursive(
-                            link, max_depth, current_depth + 1
-                        )
-                        pages.extend(sub_pages)
+    def _create_deep_crawl_strategy(
+        self, max_depth: int
+    ) -> "BFSDeepCrawlStrategyType":
+        if _deep_crawl_strategy_cls is None:
+            raise RuntimeError("Crawl4AI runtime not initialized")
+
+        strategy_depth = math.inf if max_depth <= 0 else max_depth
+        return _deep_crawl_strategy_cls(
+            max_depth=strategy_depth,
+            include_external=False,
+            max_pages=math.inf,
+            logger=logger,
+        )
+
+    def _results_to_pages(
+        self,
+        results: List["CrawlResultType"],
+        fallback_url: str,
+        *,
+        stop_after_first: bool = False,
+    ) -> List[Tuple[str, str]]:
+        pages: List[Tuple[str, str]] = []
+        seen: Set[str] = set()
+
+        for result in results:
+            if not getattr(result, "success", False):
+                continue
+
+            canonical = self._canonical_url(result, fallback_url)
+            if canonical in seen:
+                continue
+
+            text_content = self._extract_text(result)
+            if text_content:
+                pages.append((canonical, text_content))
+                seen.add(canonical)
+
+            if stop_after_first:
+                break
 
         return pages
 
-    def _fetch_and_parse(
-        self, url: str
-    ) -> Tuple[Optional[BeautifulSoup], Optional[str]]:
-        """Fetch and parse a web page, returning both soup and extracted text.
+    @staticmethod
+    def _canonical_url(result: "CrawlResultType", fallback: str) -> str:
+        return (
+            getattr(result, "redirected_url", None)
+            or getattr(result, "url", None)
+            or fallback
+        )
 
-        Args:
-            url: URL to fetch
+    def _ensure_runtime(self) -> None:
+        """Ensure a local Playwright runtime is available when required."""
 
-        Returns:
-            Tuple of (BeautifulSoup object, extracted text content)
-            Returns (None, None) on error
-        """
-        try:
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
+        if not self._requires_local_browser():
+            WebpageLoader._playwright_ready = True
+            return
 
-            # Parse HTML and extract text
-            soup = BeautifulSoup(response.content, "html.parser")
+        if WebpageLoader._playwright_ready:
+            return
 
-            # Remove script and style elements
-            for script in soup(["script", "style", "nav", "footer", "aside"]):
-                script.decompose()
+        if _playwright_browsers_installed():
+            WebpageLoader._playwright_ready = True
+            return
 
-            # IMPROVED CONTENT EXTRACTION STRATEGY
-            content_candidates = []
+        if not WebpageLoader._playwright_install_attempted:
+            WebpageLoader._playwright_install_attempted = True
+            if _install_crawl4ai_browsers():
+                WebpageLoader._playwright_ready = True
 
-            # Strategy 1: Try semantic HTML elements
-            main_content = soup.find("main")
-            if main_content:
-                text = main_content.get_text(separator=" ", strip=True)
-                text = re.sub(r"\s+", " ", text).strip()
-                content_candidates.append(("main", text))
+    def _retry_after_runtime_error(self, exc: Exception) -> bool:
+        """Attempt to recover from missing browser runtimes."""
 
-            article_content = soup.find("article")
-            if article_content:
-                text = article_content.get_text(separator=" ", strip=True)
-                text = re.sub(r"\s+", " ", text).strip()
-                content_candidates.append(("article", text))
-
-            # Strategy 2: Try common content containers
-            content_selectors = [
-                ("div.container", "container"),
-                ("div[class*='content']", "content_div"),
-                (".main-content", "main_content_class"),
-                ("#content", "content_id"),
-                ("#main", "main_id"),
-            ]
-
-            for selector, name in content_selectors:
-                try:
-                    elements = soup.select(selector)
-                    for element in elements:
-                        text = element.get_text(separator=" ", strip=True)
-                        text = re.sub(r"\s+", " ", text).strip()
-                        if text:  # Only add non-empty content
-                            content_candidates.append((name, text))
-                except Exception:
-                    continue
-
-            # Strategy 3: Try body as fallback
-            if soup.body:
-                text = soup.body.get_text(separator=" ", strip=True)
-                text = re.sub(r"\s+", " ", text).strip()
-                content_candidates.append(("body", text))
-
-            # Strategy 4: Full soup as last resort
-            text = soup.get_text(separator=" ", strip=True)
-            text = re.sub(r"\s+", " ", text).strip()
-            content_candidates.append(("full", text))
-
-            # CHOOSE THE BEST CANDIDATE
-            # Look for the candidate with the most substantial content
-            # that contains key structural indicators
-
-            best_candidate = None
-            max_quality_score = 0
-
-            for source, text in content_candidates:
-                if len(text) < 100:  # Skip very short content
-                    continue
-
-                # Calculate quality score based on:
-                # 1. Length (longer is generally better for main content)
-                # 2. Presence of structural indicators (headings, sections)
-                # 3. Avoid pure navigation/header content
-
-                length_score = min(len(text) / 10000, 1.0)  # Normalize to 0-1
-
-                # Look for structural indicators
-                structure_indicators = [
-                    "What",
-                    "How",
-                    "Why",  # Question headings
-                    "Introduction",
-                    "Overview",
-                    "Summary",
-                    "Product",
-                    "Service",
-                    "Solution",
-                    "Architecture",
-                    "Design",
-                    "Implementation",
-                ]
-
-                structure_score = sum(
-                    1
-                    for indicator in structure_indicators
-                    if indicator.lower() in text.lower()
-                ) / len(structure_indicators)
-
-                # Penalize if it looks like pure navigation
-                nav_penalties = ["Home", "About", "Contact", "Privacy", "Terms"]
-                nav_ratio = sum(1 for nav in nav_penalties if nav in text) / len(
-                    nav_penalties
-                )
-                nav_penalty = min(nav_ratio, 0.5)
-
-                quality_score = length_score + structure_score - nav_penalty
-
-                logger.debug(
-                    f"Content candidate '{source}': {len(text)} chars, quality={quality_score:.3f}"
-                )
-
-                if quality_score > max_quality_score:
-                    max_quality_score = quality_score
-                    best_candidate = (source, text)
-
-            if best_candidate:
-                source, final_text = best_candidate
-                logger.info(
-                    f"Selected content from '{source}': {len(final_text)} characters"
-                )
-                return soup, final_text
-            else:
-                logger.warning("No suitable content found")
-                return soup, None
-
-        except requests.RequestException as e:
-            logger.warning(f"Failed to load {url}: {e}")
-            return None, None
-        except Exception as e:
-            logger.warning(f"Error processing {url}: {e}")
-            return None, None
-
-    def _extract_links_from_soup(self, soup: BeautifulSoup, base_url: str) -> List[str]:
-        """Extract links from BeautifulSoup object.
-
-        Args:
-            soup: BeautifulSoup parsed HTML
-            base_url: Base URL for resolving relative links
-
-        Returns:
-            List of absolute URLs
-        """
-        try:
-            links = []
-
-            for link in soup.find_all("a", href=True):
-                href = link["href"]
-                absolute_url = urljoin(base_url, href)
-
-                # Only include HTTP/HTTPS links
-                if absolute_url.startswith(("http://", "https://")):
-                    links.append(absolute_url)
-
-            return links
-        except Exception as e:
-            logger.warning(f"Error extracting links: {e}")
-            return []
-
-    def _should_follow_link(self, link: str, base_url: str) -> bool:
-        """Determine if a link should be followed."""
-        try:
-            base_domain = urlparse(base_url).netloc
-            link_domain = urlparse(link).netloc
-
-            # Only follow links within the same domain
-            return link_domain == base_domain and link not in self.visited_urls
-
-        except Exception:
+        if not self._requires_local_browser():
             return False
 
+        message = str(exc).lower()
+        hints = [
+            "playwright",  # generic - ensures we catch CLI hints
+            "browser executable",  # playwright missing binary message
+            "chromium",  # chromium not downloaded yet
+        ]
+
+        if not any(hint in message for hint in hints):
+            return False
+
+        if _install_crawl4ai_browsers():
+            WebpageLoader._playwright_ready = True
+            return True
+
+        return False
+
+    def _requires_local_browser(self) -> bool:
+        """Determine if the loader needs a local Playwright runtime."""
+
+        mode = getattr(self._browser_config, "browser_mode", "dedicated") or "dedicated"
+        if mode.lower() == "api":
+            return False
+
+        return True
 
 class LoaderFactory:
     """Factory for selecting appropriate loader."""

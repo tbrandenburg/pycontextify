@@ -25,6 +25,10 @@ uv sync
 uv run pycontextify --verbose
 ```
 
+> **Note:** PyContextify bootstraps Crawl4AI's Playwright runtime on the first
+> crawl attempt. The initial request may take longer while Chromium downloads,
+> but no manual `crawl4ai-setup` step is required when using `uv` or `uvx`.
+
 ### Run with `uvx`
 
 If you want to execute the published CLI without modifying your current

@@ -6,6 +6,34 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+pytest.importorskip("crawl4ai")
+
+from crawl4ai.models import CrawlResult, CrawlResultContainer, MarkdownGenerationResult
+
+
+def _mk_markdown(text: str) -> MarkdownGenerationResult:
+    return MarkdownGenerationResult(
+        raw_markdown=text,
+        markdown_with_citations=text,
+        references_markdown="",
+        fit_markdown=text,
+        fit_html=None,
+    )
+
+
+def _mk_crawl_result(url: str, text: str, *, links=None) -> CrawlResult:
+    return CrawlResult(
+        url=url,
+        html=f"<html><body>{text}</body></html>",
+        fit_html=f"<html><body>{text}</body></html>",
+        cleaned_html=None,
+        markdown=_mk_markdown(text),
+        links=links or {"internal": []},
+        success=True,
+        extracted_content=None,
+        redirected_url=None,
+    )
+
 from pycontextify.index.loaders import (
     CodeLoader,
     DocumentLoader,
@@ -130,82 +158,108 @@ class TestWebpageLoaderSimple:
         assert loader_custom.delay_seconds == 2
         assert loader_custom.max_depth == 3
 
-    @patch("requests.Session.get")
-    def test_load_simple_page(self, mock_get):
+    @patch.object(WebpageLoader, "_execute_crawl")
+    def test_load_simple_page(self, mock_crawl):
         """Test loading a simple webpage."""
-        # Create content long enough to pass quality threshold
-        content = "Main Content " * 50  # Longer content
-        mock_response = Mock()
-        mock_response.content = (
-            f"<html><body><main>{content}</main></body></html>".encode()
-        )
-        mock_response.status_code = 200
-        mock_get.return_value = mock_response
+
+        content = "Main Content " * 50
+        mock_result = _mk_crawl_result("https://example.com", content)
+        mock_result.links = {"internal": [], "external": []}
+        mock_crawl.return_value = [mock_result]
 
         loader = WebpageLoader()
         result = loader.load("https://example.com")
 
-        assert len(result) <= 1  # Should be 0 or 1 depending on content quality
+        assert len(result) == 1
+        assert result[0][0] == "https://example.com"
+        assert "Main Content" in result[0][1]
 
-    @patch("requests.Session.get")
-    def test_load_request_error(self, mock_get):
-        """Test handling request errors."""
-        import requests
-
-        mock_get.side_effect = requests.RequestException("Connection failed")
+    @patch.object(WebpageLoader, "_execute_crawl", side_effect=Exception("fail"))
+    def test_load_request_error(self, _mock_crawl):
+        """Test handling crawl errors."""
 
         loader = WebpageLoader()
         result = loader.load("https://example.com")
 
         assert result == []
 
-    def test_extract_links(self):
-        """Test extracting links from HTML."""
-        html = """
-        <html>
-            <body>
-                <a href="/page1">Page 1</a>
-                <a href="https://example.com/page2">Page 2</a>
-                <a href="mailto:test@example.com">Email</a>
-            </body>
-        </html>
-        """
-
-        loader = WebpageLoader()
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, "html.parser")
-        links = loader._extract_links_from_soup(soup, "https://example.com")
-
-        # Should convert relative URLs to absolute and exclude non-HTTP links
-        http_links = [
-            link for link in links if link.startswith(("http://", "https://"))
-        ]
-        assert len(http_links) >= 1
-
-    def test_should_follow_link(self):
-        """Test link following logic."""
-        loader = WebpageLoader()
-
-        # Same domain should be followed
-        assert loader._should_follow_link(
-            "https://example.com/page2", "https://example.com/page1"
-        )
-
-        # Different domain should not
-        assert not loader._should_follow_link(
-            "https://other.com/page", "https://example.com/page1"
-        )
-
     def test_visited_urls_cleared(self):
         """Test that visited URLs are cleared between loads."""
         loader = WebpageLoader()
         loader.visited_urls.add("https://old.com")
 
-        with patch.object(loader, "_fetch_and_parse", return_value=(None, None)):
+        with patch.object(loader, "_execute_crawl", return_value=[]):
             loader.load("https://new.com")
 
         # Should not contain old URL after new load
         assert "https://old.com" not in loader.visited_urls
+
+    def test_coerce_results_accepts_container(self):
+        """Ensure CrawlResultContainer is converted to a list."""
+
+        loader = WebpageLoader()
+        result = _mk_crawl_result("https://example.com", "Body")
+        container = CrawlResultContainer(result)
+
+        coerced = loader._coerce_results(container)
+
+        assert isinstance(coerced, list)
+        assert coerced[0].url == "https://example.com"
+
+
+class TestWebpageLoaderRuntimeBootstrap:
+    """Tests covering automatic Crawl4AI runtime preparation."""
+
+    def setup_method(self):
+        WebpageLoader._playwright_ready = False
+        WebpageLoader._playwright_install_attempted = False
+
+    @patch("pycontextify.index.loaders._playwright_browsers_installed", return_value=False)
+    @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=True)
+    def test_ensure_runtime_installs_when_missing(
+        self, mock_install: Mock, _mock_detect: Mock
+    ):
+        loader = WebpageLoader()
+        loader._ensure_runtime()
+
+        mock_install.assert_called_once()
+        assert WebpageLoader._playwright_ready is True
+
+    @patch("pycontextify.index.loaders._playwright_browsers_installed", return_value=False)
+    @patch("pycontextify.index.loaders._install_crawl4ai_browsers")
+    def test_api_mode_skips_install(
+        self, mock_install: Mock, mock_detect: Mock
+    ):
+        loader = WebpageLoader(browser_mode="api")
+        loader._ensure_runtime()
+
+        mock_detect.assert_not_called()
+        mock_install.assert_not_called()
+        assert WebpageLoader._playwright_ready is True
+
+    @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=True)
+    def test_retry_after_runtime_error_success(self, mock_install: Mock):
+        loader = WebpageLoader()
+        WebpageLoader._playwright_ready = False
+
+        should_retry = loader._retry_after_runtime_error(
+            Exception("Executable doesn't exist. Please run Playwright install")
+        )
+
+        mock_install.assert_called_once()
+        assert should_retry is True
+        assert WebpageLoader._playwright_ready is True
+
+    @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=False)
+    def test_retry_after_runtime_error_failure(self, mock_install: Mock):
+        loader = WebpageLoader()
+        WebpageLoader._playwright_ready = False
+
+        should_retry = loader._retry_after_runtime_error(Exception("timeout"))
+
+        mock_install.assert_not_called()
+        assert should_retry is False
+        assert WebpageLoader._playwright_ready is False
 
 
 class TestLoaderFactorySimple:
@@ -279,23 +333,18 @@ class TestIntegration:
             assert "config.json" in file_names
             assert "cached.pyc" not in file_names
 
-    def test_webpage_recursive_crawling_mock(self):
-        """Test basic recursive crawling."""
+    @patch.object(WebpageLoader, "_execute_crawl")
+    def test_webpage_recursive_crawling_mock(self, mock_crawl):
+        """Test recursive crawling using Crawl4AI wrapper results."""
         loader = WebpageLoader()
 
-        # Mock the methods to avoid actual HTTP requests
-        from bs4 import BeautifulSoup
-        test_soup = BeautifulSoup("<html><body>Test content</body></html>", "html.parser")
-        
-        with patch.object(loader, "_fetch_and_parse") as mock_fetch:
-            with patch.object(loader, "_extract_links_from_soup") as mock_links:
-                with patch.object(loader, "_should_follow_link") as mock_should:
-                    mock_fetch.return_value = (test_soup, "Test content")
-                    mock_links.return_value = []
-                    mock_should.return_value = False
+        root_result = _mk_crawl_result("https://example.com", "Root")
+        child_result = _mk_crawl_result("https://example.com/child", "Child")
 
-                    result = loader._crawl_recursive("https://example.com", 2, 1)
+        mock_crawl.return_value = [root_result, child_result]
 
-                    assert len(result) == 1
-                    assert result[0][0] == "https://example.com"
-                    assert result[0][1] == "Test content"
+        result = loader.load("https://example.com", recursive=True, max_depth=2)
+
+        assert len(result) == 2
+        urls = [url for url, _ in result]
+        assert urls == ["https://example.com", "https://example.com/child"]
