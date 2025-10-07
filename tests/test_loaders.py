@@ -34,6 +34,7 @@ def _mk_crawl_result(url: str, text: str, *, links=None) -> CrawlResult:
         redirected_url=None,
     )
 
+
 from pycontextify.index.loaders import (
     CodeLoader,
     DocumentLoader,
@@ -214,7 +215,9 @@ class TestWebpageLoaderRuntimeBootstrap:
         WebpageLoader._playwright_ready = False
         WebpageLoader._playwright_install_attempted = False
 
-    @patch("pycontextify.index.loaders._playwright_browsers_installed", return_value=False)
+    @patch(
+        "pycontextify.index.loaders._playwright_browsers_installed", return_value=False
+    )
     @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=True)
     def test_ensure_runtime_installs_when_missing(
         self, mock_install: Mock, _mock_detect: Mock
@@ -225,11 +228,11 @@ class TestWebpageLoaderRuntimeBootstrap:
         mock_install.assert_called_once()
         assert WebpageLoader._playwright_ready is True
 
-    @patch("pycontextify.index.loaders._playwright_browsers_installed", return_value=False)
+    @patch(
+        "pycontextify.index.loaders._playwright_browsers_installed", return_value=False
+    )
     @patch("pycontextify.index.loaders._install_crawl4ai_browsers")
-    def test_api_mode_skips_install(
-        self, mock_install: Mock, mock_detect: Mock
-    ):
+    def test_api_mode_skips_install(self, mock_install: Mock, mock_detect: Mock):
         loader = WebpageLoader(browser_mode="api")
         loader._ensure_runtime()
 

@@ -448,9 +448,7 @@ def index_document(path: str) -> Dict[str, Any]:
     return handle_mcp_errors("Document indexing", _index_document_impl, path)
 
 
-def _index_webpage_impl(
-    url: str, recursive: bool, max_depth: int
-) -> Dict[str, Any]:
+def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, Any]:
     """Implementation for index_webpage with validation and business logic."""
     # Validate parameters
     url = validate_string_param(url, "url")

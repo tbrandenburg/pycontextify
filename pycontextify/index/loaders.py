@@ -13,22 +13,16 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Set, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover - import for type checkers only
-    from crawl4ai import (
-        AsyncWebCrawler as AsyncWebCrawlerType,
-        BrowserConfig as BrowserConfigType,
-        CacheMode as CacheModeType,
-        CrawlResult as CrawlResultType,
-        CrawlerRunConfig as CrawlerRunConfigType,
-    )
-    from crawl4ai.deep_crawling import (
-        BFSDeepCrawlStrategy as BFSDeepCrawlStrategyType,
-    )
-    from crawl4ai.models import (
-        CrawlResultContainer as CrawlResultContainerType,
-    )
+    from crawl4ai import AsyncWebCrawler as AsyncWebCrawlerType
+    from crawl4ai import BrowserConfig as BrowserConfigType
+    from crawl4ai import CacheMode as CacheModeType
+    from crawl4ai import CrawlerRunConfig as CrawlerRunConfigType
+    from crawl4ai import CrawlResult as CrawlResultType
+    from crawl4ai.deep_crawling import BFSDeepCrawlStrategy as BFSDeepCrawlStrategyType
+    from crawl4ai.models import CrawlResultContainer as CrawlResultContainerType
 else:  # pragma: no cover - runtime fallbacks populated lazily
     AsyncWebCrawlerType = BrowserConfigType = CacheModeType = CrawlResultType = (
         CrawlerRunConfigType
@@ -65,21 +59,17 @@ def _require_crawl4ai() -> None:
         return
 
     try:
-        from crawl4ai import (
-            AsyncWebCrawler as _AsyncWebCrawler,
-            BrowserConfig as _BrowserConfig,
-            CacheMode as _CacheMode,
-            CrawlResult as _CrawlResult,
-            CrawlerRunConfig as _CrawlerRunConfig,
-            html2text as _html2text,
-        )
-        from crawl4ai.deep_crawling import (
-            BFSDeepCrawlStrategy as _BFSDeepCrawlStrategy,
-        )
-        from crawl4ai.models import (
-            CrawlResultContainer as _CrawlResultContainer,
-        )
-    except ModuleNotFoundError as exc:  # pragma: no cover - exercised in import guard tests
+        from crawl4ai import AsyncWebCrawler as _AsyncWebCrawler
+        from crawl4ai import BrowserConfig as _BrowserConfig
+        from crawl4ai import CacheMode as _CacheMode
+        from crawl4ai import CrawlerRunConfig as _CrawlerRunConfig
+        from crawl4ai import CrawlResult as _CrawlResult
+        from crawl4ai import html2text as _html2text
+        from crawl4ai.deep_crawling import BFSDeepCrawlStrategy as _BFSDeepCrawlStrategy
+        from crawl4ai.models import CrawlResultContainer as _CrawlResultContainer
+    except (
+        ModuleNotFoundError
+    ) as exc:  # pragma: no cover - exercised in import guard tests
         raise ModuleNotFoundError(
             "crawl4ai is required for web crawling support. "
             "Install it with 'pip install crawl4ai' or reinstall PyContextify with its web extras."
@@ -124,18 +114,14 @@ def _install_crawl4ai_browsers() -> bool:
     try:
         crawl4ai_install.install_playwright()
     except Exception as exc:
-        logger.warning(
-            "Automatic Crawl4AI Playwright install failed: %s", exc
-        )
+        logger.warning("Automatic Crawl4AI Playwright install failed: %s", exc)
         return False
 
     if _playwright_browsers_installed():
         logger.info("Installed Playwright Chromium runtime for Crawl4AI")
         return True
 
-    logger.warning(
-        "Playwright install command completed but Chromium was not detected"
-    )
+    logger.warning("Playwright install command completed but Chromium was not detected")
     return False
 
 
@@ -457,7 +443,9 @@ class WebpageLoader(BaseLoader):
         try:
             if recursive:
                 run_config = self._build_run_config(
-                    deep_crawl_strategy=self._create_deep_crawl_strategy(effective_depth),
+                    deep_crawl_strategy=self._create_deep_crawl_strategy(
+                        effective_depth
+                    ),
                     stream=False,
                 )
                 results = self._execute_crawl(url, run_config)
@@ -499,9 +487,8 @@ class WebpageLoader(BaseLoader):
             if stripped:
                 return stripped
 
-        html_content = (
-            getattr(result, "cleaned_html", None)
-            or getattr(result, "html", None)
+        html_content = getattr(result, "cleaned_html", None) or getattr(
+            result, "html", None
         )
 
         if not html_content:
@@ -509,7 +496,9 @@ class WebpageLoader(BaseLoader):
 
         converter = _html2text_fn
         if converter is None:
-            converter = lambda value: re.sub(r"<[^>]+>", " ", value)
+
+            def converter(value):
+                return re.sub(r"<[^>]+>", " ", value)
 
         try:
             converted = converter(html_content)
@@ -546,7 +535,13 @@ class WebpageLoader(BaseLoader):
                 if inspect.isasyncgen(response):
                     return [item async for item in response]
 
-                result = await response
+                # Add timeout to prevent indefinite hangs (5 minutes for recursive crawls)
+                try:
+                    result = await asyncio.wait_for(response, timeout=300.0)
+                except asyncio.TimeoutError:
+                    logger.error(f"Crawl timed out after 300 seconds for {target_url}")
+                    raise TimeoutError("Crawl operation timed out after 300 seconds")
+
                 return self._coerce_results(result)
 
         try:
@@ -572,9 +567,8 @@ class WebpageLoader(BaseLoader):
         if _crawl_result_cls is not None and isinstance(result, _crawl_result_cls):
             return [result]
 
-        if (
-            _crawl_result_container_cls is not None
-            and isinstance(result, _crawl_result_container_cls)
+        if _crawl_result_container_cls is not None and isinstance(
+            result, _crawl_result_container_cls
         ):
             return list(result)
 
@@ -586,17 +580,19 @@ class WebpageLoader(BaseLoader):
     def _build_run_config(self, **overrides: Any) -> "CrawlerRunConfigType":
         return self._crawler_config.clone(**overrides)
 
-    def _create_deep_crawl_strategy(
-        self, max_depth: int
-    ) -> "BFSDeepCrawlStrategyType":
+    def _create_deep_crawl_strategy(self, max_depth: int) -> "BFSDeepCrawlStrategyType":
         if _deep_crawl_strategy_cls is None:
             raise RuntimeError("Crawl4AI runtime not initialized")
 
         strategy_depth = math.inf if max_depth <= 0 else max_depth
+        # Limit max_pages to prevent crawling entire websites
+        # With depth 1, this could be ~50 pages max (start + up to 49 children)
+        # With depth 2, this limits exponential growth
+        max_pages_limit = 50
         return _deep_crawl_strategy_cls(
             max_depth=strategy_depth,
             include_external=False,
-            max_pages=math.inf,
+            max_pages=max_pages_limit,
             logger=logger,
         )
 
@@ -685,6 +681,7 @@ class WebpageLoader(BaseLoader):
             return False
 
         return True
+
 
 class LoaderFactory:
     """Factory for selecting appropriate loader."""

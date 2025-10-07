@@ -277,7 +277,9 @@ class TestSearchResponse:
         # Check degradation info in performance
         assert "degradation" in response.performance
         assert response.performance["degradation"]["reason"] == "Keyword search failed"
-        assert response.performance["degradation"]["failed_components"] == ["keyword_search"]
+        assert response.performance["degradation"]["failed_components"] == [
+            "keyword_search"
+        ]
 
 
 class TestSearchResponseFormatting:
