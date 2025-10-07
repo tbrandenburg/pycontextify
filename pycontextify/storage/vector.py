@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .config import Config
+from ..orchestrator.config import Config
 
 logger = logging.getLogger(__name__)
 

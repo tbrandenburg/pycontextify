@@ -5,8 +5,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from pycontextify.index.config import Config
-from pycontextify.index.manager import IndexManager
+from pycontextify.orchestrator.config import Config
+from pycontextify.indexer.manager import IndexManager
 
 
 def measure_startup_performance():

@@ -2,7 +2,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from pycontextify.index.config import Config
+from pycontextify.orchestrator.config import Config
 
 
 def time_operation(description, func):
@@ -33,20 +33,16 @@ def main():
         print("\n2. IndexManager components initialization...")
 
         # Initialize basic stores
-        from pycontextify.index.metadata import MetadataStore
-        from pycontextify.index.relationship_store import RelationshipStore
+        from pycontextify.storage.metadata import MetadataStore
 
         metadata_store, metadata_time = time_operation(
             "MetadataStore", lambda: MetadataStore()
         )
-        relationship_store, relationship_time = time_operation(
-            "RelationshipStore", lambda: RelationshipStore()
-        )
-        total_time += metadata_time + relationship_time
+        total_time += metadata_time
 
         # Initialize embedder
         print("\n3. Embedder initialization...")
-        from pycontextify.index.embedders import EmbedderFactory
+        from pycontextify.embedder import EmbedderFactory
 
         def create_embedder():
             embedding_config = config.get_embedding_config()
@@ -66,7 +62,7 @@ def main():
 
         # Initialize vector store
         print("\n4. Vector store initialization...")
-        from pycontextify.index.vector_store import VectorStore
+        from pycontextify.storage.vector import VectorStore
 
         vector_store, vector_time = time_operation(
             "VectorStore", lambda: VectorStore(dimension, config)
@@ -77,7 +73,7 @@ def main():
         print("\n5. Hybrid search initialization...")
         if config.use_hybrid_search:
             try:
-                from pycontextify.index.hybrid_search import HybridSearchEngine
+                from pycontextify.search.hybrid import HybridSearchEngine
 
                 hybrid_search, hybrid_time = time_operation(
                     "HybridSearchEngine",
@@ -101,7 +97,6 @@ def main():
         print(f"{'='*50}")
         print(f"Config initialization:     {config_time:.2f}s")
         print(f"MetadataStore:             {metadata_time:.2f}s")
-        print(f"RelationshipStore:         {relationship_time:.2f}s")
         print(f"Embedder creation:         {embedder_time:.2f}s")
         print(f"Get dimension:             {dimension_time:.2f}s")
         print(f"VectorStore:               {vector_time:.2f}s")
@@ -114,7 +109,6 @@ def main():
         timings = [
             ("Config", config_time),
             ("Metadata", metadata_time),
-            ("Relationships", relationship_time),
             ("Embedder", embedder_time),
             ("Dimension", dimension_time),
             ("VectorStore", vector_time),

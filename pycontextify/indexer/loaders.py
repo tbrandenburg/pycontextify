@@ -28,7 +28,7 @@ else:  # pragma: no cover - runtime fallbacks populated lazily
         CrawlerRunConfigType
     ) = BFSDeepCrawlStrategyType = CrawlResultContainerType = Any
 
-from .metadata import SourceType
+from ..storage.metadata import SourceType
 
 logger = logging.getLogger(__name__)
 

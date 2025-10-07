@@ -5,9 +5,9 @@ embedding providers, vector storage, content loading, text chunking,
 and lightweight knowledge graph capabilities.
 """
 
-from .config import Config
-from .manager import IndexManager
-from .metadata import ChunkMetadata, MetadataStore, SourceType
+from ..indexer.manager import IndexManager
+from ..orchestrator.config import Config
+from ..storage.metadata import ChunkMetadata, MetadataStore, SourceType
 
 __all__ = [
     "IndexManager",

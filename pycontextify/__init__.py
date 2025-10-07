@@ -2,8 +2,9 @@
 
 from importlib import metadata as _metadata
 
-from .index.config import Config
-from .index.manager import IndexManager
+from .orchestrator.config import Config
+from .indexer.manager import IndexManager
+from .mcp import server as mcp_server
 
 try:  # pragma: no cover - exercised when installed as a package
     __version__ = _metadata.version("pycontextify")
@@ -14,4 +15,11 @@ __author__ = "Tom Brandenburg"
 __email__ = "kabelkaspertom@googlemail.com"
 __license__ = "MIT"
 
-__all__ = ["IndexManager", "Config", "__version__", "__author__", "__email__"]
+__all__ = [
+    "IndexManager",
+    "Config",
+    "mcp_server",
+    "__version__",
+    "__author__",
+    "__email__",
+]
