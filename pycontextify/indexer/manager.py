@@ -21,12 +21,12 @@ from urllib.request import url2pathname
 import psutil
 import requests
 
-from .chunker import ChunkerFactory
-from .config import Config
-from .embedders import EmbedderFactory
+from ..chunker import ChunkerFactory
+from ..orchestrator.config import Config
+from ..embedder import EmbedderFactory
 from .loaders import LoaderFactory
-from .metadata import MetadataStore, SourceType
-from .models import (
+from ..storage.metadata import MetadataStore, SourceType
+from ..search.models import (
     SearchErrorCode,
     SearchPerformanceLogger,
     SearchResponse,
@@ -37,7 +37,7 @@ from .models import (
     create_structured_scores,
     enhance_search_results_with_ranking,
 )
-from .vector_store import VectorStore
+from ..storage.vector import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class IndexManager:
             return
 
         try:
-            from .hybrid_search import HybridSearchEngine
+            from ..search.hybrid import HybridSearchEngine
 
             self.hybrid_search = HybridSearchEngine(
                 keyword_weight=self.config.keyword_weight

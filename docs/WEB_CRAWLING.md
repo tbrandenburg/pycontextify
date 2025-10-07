@@ -28,7 +28,7 @@ upstream defaults.
 ## Basic usage
 
 ```python
-from pycontextify.index.loaders import WebpageLoader
+from pycontextify.indexer.loaders import WebpageLoader
 
 loader = WebpageLoader()
 pages = loader.load(

@@ -1,7 +1,7 @@
 """Integration tests for hybrid search backed by the metadata store."""
 
-from pycontextify.index.hybrid_search import HybridSearchEngine
-from pycontextify.index.metadata import ChunkMetadata, MetadataStore, SourceType
+from pycontextify.search.hybrid import HybridSearchEngine
+from pycontextify.storage.metadata import ChunkMetadata, MetadataStore, SourceType
 
 
 def test_hybrid_search_with_metadata_store():

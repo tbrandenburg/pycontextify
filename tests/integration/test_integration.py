@@ -10,9 +10,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pycontextify.index.config import Config
-from pycontextify.index.manager import IndexManager
-from pycontextify.index.metadata import SourceType
+from pycontextify.orchestrator.config import Config
+from pycontextify.indexer.manager import IndexManager
+from pycontextify.storage.metadata import SourceType
 
 
 class TestEmbeddingGeneration:

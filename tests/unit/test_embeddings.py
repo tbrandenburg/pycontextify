@@ -5,12 +5,12 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from pycontextify.index.embedders import (
+from pycontextify.embedder import (
     BaseEmbedder,
     EmbedderFactory,
     SentenceTransformersEmbedder,
 )
-from pycontextify.index.embedders.base import (
+from pycontextify.embedder.base import (
     EmbeddingError,
     ModelNotFoundError,
     ProviderNotAvailableError,

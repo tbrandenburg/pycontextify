@@ -1,4 +1,4 @@
-"""Simple tests for pycontextify.index.loaders module to improve coverage."""
+"""Simple tests for pycontextify.indexer.loaders module to improve coverage."""
 
 import tempfile
 from pathlib import Path
@@ -35,13 +35,13 @@ def _mk_crawl_result(url: str, text: str, *, links=None) -> CrawlResult:
     )
 
 
-from pycontextify.index.loaders import (
+from pycontextify.indexer.loaders import (
     CodeLoader,
     DocumentLoader,
     LoaderFactory,
     WebpageLoader,
 )
-from pycontextify.index.metadata import SourceType
+from pycontextify.storage.metadata import SourceType
 
 # Disable the automatic sentence transformer mocking for this file
 pytestmark = pytest.mark.no_mock_st
@@ -216,9 +216,9 @@ class TestWebpageLoaderRuntimeBootstrap:
         WebpageLoader._playwright_install_attempted = False
 
     @patch(
-        "pycontextify.index.loaders._playwright_browsers_installed", return_value=False
+        "pycontextify.indexer.loaders._playwright_browsers_installed", return_value=False
     )
-    @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=True)
+    @patch("pycontextify.indexer.loaders._install_crawl4ai_browsers", return_value=True)
     def test_ensure_runtime_installs_when_missing(
         self, mock_install: Mock, _mock_detect: Mock
     ):
@@ -229,9 +229,9 @@ class TestWebpageLoaderRuntimeBootstrap:
         assert WebpageLoader._playwright_ready is True
 
     @patch(
-        "pycontextify.index.loaders._playwright_browsers_installed", return_value=False
+        "pycontextify.indexer.loaders._playwright_browsers_installed", return_value=False
     )
-    @patch("pycontextify.index.loaders._install_crawl4ai_browsers")
+    @patch("pycontextify.indexer.loaders._install_crawl4ai_browsers")
     def test_api_mode_skips_install(self, mock_install: Mock, mock_detect: Mock):
         loader = WebpageLoader(browser_mode="api")
         loader._ensure_runtime()
@@ -240,7 +240,7 @@ class TestWebpageLoaderRuntimeBootstrap:
         mock_install.assert_not_called()
         assert WebpageLoader._playwright_ready is True
 
-    @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=True)
+    @patch("pycontextify.indexer.loaders._install_crawl4ai_browsers", return_value=True)
     def test_retry_after_runtime_error_success(self, mock_install: Mock):
         loader = WebpageLoader()
         WebpageLoader._playwright_ready = False
@@ -253,7 +253,7 @@ class TestWebpageLoaderRuntimeBootstrap:
         assert should_retry is True
         assert WebpageLoader._playwright_ready is True
 
-    @patch("pycontextify.index.loaders._install_crawl4ai_browsers", return_value=False)
+    @patch("pycontextify.indexer.loaders._install_crawl4ai_browsers", return_value=False)
     def test_retry_after_runtime_error_failure(self, mock_install: Mock):
         loader = WebpageLoader()
         WebpageLoader._playwright_ready = False

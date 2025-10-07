@@ -184,20 +184,18 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 ### Python Sources
 - **examples/cli_usage_examples.py** – Demonstrates command-line indexing and searching workflows across representative project types.
 - **pycontextify/__init__.py** – Exposes the package’s primary configuration and indexing interfaces for external consumers.
-- **pycontextify/index/__init__.py** – Re-exports core indexing classes so they can be imported from a single module.
-- **pycontextify/index/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
-- **pycontextify/index/metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.
-- **pycontextify/index/embedders/base.py** – Specifies the abstract embedder contract, error types, and shared embedding utilities.
-- **pycontextify/index/embedders/sentence_transformers_embedder.py** – Implements embeddings via Sentence Transformers with batching, device selection, and cleanup.
-- **pycontextify/index/embedders/factory.py** – Registers embedding providers, validates configuration, and constructs embedder instances.
-- **pycontextify/index/chunker.py** – Provides base and specialized chunkers for code, documents, and web pages, handling splitting and metadata extraction.
-- **pycontextify/index/loaders.py** – Supplies loaders for code, documents, and web pages, orchestrating ingestion workflows per source type.
-- **pycontextify/index/manager.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
-- **pycontextify/index/hybrid_search.py** – Implements keyword-based hybrid search that complements vector similarity results.
-- **pycontextify/index/vector_store.py** – Wraps FAISS vector storage operations, including persistence, backup, and validation routines.
-- **pycontextify/index/models.py** – Defines search-related data structures, response formatting helpers, and analytics utilities.
-- **pycontextify/index/pdf_loader.py** – Handles PDF extraction via multiple backends and enriches pages with contextual metadata.
-- **pycontextify/mcp_server.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
+- **pycontextify/index/__init__.py** – Maintains backwards-compatible exports while forwarding to the new architectural blocks.
+- **pycontextify/orchestrator/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
+- **pycontextify/embedder/** – Hosts the embedding abstractions, provider implementations, and factory wiring.
+- **pycontextify/chunker/__init__.py** – Provides base and specialized chunkers for code, documents, and web pages, handling splitting and metadata extraction.
+- **pycontextify/storage/metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.
+- **pycontextify/storage/vector.py** – Wraps FAISS vector storage operations, including persistence, backup, and validation routines.
+- **pycontextify/search/hybrid.py** – Implements keyword-based hybrid search that complements vector similarity results.
+- **pycontextify/search/models.py** – Defines search-related data structures, response formatting helpers, and analytics utilities.
+- **pycontextify/indexer/manager.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
+- **pycontextify/indexer/loaders.py** – Supplies loaders for code, documents, and web pages, orchestrating ingestion workflows per source type.
+- **pycontextify/indexer/pdf_loader.py** – Handles PDF extraction via multiple backends and enriches pages with contextual metadata.
+- **pycontextify/mcp/server.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
 - **scripts/debug_lazy_loading.py** – Prints diagnostics to inspect lazy-loading behavior of the index manager.
 - **scripts/detailed_perf.py** – Measures fine-grained startup timings for key indexing components.
 - **scripts/fast_startup_test.py** – Benchmarks configuration options and lazy-loading strategies for faster startup.

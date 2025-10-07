@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from pycontextify.index.config import Config
-from pycontextify.index.manager import IndexManager
+from pycontextify.orchestrator.config import Config
+from pycontextify.indexer.manager import IndexManager
 
 
 class TestPersistenceFeatures:
