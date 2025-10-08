@@ -1,8 +1,9 @@
 import tempfile
+import tempfile
 import time
 from pathlib import Path
 
-from pycontextify.orchestrator.config import Config
+from pycontextify.orchestrator_config import Config
 
 
 def time_operation(description, func):
@@ -33,7 +34,7 @@ def main():
         print("\n2. IndexManager components initialization...")
 
         # Initialize basic stores
-        from pycontextify.storage.metadata import MetadataStore
+        from pycontextify.storage_metadata import MetadataStore
 
         metadata_store, metadata_time = time_operation(
             "MetadataStore", lambda: MetadataStore()
@@ -62,7 +63,7 @@ def main():
 
         # Initialize vector store
         print("\n4. Vector store initialization...")
-        from pycontextify.storage.vector import VectorStore
+        from pycontextify.storage_vector import VectorStore
 
         vector_store, vector_time = time_operation(
             "VectorStore", lambda: VectorStore(dimension, config)
@@ -73,7 +74,7 @@ def main():
         print("\n5. Hybrid search initialization...")
         if config.use_hybrid_search:
             try:
-                from pycontextify.search.hybrid import HybridSearchEngine
+                from pycontextify.search_hybrid import HybridSearchEngine
 
                 hybrid_search, hybrid_time = time_operation(
                     "HybridSearchEngine",

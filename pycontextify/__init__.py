@@ -2,9 +2,9 @@
 
 from importlib import metadata as _metadata
 
-from .orchestrator.config import Config
-from .indexer.manager import IndexManager
-from .mcp import server as mcp_server
+from .orchestrator_config import Config
+from .indexer_manager import IndexManager
+from . import mcp_server as mcp_server
 
 try:  # pragma: no cover - exercised when installed as a package
     __version__ = _metadata.version("pycontextify")

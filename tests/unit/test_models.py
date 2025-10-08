@@ -13,7 +13,7 @@ import pytest
 # Disable sentence transformer mocking for all tests in this module
 pytestmark = pytest.mark.no_mock_st
 
-from pycontextify.search.models import (
+from pycontextify.search_models import (
     SearchErrorCode,
     SearchResponse,
     SearchResult,

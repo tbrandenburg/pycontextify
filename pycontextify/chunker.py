@@ -10,8 +10,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List
 
-from ..orchestrator.config import Config
-from ..storage.metadata import ChunkMetadata, SourceType
+from .orchestrator_config import Config
+from .storage_metadata import ChunkMetadata, SourceType
 
 logger = logging.getLogger(__name__)
 

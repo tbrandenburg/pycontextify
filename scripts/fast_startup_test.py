@@ -2,8 +2,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from pycontextify.orchestrator.config import Config
-from pycontextify.indexer.manager import IndexManager
+from pycontextify.orchestrator_config import Config
+from pycontextify.indexer_manager import IndexManager
 
 
 def test_fast_startup_config():
@@ -94,8 +94,8 @@ def test_lazy_loading_concept():
         start_time = time.time()
 
         # Initialize basic components only
-        from pycontextify.storage.metadata import MetadataStore
-        from pycontextify.storage.vector import VectorStore
+        from pycontextify.storage_metadata import MetadataStore
+        from pycontextify.storage_vector import VectorStore
 
         metadata_store = MetadataStore()
 

@@ -21,12 +21,12 @@ from urllib.request import url2pathname
 import psutil
 import requests
 
-from ..chunker import ChunkerFactory
-from ..orchestrator.config import Config
-from ..embedder import EmbedderFactory
-from .loaders import LoaderFactory
-from ..storage.metadata import MetadataStore, SourceType
-from ..search.models import (
+from .chunker import ChunkerFactory
+from .orchestrator_config import Config
+from .embedder import EmbedderFactory
+from .indexer_loaders import LoaderFactory
+from .storage_metadata import MetadataStore, SourceType
+from .search_models import (
     SearchErrorCode,
     SearchPerformanceLogger,
     SearchResponse,
@@ -37,7 +37,7 @@ from ..search.models import (
     create_structured_scores,
     enhance_search_results_with_ranking,
 )
-from ..storage.vector import VectorStore
+from .storage_vector import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class IndexManager:
             return
 
         try:
-            from ..search.hybrid import HybridSearchEngine
+            from .search_hybrid import HybridSearchEngine
 
             self.hybrid_search = HybridSearchEngine(
                 keyword_weight=self.config.keyword_weight
@@ -1047,7 +1047,7 @@ class IndexManager:
         """
         from pathlib import Path
 
-        from .pdf_loader import PDFLoader
+        from .indexer_pdf_loader import PDFLoader
 
         # Get source_path safely, handling both real objects and mocks
         source_path = getattr(chunk, "source_path", "/unknown")

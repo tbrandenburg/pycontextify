@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from pycontextify.orchestrator.config import Config
-from pycontextify.storage.vector import VectorStore
+from pycontextify.orchestrator_config import Config
+from pycontextify.storage_vector import VectorStore
 
 
 class TestVectorStoreConsolidated:
@@ -45,7 +45,7 @@ class TestVectorStoreConsolidated:
 
         # Test FAISS import error
         with patch(
-            "pycontextify.storage.vector.VectorStore._initialize_index"
+            "pycontextify.storage_vector.VectorStore._initialize_index"
         ) as mock_init:
             mock_init.side_effect = ImportError(
                 "FAISS not installed. Install with: pip install faiss-cpu"
