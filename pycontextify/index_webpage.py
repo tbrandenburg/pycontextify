@@ -212,8 +212,8 @@ class WebpageLoader:
             raise RuntimeError("Crawl4AI runtime not initialized")
 
         async def _crawl(target_url: str, config: "CrawlerRunConfigType") -> List["CrawlResultType"]:
-            async with _async_crawler_cls(browser_config=self._browser_config) as crawler:
-                response = crawler.arun(url=target_url, config=config)
+            async with _async_crawler_cls() as crawler:
+                response = crawler.arun(url=target_url, config=config, browser_config=self._browser_config)
 
                 if inspect.isasyncgen(response):
                     return [item async for item in response]
