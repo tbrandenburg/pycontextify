@@ -160,18 +160,33 @@ async def handle_mcp_errors_async(operation_name: str, func_impl, *args):
     Returns:
         Result from function or structured error dict
     """
+    import time
+    start_time = time.time()
+    
     try:
-        return await func_impl(*args)
+        logger.info(f"{operation_name} started")
+        result = await func_impl(*args)
+        elapsed = time.time() - start_time
+        logger.info(f"{operation_name} completed successfully in {elapsed:.2f}s")
+        
+        # Ensure result is JSON serializable
+        if result is None:
+            logger.warning(f"{operation_name} returned None, converting to empty dict")
+            result = {"warning": "Operation completed but returned no data"}
+        
+        return result
     except ValueError as e:
         # Validation errors - return structured error
+        elapsed = time.time() - start_time
         error_msg = str(e)
-        logger.warning(f"{operation_name} validation error: {error_msg}")
-        return {"error": error_msg}
+        logger.warning(f"{operation_name} validation error after {elapsed:.2f}s: {error_msg}")
+        return {"error": error_msg, "operation": operation_name, "elapsed_seconds": elapsed}
     except Exception as e:
         # Unexpected errors - log and return structured error
+        elapsed = time.time() - start_time
         error_msg = f"{operation_name} failed: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg}
+        logger.error(f"{operation_name} failed after {elapsed:.2f}s: {error_msg}")
+        return {"error": error_msg, "operation": operation_name, "elapsed_seconds": elapsed}
 
 
 def parse_args() -> argparse.Namespace:
@@ -476,6 +491,8 @@ async def _index_webpage_impl(
     url: str, recursive: bool, max_depth: int
 ) -> Dict[str, Any]:
     """Implementation for index_webpage with validation and business logic."""
+    import time
+    
     # Validate parameters
     url = validate_string_param(url, "url")
 
@@ -493,13 +510,29 @@ async def _index_webpage_impl(
 
     # Initialize manager and index
     mgr = initialize_manager()
+    
+    logger.info(f"Starting webpage indexing for {url} with recursive={recursive}, max_depth={max_depth}")
     result = await mgr.index_webpage(
         url,
         recursive=recursive,
         max_depth=max_depth,
     )
-
-    logger.info(f"Webpage indexing completed for {url}: {result}")
+    
+    # Validate result before returning
+    if result is None:
+        logger.error(f"Webpage indexing returned None for {url}")
+        return {"error": "Indexing completed but returned no data"}
+    
+    if not isinstance(result, dict):
+        logger.error(f"Webpage indexing returned non-dict result for {url}: {type(result)}")
+        return {"error": f"Indexing returned invalid result type: {type(result)}"}
+    
+    # Add metadata to help with debugging
+    result["indexed_url"] = url
+    result["indexing_timestamp"] = int(time.time())
+    result["mcp_version"] = "0.1.0"
+    
+    logger.info(f"Webpage indexing completed successfully for {url}: {result}")
     return result
 
 
@@ -524,13 +557,18 @@ async def index_webpage(
     Returns:
         Dictionary with indexing statistics including pages processed and chunks added
     """
-    return await handle_mcp_errors_async(
+    logger.info(f"MCP index_webpage called with url={url}, recursive={recursive}, max_depth={max_depth}")
+    
+    result = await handle_mcp_errors_async(
         "Webpage indexing",
         _index_webpage_impl,
         url,
         recursive,
         max_depth,
     )
+    
+    logger.info(f"MCP index_webpage returning result: {result}")
+    return result
 
 
 @mcp.tool
