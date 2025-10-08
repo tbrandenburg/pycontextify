@@ -7,13 +7,13 @@ import pytest
 
 from pycontextify.embedder import (
     BaseEmbedder,
-    EmbedderFactory,
-    SentenceTransformersEmbedder,
-)
-from pycontextify.embedder_base import (
     EmbeddingError,
     ModelNotFoundError,
     ProviderNotAvailableError,
+)
+from pycontextify.embedder_factory import EmbedderFactory
+from pycontextify.embedder_sentence_transformers_embedder import (
+    SentenceTransformersEmbedder,
 )
 
 

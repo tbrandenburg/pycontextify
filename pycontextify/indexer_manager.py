@@ -23,7 +23,7 @@ import requests
 
 from .chunker import ChunkerFactory
 from .config import Config
-from .embedder import EmbedderFactory
+from .embedder_factory import EmbedderFactory
 from .index_codebase import CodebaseIndexer
 from .index_document import DocumentIndexer
 from .index_webpage import WebpageIndexer

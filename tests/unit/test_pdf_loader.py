@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from pycontextify.indexer_pdf_loader import PDFLoader
+from pycontextify.index_document import PDFLoader
 
 
 class TestPDFLoaderInitialization:

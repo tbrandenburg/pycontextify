@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from .embedder_base import (
+from .embedder import (
     BaseEmbedder,
     EmbeddingError,
     ModelNotFoundError,
@@ -221,20 +221,21 @@ class SentenceTransformersEmbedder(BaseEmbedder):
     def is_available(self) -> bool:
         """Check if sentence-transformers is available and model can be loaded."""
         try:
+            import importlib
+
             # Check if sentence-transformers is available
-            import sentence_transformers  # noqa: F401
-
-            # Try to load the model if not already loaded
-            if self._model is None:
-                try:
-                    self._ensure_model_loaded()
-                except Exception:
-                    return False
-
-            return True
-
+            importlib.import_module("sentence_transformers")
         except ImportError:
             return False
+
+        # If the model is already loaded we are available
+        if self._model is not None:
+            return True
+
+        # We avoid eager model loading to keep availability checks lightweight.
+        # If a downstream operation requires embeddings, `_ensure_model_loaded`
+        # will perform the actual initialization and raise meaningful errors.
+        return True
 
     def cleanup(self) -> None:
         """Clean up resources used by the embedder."""
