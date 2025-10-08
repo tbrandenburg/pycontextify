@@ -1,7 +1,7 @@
 """Search components for PyContextify."""
 
-from .hybrid import HybridSearchEngine
-from .models import (
+from .search_hybrid import HybridSearchEngine
+from .search_models import (
     SearchErrorCode,
     SearchPerformanceLogger,
     SearchResponse,

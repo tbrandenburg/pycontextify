@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from .base import (
+from .embedder_base import (
     BaseEmbedder,
     EmbeddingError,
     ModelNotFoundError,

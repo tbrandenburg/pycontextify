@@ -2,7 +2,7 @@ import pytest
 
 pytest.importorskip("crawl4ai")
 
-from pycontextify.indexer.loaders import WebpageLoader
+from pycontextify.indexer_loaders import WebpageLoader
 
 
 @pytest.mark.integration

@@ -1,5 +1,5 @@
 """Orchestration utilities for PyContextify."""
 
-from .config import Config
+from .orchestrator_config import Config
 
 __all__ = ["Config"]

@@ -7,8 +7,8 @@ making it easy to switch between different providers and add new ones.
 import logging
 from typing import Any, Dict, List, Type
 
-from .base import BaseEmbedder, EmbeddingError, ProviderNotAvailableError
-from .sentence_transformers_embedder import SentenceTransformersEmbedder
+from .embedder_base import BaseEmbedder, EmbeddingError, ProviderNotAvailableError
+from .embedder_sentence_transformers_embedder import SentenceTransformersEmbedder
 
 logger = logging.getLogger(__name__)
 

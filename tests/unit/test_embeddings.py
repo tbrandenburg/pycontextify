@@ -10,7 +10,7 @@ from pycontextify.embedder import (
     EmbedderFactory,
     SentenceTransformersEmbedder,
 )
-from pycontextify.embedder.base import (
+from pycontextify.embedder_base import (
     EmbeddingError,
     ModelNotFoundError,
     ProviderNotAvailableError,

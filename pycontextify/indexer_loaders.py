@@ -28,7 +28,7 @@ else:  # pragma: no cover - runtime fallbacks populated lazily
         CrawlerRunConfigType
     ) = BFSDeepCrawlStrategyType = CrawlResultContainerType = Any
 
-from ..storage.metadata import SourceType
+from .storage_metadata import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +328,7 @@ class DocumentLoader(BaseLoader):
     def _initialize_pdf_loader(self):
         """Initialize PDF loader with configured engine."""
         try:
-            from .pdf_loader import PDFLoader
+            from .indexer_pdf_loader import PDFLoader
 
             self.pdf_loader = PDFLoader(preferred_engine=self.pdf_engine)
             logger.info(f"PDF loader initialized with engine: {self.pdf_engine}")

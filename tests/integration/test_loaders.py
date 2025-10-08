@@ -9,7 +9,7 @@ pytest.importorskip("crawl4ai")
 
 from crawl4ai.models import CrawlResult, MarkdownGenerationResult
 
-from pycontextify.indexer.loaders import CodeLoader, WebpageLoader
+from pycontextify.indexer_loaders import CodeLoader, WebpageLoader
 
 
 def _mk_crawl_result(url: str, text: str) -> CrawlResult:

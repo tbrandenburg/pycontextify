@@ -7,7 +7,7 @@ import argparse
 import logging
 from typing import List, Tuple
 
-from pycontextify.indexer.loaders import WebpageLoader
+from pycontextify.indexer_loaders import WebpageLoader
 
 
 def _format_page(index: int, page: Tuple[str, str]) -> str:

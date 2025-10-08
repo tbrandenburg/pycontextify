@@ -13,12 +13,12 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-import pycontextify.mcp.server as mcp_server_module
+import pycontextify.mcp_server as mcp_server_module
 
 # Import MCP functions and utilities
 from pycontextify import mcp_server
-from pycontextify.orchestrator.config import Config
-from pycontextify.mcp.server import (
+from pycontextify.orchestrator_config import Config
+from pycontextify.mcp_server import (
     args_to_config_overrides,
     get_manager,
     handle_mcp_errors,
@@ -142,8 +142,8 @@ class TestManagerSingleton:
         """Test getting manager when not initialized."""
         assert get_manager() is None
 
-    @patch("pycontextify.mcp.server.IndexManager")
-    @patch("pycontextify.mcp.server.Config")
+    @patch("pycontextify.mcp_server.IndexManager")
+    @patch("pycontextify.mcp_server.Config")
     def test_initialize_manager_success(self, mock_config_class, mock_manager_class):
         """Test successful manager initialization."""
         mock_config = Mock()
@@ -161,7 +161,7 @@ class TestManagerSingleton:
 
     def test_reset_manager(self):
         """Test manager reset functionality."""
-        with patch("pycontextify.mcp.server.IndexManager") as mock_manager_class:
+        with patch("pycontextify.mcp_server.IndexManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager_class.return_value = mock_manager
 
@@ -192,7 +192,7 @@ class TestMCPServerFunctions:
         # Clean up manager singleton
         reset_manager()
 
-    @patch("pycontextify.mcp.server.IndexManager")
+    @patch("pycontextify.mcp_server.IndexManager")
     def test_index_code_success(self, mock_manager_class):
         """Test successful code indexing."""
         # Create test directory
@@ -235,7 +235,7 @@ class TestMCPServerFunctions:
         assert "error" in result
         assert "cannot be empty" in result["error"]
 
-    @patch("pycontextify.mcp.server.IndexManager")
+    @patch("pycontextify.mcp_server.IndexManager")
     def test_index_document_success(self, mock_manager_class):
         """Test successful document indexing."""
         test_doc = self.test_dir / "test.pdf"
@@ -269,7 +269,7 @@ class TestMCPServerFunctions:
         assert "error" in result
         assert "Unsupported file type" in result["error"]
 
-    @patch("pycontextify.mcp.server.IndexManager")
+    @patch("pycontextify.mcp_server.IndexManager")
     def test_search_success(self, mock_manager_class):
         """Test successful search."""
         mock_manager = Mock()
@@ -303,7 +303,7 @@ class TestMCPServerFunctions:
         result = search_fn("")
         assert result == []
 
-    @patch("pycontextify.mcp.server.IndexManager")
+    @patch("pycontextify.mcp_server.IndexManager")
     def test_status_function(self, mock_manager_class):
         """Test the status MCP function."""
         mock_manager = Mock()
@@ -329,7 +329,7 @@ class TestMCPServerFunctions:
         assert status["mcp_server"]["name"] == "PyContextify"
         assert len(status["mcp_server"]["mcp_functions"]) == 6
 
-    @patch("pycontextify.mcp.server.IndexManager")
+    @patch("pycontextify.mcp_server.IndexManager")
     def test_reset_index_success(self, mock_manager_class):
         """Test successful index reset."""
         mock_manager = Mock()
@@ -500,7 +500,7 @@ class TestMCPUtilityFunctions:
         assert overrides["embedding_provider"] == "openai"
         assert overrides["embedding_model"] == "text-embedding-3-small"
 
-    @patch("pycontextify.mcp.server.IndexManager")
+    @patch("pycontextify.mcp_server.IndexManager")
     def test_perform_initial_indexing(self, mock_manager_class):
         """Test initial indexing functionality."""
         mock_manager = Mock()

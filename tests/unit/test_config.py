@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pycontextify.orchestrator.config import Config
+from pycontextify.orchestrator_config import Config
 
 
 class TestConfig(unittest.TestCase):
@@ -18,7 +18,7 @@ class TestConfig(unittest.TestCase):
         """Test default configuration values."""
         # Clear environment variables and .env file loading for pure defaults
         with patch.dict(os.environ, {}, clear=True):
-            with patch("pycontextify.orchestrator.config.load_dotenv"):
+            with patch("pycontextify.orchestrator_config.load_dotenv"):
                 config = Config()
 
                 self.assertEqual(config.embedding_provider, "sentence_transformers")

@@ -66,7 +66,7 @@ dev = [
 gpu = ["faiss-gpu>=1.7.0"]
 
 [project.scripts]
-pycontextify = "pycontextify.mcp.server:main"
+pycontextify = "pycontextify.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/pycontextify/pycontextify"

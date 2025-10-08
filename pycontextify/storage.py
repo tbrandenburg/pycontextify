@@ -1,7 +1,7 @@
 """Storage components for PyContextify."""
 
-from .metadata import ChunkMetadata, MetadataStore, SourceType
-from .vector import VectorStore
+from .storage_metadata import ChunkMetadata, MetadataStore, SourceType
+from .storage_vector import VectorStore
 
 __all__ = [
     "ChunkMetadata",
