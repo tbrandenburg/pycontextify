@@ -100,6 +100,8 @@ def _playwright_browsers_installed(browser: str = "chromium") -> bool:
 
 
 def _install_crawl4ai_browsers() -> bool:
+    """Install Playwright browsers with improved Windows encoding handling."""
+    # and timeout protection.
     try:
         from crawl4ai import install as crawl4ai_install  # type: ignore
     except Exception as exc:  # pragma: no cover - defensive
@@ -112,19 +114,67 @@ def _install_crawl4ai_browsers() -> bool:
         if sys.platform == "win32":
             env["PYTHONIOENCODING"] = "utf-8"
             env["PYTHONUTF8"] = "1"
+            # Additional Windows encoding fixes
+            env["LANG"] = "en_US.UTF-8"
+            env["LC_ALL"] = "en_US.UTF-8"
 
-        crawl4ai_install.install_playwright()
+        logger.info(
+            "Installing Playwright browsers (this may take a few minutes on first run)..."
+        )
+
+        # Use subprocess with encoding fixes for Windows
+        if sys.platform == "win32":
+
+            # Use subprocess to avoid encoding issues in the current process
+            install_cmd = (
+                "from crawl4ai.install import install_playwright; "
+                "install_playwright()"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", install_cmd],
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=180,  # 3 minute timeout
+            )
+
+            if result.returncode != 0:
+                logger.warning(
+                    "Playwright installation subprocess failed (exit code %d): %s",
+                    result.returncode,
+                    result.stderr,
+                )
+                return False
+        else:
+            # Use direct installation for non-Windows
+            crawl4ai_install.install_playwright()
+
+    except subprocess.TimeoutExpired:  # pragma: no cover - Windows specific
+        logger.warning("Playwright installation timed out after 3 minutes")
+        return False
     except UnicodeEncodeError as enc_exc:  # pragma: no cover - Windows specific
         logger.warning(
             "Automatic Crawl4AI Playwright install failed due to encoding: %s", enc_exc
         )
+        # Try fallback installation method
+        try:
+            subprocess.run(
+                ["playwright", "install", "chromium"],
+                check=False,  # Don't raise on error
+                capture_output=True,
+                timeout=120,
+            )
+        except Exception:
+            pass  # Ignore fallback errors
         return False
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Automatic Crawl4AI Playwright install failed: %s", exc)
         return False
 
     if _playwright_browsers_installed():
-        logger.info("Installed Playwright Chromium runtime for Crawl4AI")
+        logger.info("Successfully installed Playwright Chromium runtime for Crawl4AI")
         return True
 
     logger.warning("Playwright install command completed but Chromium was not detected")
@@ -390,6 +440,7 @@ class WebpageLoader:
 
         converter = _html2text_fn
         if converter is None:
+
             def converter(value):
                 return re.sub(r"<[^>]+>", " ", value)
 
@@ -403,6 +454,7 @@ class WebpageLoader:
         return stripped or None
 
     def _ensure_runtime(self) -> None:
+        """Ensure Playwright runtime is available, with async installation support."""
         if not self._requires_local_browser():
             WebpageLoader._playwright_ready = True
             return
@@ -416,8 +468,17 @@ class WebpageLoader:
 
         if not WebpageLoader._playwright_install_attempted:
             WebpageLoader._playwright_install_attempted = True
+            logger.info(
+                "First-time Playwright setup detected - this may take a few minutes"
+            )
             if _install_crawl4ai_browsers():
                 WebpageLoader._playwright_ready = True
+            else:
+                # Log that we'll continue without Playwright but may have issues
+                logger.warning(
+                    "Playwright installation failed - web crawling may not work properly. "
+                    "You may need to manually run 'playwright install chromium'."
+                )
 
     def _retry_after_runtime_error(self, exc: Exception) -> bool:
         if not self._requires_local_browser():

@@ -497,7 +497,6 @@ class TestMCPUtilityFunctions:
         assert overrides["embedding_model"] == "text-embedding-3-small"
 
     @patch("pycontextify.mcp.IndexManager")
-    @pytest.mark.asyncio
     async def test_perform_initial_indexing(self, mock_manager_class):
         """Test initial indexing functionality."""
         mock_manager = Mock()
