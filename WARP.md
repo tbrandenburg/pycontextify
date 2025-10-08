@@ -43,7 +43,7 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 ## Architecture
 
 ### Key Components
-- **IndexManager**: Central orchestrator with lazy loading (`manager.py`)
+- **IndexManager**: Central coordinator with lazy loading (`manager.py`)
 - **VectorStore**: FAISS wrapper with persistence (`vector_store.py`)
 - **EmbedderFactory**: Provider system (`embedders/factory.py`) — currently ships with the sentence-transformers implementation and validation stubs for future providers
 - **HybridSearchEngine**: Vector + keyword search (`hybrid_search.py`)
@@ -185,7 +185,7 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 - **examples/cli_usage_examples.py** – Demonstrates command-line indexing and searching workflows across representative project types.
 - **pycontextify/__init__.py** – Exposes the package’s primary configuration and indexing interfaces for external consumers.
 - **pycontextify/index/__init__.py** – Maintains backwards-compatible exports while forwarding to the new architectural blocks.
-- **pycontextify/orchestrator/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
+- **pycontextify/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
 - **pycontextify/embedder/** – Hosts the embedding abstractions, provider implementations, and factory wiring.
 - **pycontextify/chunker/__init__.py** – Provides base and specialized chunkers for code, documents, and web pages, handling splitting and metadata extraction.
 - **pycontextify/storage/metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.

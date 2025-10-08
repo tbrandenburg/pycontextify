@@ -3,7 +3,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from pycontextify.orchestrator_config import Config
+from pycontextify.config import Config
 
 
 def time_operation(description, func):

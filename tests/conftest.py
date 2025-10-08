@@ -143,7 +143,7 @@ def mock_embedder():
 @pytest.fixture
 def mock_config(temp_index_dir):
     """Provide a mock config for testing."""
-    from pycontextify.orchestrator_config import Config
+    from pycontextify.config import Config
 
     # Create config with temporary directory
     config_overrides = {

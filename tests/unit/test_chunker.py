@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from pycontextify.chunker import BaseChunker, SimpleChunker
-from pycontextify.orchestrator_config import Config
+from pycontextify.config import Config
 from pycontextify.storage_metadata import ChunkMetadata, SourceType
 
 
