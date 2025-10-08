@@ -2,7 +2,7 @@
 
 from importlib import metadata as _metadata
 
-from .orchestrator_config import Config
+from .indexer import Config
 from .indexer_manager import IndexManager
 from . import mcp_server as mcp_server
 
