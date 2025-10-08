@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from pycontextify.storage_metadata import ChunkMetadata, MetadataStore, SourceType
+from pycontextify.storage_metadata import ChunkMetadata, MetadataStore
+from pycontextify.types import SourceType
 
 # RelationshipStore import removed - feature was deleted
 

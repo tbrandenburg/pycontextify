@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .storage_metadata import SourceType
+from .types import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,9 @@ class PDFLoader:
                     "%s extracted empty text, trying fallback", self.preferred_engine
                 )
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning("%s failed: %s, trying fallback", self.preferred_engine, exc)
+                logger.warning(
+                    "%s failed: %s, trying fallback", self.preferred_engine, exc
+                )
 
         for engine in self.available_engines:
             if engine == self.preferred_engine:

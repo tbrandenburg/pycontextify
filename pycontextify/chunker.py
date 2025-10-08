@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .config import Config
-from .storage_metadata import ChunkMetadata, SourceType
+from .storage_metadata import ChunkMetadata
+from .types import SourceType
 
 logger = logging.getLogger(__name__)
 

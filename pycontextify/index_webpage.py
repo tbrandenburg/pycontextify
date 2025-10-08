@@ -9,9 +9,9 @@ import math
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from .storage_metadata import SourceType
+from .types import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,12 @@ if TYPE_CHECKING:  # pragma: no cover - handled lazily
     from crawl4ai import CacheMode as CacheModeType  # noqa: F401
     from crawl4ai import CrawlerRunConfig as CrawlerRunConfigType  # noqa: F401
     from crawl4ai import CrawlResult as CrawlResultType  # noqa: F401
-    from crawl4ai.deep_crawling import BFSDeepCrawlStrategy as BFSDeepCrawlStrategyType  # noqa: F401
-    from crawl4ai.models import CrawlResultContainer as CrawlResultContainerType  # noqa: F401
+    from crawl4ai.deep_crawling import (  # noqa: F401
+        BFSDeepCrawlStrategy as BFSDeepCrawlStrategyType,
+    )
+    from crawl4ai.models import (  # noqa: F401
+        CrawlResultContainer as CrawlResultContainerType,
+    )
 else:  # pragma: no cover - keep mypy happy
     AsyncWebCrawlerType = BrowserConfigType = CacheModeType = CrawlResultType = (
         CrawlerRunConfigType
@@ -81,7 +85,11 @@ def _require_crawl4ai() -> None:
 
 def _playwright_browsers_installed(browser: str = "chromium") -> bool:
     browsers_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-    base_dir = Path(browsers_path).expanduser() if browsers_path else Path.home() / ".cache" / "ms-playwright"
+    base_dir = (
+        Path(browsers_path).expanduser()
+        if browsers_path
+        else Path.home() / ".cache" / "ms-playwright"
+    )
     pattern = f"{browser}-*"
     try:
         return any(base_dir.glob(pattern))
@@ -139,8 +147,12 @@ class WebpageLoader:
             headless=headless,
             verbose=False,
         )
-        default_cache_mode = getattr(_cache_mode_cls, "BYPASS", None) if _cache_mode_cls else None
-        effective_cache_mode = cache_mode if cache_mode is not None else default_cache_mode
+        default_cache_mode = (
+            getattr(_cache_mode_cls, "BYPASS", None) if _cache_mode_cls else None
+        )
+        effective_cache_mode = (
+            cache_mode if cache_mode is not None else default_cache_mode
+        )
 
         self._crawler_config = _crawler_run_config_cls(
             cache_mode=effective_cache_mode,
@@ -163,7 +175,9 @@ class WebpageLoader:
         try:
             if recursive:
                 run_config = self._build_run_config(
-                    deep_crawl_strategy=self._create_deep_crawl_strategy(effective_depth),
+                    deep_crawl_strategy=self._create_deep_crawl_strategy(
+                        effective_depth
+                    ),
                     stream=False,
                 )
                 results = self._execute_crawl(url, run_config)
@@ -197,7 +211,9 @@ class WebpageLoader:
             run_config.deep_crawl_strategy = deep_crawl_strategy
         return run_config
 
-    def _execute_crawl(self, url: str, run_config: "CrawlerRunConfigType") -> List["CrawlResultType"]:
+    def _execute_crawl(
+        self, url: str, run_config: "CrawlerRunConfigType"
+    ) -> List["CrawlResultType"]:
         self._ensure_runtime()
 
         try:
@@ -207,13 +223,19 @@ class WebpageLoader:
                 return self._run_crawl(url, run_config)
             raise
 
-    def _run_crawl(self, url: str, run_config: "CrawlerRunConfigType") -> List["CrawlResultType"]:
+    def _run_crawl(
+        self, url: str, run_config: "CrawlerRunConfigType"
+    ) -> List["CrawlResultType"]:
         if _async_crawler_cls is None:
             raise RuntimeError("Crawl4AI runtime not initialized")
 
-        async def _crawl(target_url: str, config: "CrawlerRunConfigType") -> List["CrawlResultType"]:
+        async def _crawl(
+            target_url: str, config: "CrawlerRunConfigType"
+        ) -> List["CrawlResultType"]:
             async with _async_crawler_cls() as crawler:
-                response = crawler.arun(url=target_url, config=config, browser_config=self._browser_config)
+                response = crawler.arun(
+                    url=target_url, config=config, browser_config=self._browser_config
+                )
 
                 if inspect.isasyncgen(response):
                     return [item async for item in response]
@@ -303,7 +325,11 @@ class WebpageLoader:
 
     @staticmethod
     def _canonical_url(result: "CrawlResultType", fallback: str) -> str:
-        return getattr(result, "redirected_url", None) or getattr(result, "url", None) or fallback
+        return (
+            getattr(result, "redirected_url", None)
+            or getattr(result, "url", None)
+            or fallback
+        )
 
     def _extract_text(self, result: "CrawlResultType") -> Optional[str]:
         markdown_result = getattr(result, "markdown", None)
@@ -320,7 +346,9 @@ class WebpageLoader:
         if extracted and extracted.strip():
             return extracted.strip()
 
-        html_content = getattr(result, "cleaned_html", None) or getattr(result, "html", None)
+        html_content = getattr(result, "cleaned_html", None) or getattr(
+            result, "html", None
+        )
         if not html_content:
             return None
 

@@ -8,7 +8,8 @@ import pytest
 
 from pycontextify.chunker import BaseChunker, SimpleChunker
 from pycontextify.config import Config
-from pycontextify.storage_metadata import ChunkMetadata, SourceType
+from pycontextify.storage_metadata import ChunkMetadata
+from pycontextify.types import SourceType
 
 
 class TestBaseChunker:

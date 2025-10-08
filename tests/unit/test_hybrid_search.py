@@ -5,7 +5,8 @@ from unittest.mock import Mock, patch
 import pytest
 
 from pycontextify.search_hybrid import HybridSearchEngine, SearchResult
-from pycontextify.storage_metadata import ChunkMetadata, SourceType
+from pycontextify.storage_metadata import ChunkMetadata
+from pycontextify.types import SourceType
 
 
 class TestHybridSearchEngine:

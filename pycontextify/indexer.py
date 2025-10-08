@@ -27,7 +27,6 @@ from .embedder_factory import EmbedderFactory
 from .index_codebase import CodebaseIndexer
 from .index_document import DocumentIndexer
 from .index_webpage import WebpageIndexer
-from .storage_metadata import MetadataStore, SourceType
 from .search_models import (
     SearchErrorCode,
     SearchPerformanceLogger,
@@ -39,7 +38,9 @@ from .search_models import (
     create_structured_scores,
     enhance_search_results_with_ranking,
 )
+from .storage_metadata import ChunkMetadata, MetadataStore
 from .storage_vector import VectorStore
+from .types import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -827,9 +828,7 @@ class IndexManager:
     ) -> Dict[str, Any]:
         """Index web content using :class:`WebpageIndexer`."""
 
-        return self._web_indexer.index(
-            url, recursive=recursive, max_depth=max_depth
-        )
+        return self._web_indexer.index(url, recursive=recursive, max_depth=max_depth)
 
     def process_content(
         self, content: str, source_path: str, source_type: SourceType

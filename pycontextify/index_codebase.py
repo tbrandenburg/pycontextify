@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .storage_metadata import SourceType
+from .types import SourceType
 
 logger = logging.getLogger(__name__)
 

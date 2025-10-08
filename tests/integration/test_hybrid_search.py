@@ -1,7 +1,8 @@
 """Integration tests for hybrid search backed by the metadata store."""
 
 from pycontextify.search_hybrid import HybridSearchEngine
-from pycontextify.storage_metadata import ChunkMetadata, MetadataStore, SourceType
+from pycontextify.storage_metadata import ChunkMetadata, MetadataStore
+from pycontextify.types import SourceType
 
 
 def test_hybrid_search_with_metadata_store():
@@ -25,7 +26,9 @@ def test_hybrid_search_with_metadata_store():
     faiss_id1 = metadata_store.add_chunk(chunk1)
     faiss_id2 = metadata_store.add_chunk(chunk2)
 
-    engine.add_documents([chunk1.chunk_id, chunk2.chunk_id], [chunk1.chunk_text, chunk2.chunk_text])
+    engine.add_documents(
+        [chunk1.chunk_id, chunk2.chunk_id], [chunk1.chunk_text, chunk2.chunk_text]
+    )
     results = engine.search(
         query="python",
         vector_scores=[(faiss_id1, 0.9), (faiss_id2, 0.1)],

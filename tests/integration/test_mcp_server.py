@@ -248,9 +248,7 @@ class TestMCPServerFunctions:
         }
         mock_manager_class.return_value = mock_manager
 
-        index_document_fn = mcp_module.mcp._tool_manager._tools[
-            "index_document"
-        ].fn
+        index_document_fn = mcp_module.mcp._tool_manager._tools["index_document"].fn
         result = index_document_fn(str(test_doc))
 
         assert "error" not in result
@@ -262,9 +260,7 @@ class TestMCPServerFunctions:
         test_file = self.test_dir / "test.exe"
         test_file.write_text("binary content")
 
-        index_document_fn = mcp_module.mcp._tool_manager._tools[
-            "index_document"
-        ].fn
+        index_document_fn = mcp_module.mcp._tool_manager._tools["index_document"].fn
         result = index_document_fn(str(test_file))
         assert "error" in result
         assert "Unsupported file type" in result["error"]

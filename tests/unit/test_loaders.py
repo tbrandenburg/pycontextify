@@ -117,9 +117,7 @@ class TestDocumentLoaderSimple:
         """Test loading a text file."""
         loader = DocumentLoader()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Hello, world!")
             temp_path = f.name
 
@@ -255,6 +253,3 @@ class TestWebpageLoaderRuntimeBootstrap:
         mock_install.assert_not_called()
         assert should_retry is False
         assert WebpageLoader._playwright_ready is False
-
-
-

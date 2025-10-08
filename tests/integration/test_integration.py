@@ -12,7 +12,7 @@ import pytest
 
 from pycontextify.config import Config
 from pycontextify.indexer import IndexManager
-from pycontextify.storage_metadata import SourceType
+from pycontextify.types import SourceType
 
 
 class TestEmbeddingGeneration:

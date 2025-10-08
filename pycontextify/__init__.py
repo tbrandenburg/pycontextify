@@ -2,9 +2,10 @@
 
 from importlib import metadata as _metadata
 
+from . import mcp as mcp
 from .config import Config
 from .indexer import IndexManager
-from . import mcp as mcp
+from .types import SourceType
 
 try:  # pragma: no cover - exercised when installed as a package
     __version__ = _metadata.version("pycontextify")
@@ -18,6 +19,7 @@ __license__ = "MIT"
 __all__ = [
     "IndexManager",
     "Config",
+    "SourceType",
     "mcp",
     "__version__",
     "__author__",

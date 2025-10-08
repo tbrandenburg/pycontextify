@@ -14,13 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-
-class SourceType(Enum):
-    """Types of content sources for chunks."""
-
-    CODE = "code"
-    DOCUMENT = "document"
-    WEBPAGE = "webpage"
+from .types import SourceType
 
 
 @dataclass
