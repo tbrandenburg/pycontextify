@@ -17,7 +17,7 @@ import pycontextify.mcp_server as mcp_server_module
 
 # Import MCP functions and utilities
 from pycontextify import mcp_server
-from pycontextify.orchestrator_config import Config
+from pycontextify.config import Config
 from pycontextify.mcp_server import (
     args_to_config_overrides,
     get_manager,

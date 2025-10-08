@@ -2,7 +2,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from pycontextify.orchestrator_config import Config
+from pycontextify.config import Config
 from pycontextify.indexer_manager import IndexManager
 
 

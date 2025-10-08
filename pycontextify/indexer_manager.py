@@ -22,7 +22,7 @@ import psutil
 import requests
 
 from .chunker import ChunkerFactory
-from .orchestrator_config import Config
+from .config import Config
 from .embedder import EmbedderFactory
 from .indexer_loaders import LoaderFactory
 from .storage_metadata import MetadataStore, SourceType

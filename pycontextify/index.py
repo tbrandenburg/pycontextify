@@ -6,7 +6,7 @@ and lightweight knowledge graph capabilities.
 """
 
 from .indexer_manager import IndexManager
-from .orchestrator_config import Config
+from .config import Config
 from .storage_metadata import ChunkMetadata, MetadataStore, SourceType
 
 __all__ = [

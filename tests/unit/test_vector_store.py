@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from pycontextify.orchestrator_config import Config
+from pycontextify.config import Config
 from pycontextify.storage_vector import VectorStore
 
 

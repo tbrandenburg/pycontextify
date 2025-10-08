@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pycontextify.orchestrator_config import Config
+from pycontextify.config import Config
 from pycontextify.indexer_manager import IndexManager
 from pycontextify.storage_metadata import SourceType
 
