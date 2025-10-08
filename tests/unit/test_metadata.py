@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from pycontextify.storage_metadata import ChunkMetadata, MetadataStore
-from pycontextify.types import SourceType
+from pycontextify.types import Chunk, SourceType
 
 # RelationshipStore import removed - feature was deleted
 
@@ -143,6 +143,105 @@ class TestChunkMetadata:
         assert chunk.tags == ["python"]
         assert chunk.references == ["test"]
         assert chunk.code_symbols == ["hello"]
+
+    def test_from_chunk_conversion_basic(self):
+        """Test converting Chunk DTO to ChunkMetadata."""
+        chunk = Chunk(
+            chunk_text="test content",
+            source_path="/test/file.py",
+            source_type=SourceType.CODE,
+            start_char=0,
+            end_char=12,
+            embedding_provider="openai",
+            embedding_model="text-embedding-3-small",
+        )
+
+        metadata = ChunkMetadata.from_chunk(chunk)
+
+        # Verify all fields transferred correctly
+        assert metadata.chunk_text == chunk.chunk_text
+        assert metadata.source_path == chunk.source_path
+        assert metadata.source_type == chunk.source_type
+        assert metadata.start_char == chunk.start_char
+        assert metadata.end_char == chunk.end_char
+        assert metadata.embedding_provider == chunk.embedding_provider
+        assert metadata.embedding_model == chunk.embedding_model
+
+        # Verify storage-specific fields are generated
+        assert metadata.chunk_id  # UUID generated
+        assert isinstance(metadata.created_at, datetime)
+
+    def test_from_chunk_conversion_with_metadata(self):
+        """Test converting Chunk with full metadata fields."""
+        chunk = Chunk(
+            chunk_text="def hello(): pass",
+            source_path="/test/file.py",
+            source_type=SourceType.CODE,
+            start_char=0,
+            end_char=17,
+            file_extension=".py",
+            tags=["python", "function"],
+            references=["stdlib", "builtins"],
+            parent_section="module_main",
+            code_symbols=["hello"],
+            metadata={"complexity": "low", "lines": 1},
+        )
+
+        metadata = ChunkMetadata.from_chunk(chunk)
+
+        # Verify all optional fields transferred
+        assert metadata.file_extension == ".py"
+        assert metadata.tags == ["python", "function"]
+        assert metadata.references == ["stdlib", "builtins"]
+        assert metadata.parent_section == "module_main"
+        assert metadata.code_symbols == ["hello"]
+        assert metadata.metadata == {"complexity": "low", "lines": 1}
+
+    def test_from_chunk_conversion_independence(self):
+        """Test that from_chunk creates independent copies of lists."""
+        chunk = Chunk(
+            chunk_text="test",
+            source_path="/test.py",
+            source_type=SourceType.CODE,
+            tags=["original"],
+            references=["ref1"],
+            code_symbols=["sym1"],
+        )
+
+        metadata = ChunkMetadata.from_chunk(chunk)
+
+        # Modify the original chunk's lists
+        chunk.tags.append("new_tag")
+        chunk.references.append("new_ref")
+        chunk.code_symbols.append("new_sym")
+
+        # Verify metadata lists are independent
+        assert "new_tag" not in metadata.tags
+        assert "new_ref" not in metadata.references
+        assert "new_sym" not in metadata.code_symbols
+
+        # Verify original values are preserved
+        assert metadata.tags == ["original"]
+        assert metadata.references == ["ref1"]
+        assert metadata.code_symbols == ["sym1"]
+
+    def test_from_chunk_conversion_empty_optionals(self):
+        """Test converting Chunk with empty optional fields."""
+        chunk = Chunk(
+            chunk_text="minimal chunk",
+            source_path="/test.txt",
+            source_type=SourceType.DOCUMENT,
+        )
+
+        metadata = ChunkMetadata.from_chunk(chunk)
+
+        # Verify optional fields are properly initialized
+        assert metadata.file_extension is None
+        assert metadata.tags == []
+        assert metadata.references == []
+        assert metadata.parent_section is None
+        assert metadata.code_symbols == []
+        assert metadata.metadata == {}
 
 
 class TestMetadataStore:
