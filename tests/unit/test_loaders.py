@@ -1,4 +1,4 @@
-"""Simple tests for pycontextify.indexer_loaders module to improve coverage."""
+"""Simple tests covering the dedicated indexing loader modules."""
 
 import tempfile
 from pathlib import Path
@@ -35,12 +35,10 @@ def _mk_crawl_result(url: str, text: str, *, links=None) -> CrawlResult:
     )
 
 
-from pycontextify.indexer_loaders import (
-    CodeLoader,
-    DocumentLoader,
-    LoaderFactory,
-    WebpageLoader,
-)
+from pycontextify.index_codebase import CodeLoader
+from pycontextify.index_document import DocumentLoader
+from pycontextify.index_webpage import WebpageLoader
+from pycontextify.indexer_loaders import LoaderFactory
 from pycontextify.storage_metadata import SourceType
 
 # Disable the automatic sentence transformer mocking for this file
@@ -105,44 +103,40 @@ class TestDocumentLoaderSimple:
 
     def test_init(self):
         """Test DocumentLoader initialization."""
-        with patch.object(DocumentLoader, "_initialize_pdf_loader"):
-            loader = DocumentLoader()
-            assert loader.pdf_engine == "pymupdf"
+        loader = DocumentLoader()
+        assert loader.pdf_engine == "pymupdf"
 
-            loader_custom = DocumentLoader(pdf_engine="pypdf2")
-            assert loader_custom.pdf_engine == "pypdf2"
+        loader_custom = DocumentLoader(pdf_engine="pypdf2")
+        assert loader_custom.pdf_engine == "pypdf2"
 
     def test_load_nonexistent_file(self):
         """Test loading non-existent file."""
-        with patch.object(DocumentLoader, "_initialize_pdf_loader"):
-            loader = DocumentLoader()
-            with pytest.raises(FileNotFoundError):
-                loader.load("/this/file/does/not/exist.pdf")
+        loader = DocumentLoader()
+        with pytest.raises(FileNotFoundError):
+            loader.load("/this/file/does/not/exist.pdf")
 
     def test_load_text_file(self):
         """Test loading a text file."""
-        with patch.object(DocumentLoader, "_initialize_pdf_loader"):
-            loader = DocumentLoader()
+        loader = DocumentLoader()
 
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".txt", delete=False
-            ) as f:
-                f.write("Hello, world!")
-                temp_path = f.name
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as f:
+            f.write("Hello, world!")
+            temp_path = f.name
 
-            try:
-                content = loader._load_text_file(Path(temp_path))
-                assert content == "Hello, world!"
-            finally:
-                Path(temp_path).unlink()
+        try:
+            content = loader._load_text_file(Path(temp_path))
+            assert content == "Hello, world!"
+        finally:
+            Path(temp_path).unlink()
 
     def test_unsupported_format(self):
         """Test loading unsupported format."""
-        with patch.object(DocumentLoader, "_initialize_pdf_loader"):
-            loader = DocumentLoader()
+        loader = DocumentLoader()
 
-            result = loader._load_document(Path("/test/file.unknown"))
-            assert result is None
+        result = loader._load_document(Path("/test/file.unknown"))
+        assert result is None
 
 
 class TestWebpageLoaderSimple:
@@ -216,9 +210,9 @@ class TestWebpageLoaderRuntimeBootstrap:
         WebpageLoader._playwright_install_attempted = False
 
     @patch(
-        "pycontextify.indexer_loaders._playwright_browsers_installed", return_value=False
+        "pycontextify.index_webpage._playwright_browsers_installed", return_value=False
     )
-    @patch("pycontextify.indexer_loaders._install_crawl4ai_browsers", return_value=True)
+    @patch("pycontextify.index_webpage._install_crawl4ai_browsers", return_value=True)
     def test_ensure_runtime_installs_when_missing(
         self, mock_install: Mock, _mock_detect: Mock
     ):
@@ -229,9 +223,9 @@ class TestWebpageLoaderRuntimeBootstrap:
         assert WebpageLoader._playwright_ready is True
 
     @patch(
-        "pycontextify.indexer_loaders._playwright_browsers_installed", return_value=False
+        "pycontextify.index_webpage._playwright_browsers_installed", return_value=False
     )
-    @patch("pycontextify.indexer_loaders._install_crawl4ai_browsers")
+    @patch("pycontextify.index_webpage._install_crawl4ai_browsers")
     def test_api_mode_skips_install(self, mock_install: Mock, mock_detect: Mock):
         loader = WebpageLoader(browser_mode="api")
         loader._ensure_runtime()
@@ -240,7 +234,7 @@ class TestWebpageLoaderRuntimeBootstrap:
         mock_install.assert_not_called()
         assert WebpageLoader._playwright_ready is True
 
-    @patch("pycontextify.indexer_loaders._install_crawl4ai_browsers", return_value=True)
+    @patch("pycontextify.index_webpage._install_crawl4ai_browsers", return_value=True)
     def test_retry_after_runtime_error_success(self, mock_install: Mock):
         loader = WebpageLoader()
         WebpageLoader._playwright_ready = False
@@ -253,7 +247,7 @@ class TestWebpageLoaderRuntimeBootstrap:
         assert should_retry is True
         assert WebpageLoader._playwright_ready is True
 
-    @patch("pycontextify.indexer_loaders._install_crawl4ai_browsers", return_value=False)
+    @patch("pycontextify.index_webpage._install_crawl4ai_browsers", return_value=False)
     def test_retry_after_runtime_error_failure(self, mock_install: Mock):
         loader = WebpageLoader()
         WebpageLoader._playwright_ready = False
@@ -270,40 +264,46 @@ class TestLoaderFactorySimple:
 
     def test_get_code_loader(self):
         """Test creating CodeLoader."""
-        loader = LoaderFactory.get_loader(SourceType.CODE)
+        with pytest.warns(DeprecationWarning):
+            loader = LoaderFactory.get_loader(SourceType.CODE)
         assert isinstance(loader, CodeLoader)
 
     def test_get_document_loader(self):
         """Test creating DocumentLoader."""
-        with patch.object(DocumentLoader, "_initialize_pdf_loader"):
+        with pytest.warns(DeprecationWarning):
             loader = LoaderFactory.get_loader(SourceType.DOCUMENT)
-            assert isinstance(loader, DocumentLoader)
+        assert isinstance(loader, DocumentLoader)
 
     def test_get_webpage_loader(self):
         """Test creating WebpageLoader."""
-        loader = LoaderFactory.get_loader(SourceType.WEBPAGE)
+        with pytest.warns(DeprecationWarning):
+            loader = LoaderFactory.get_loader(SourceType.WEBPAGE)
         assert isinstance(loader, WebpageLoader)
 
     def test_unsupported_type(self):
         """Test error for unsupported type."""
-        with pytest.raises(ValueError, match="Unsupported source type"):
+        with pytest.warns(DeprecationWarning), pytest.raises(
+            ValueError, match="Unsupported source type"
+        ):
             LoaderFactory.get_loader("invalid_type")
 
     def test_loader_with_params(self):
         """Test creating loaders with parameters."""
         # CodeLoader with params
-        loader = LoaderFactory.get_loader(SourceType.CODE, max_file_size_mb=5)
+        with pytest.warns(DeprecationWarning):
+            loader = LoaderFactory.get_loader(SourceType.CODE, max_file_size_mb=5)
         assert isinstance(loader, CodeLoader)
         assert loader.max_file_size_bytes == 5 * 1024 * 1024
 
         # DocumentLoader with params
-        with patch.object(DocumentLoader, "_initialize_pdf_loader"):
+        with pytest.warns(DeprecationWarning):
             loader = LoaderFactory.get_loader(SourceType.DOCUMENT, pdf_engine="pypdf2")
-            assert isinstance(loader, DocumentLoader)
-            assert loader.pdf_engine == "pypdf2"
+        assert isinstance(loader, DocumentLoader)
+        assert loader.pdf_engine == "pypdf2"
 
         # WebpageLoader with params
-        loader = LoaderFactory.get_loader(SourceType.WEBPAGE, delay_seconds=3)
+        with pytest.warns(DeprecationWarning):
+            loader = LoaderFactory.get_loader(SourceType.WEBPAGE, delay_seconds=3)
         assert isinstance(loader, WebpageLoader)
         assert loader.delay_seconds == 3
 

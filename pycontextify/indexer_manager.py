@@ -24,7 +24,9 @@ import requests
 from .chunker import ChunkerFactory
 from .config import Config
 from .embedder import EmbedderFactory
-from .indexer_loaders import LoaderFactory
+from .index_codebase import CodebaseIndexer
+from .index_document import DocumentIndexer
+from .index_webpage import WebpageIndexer
 from .storage_metadata import MetadataStore, SourceType
 from .search_models import (
     SearchErrorCode,
@@ -70,6 +72,11 @@ class IndexManager:
 
         # Initialize hybrid search (lightweight)
         self._initialize_hybrid_search()
+
+        # Prepare source-specific indexers
+        self._code_indexer = CodebaseIndexer(self)
+        self._document_indexer = DocumentIndexer(self)
+        self._web_indexer = WebpageIndexer(self)
 
         # Auto-load existing index if enabled
         if self.config.auto_load:
@@ -792,102 +799,25 @@ class IndexManager:
             logger.error(f"Failed to auto-save index: {e}")
             # Don't raise - indexing should continue even if save fails
 
+    def auto_save(self) -> None:
+        """Public facade for conditional persistence used by indexers."""
+
+        self._auto_save()
+
+    def ensure_embedder_loaded(self) -> None:
+        """Ensure the embedder is ready before reporting statistics."""
+
+        self._ensure_embedder_loaded()
+
     def index_codebase(self, path: str) -> Dict[str, Any]:
-        """Index a codebase directory.
+        """Index a codebase directory using :class:`CodebaseIndexer`."""
 
-        Args:
-            path: Path to codebase directory
-
-        Returns:
-            Statistics about the indexing operation
-        """
-        logger.info(f"Starting codebase indexing: {path}")
-
-        try:
-            # Load content
-            loader = LoaderFactory.get_loader(
-                SourceType.CODE, max_file_size_mb=self.config.max_file_size_mb
-            )
-            files = loader.load(path)
-
-            if not files:
-                return {"error": "No files found to index"}
-
-            # Process files
-            chunks_added = 0
-            for file_path, content in files:
-                chunks_added += self._process_content(
-                    content, file_path, SourceType.CODE
-                )
-
-            # Auto-save after successful indexing
-            self._auto_save()
-
-            # Ensure embedder loaded before accessing provider/model info
-            self._ensure_embedder_loaded()
-            stats = {
-                "files_processed": len(files),
-                "chunks_added": chunks_added,
-                "source_type": "code",
-                "embedding_provider": self.embedder.get_provider_name(),
-                "embedding_model": self.embedder.get_model_name(),
-            }
-
-            logger.info(f"Completed codebase indexing: {stats}")
-            return stats
-
-        except Exception as e:
-            error_msg = f"Failed to index codebase {path}: {str(e)}"
-            logger.error(error_msg)
-            return {"error": error_msg}
+        return self._code_indexer.index(path)
 
     def index_document(self, path: str) -> Dict[str, Any]:
-        """Index a single document.
+        """Index a single document using :class:`DocumentIndexer`."""
 
-        Args:
-            path: Path to document file
-
-        Returns:
-            Statistics about the indexing operation
-        """
-        logger.info(f"Starting document indexing: {path}")
-
-        try:
-            # Load content with PDF engine configuration
-            loader = LoaderFactory.get_loader(
-                SourceType.DOCUMENT, pdf_engine=self.config.pdf_engine
-            )
-            files = loader.load(path)
-
-            if not files:
-                return {"error": "Could not load document"}
-
-            # Process document
-            file_path, content = files[0]
-            chunks_added = self._process_content(
-                content, file_path, SourceType.DOCUMENT
-            )
-
-            # Auto-save after successful indexing
-            self._auto_save()
-
-            # Ensure embedder loaded before accessing provider/model info
-            self._ensure_embedder_loaded()
-            stats = {
-                "file_processed": file_path,
-                "chunks_added": chunks_added,
-                "source_type": "document",
-                "embedding_provider": self.embedder.get_provider_name(),
-                "embedding_model": self.embedder.get_model_name(),
-            }
-
-            logger.info(f"Completed document indexing: {stats}")
-            return stats
-
-        except Exception as e:
-            error_msg = f"Failed to index document {path}: {str(e)}"
-            logger.error(error_msg)
-            return {"error": error_msg}
+        return self._document_indexer.index(path)
 
     def index_webpage(
         self,
@@ -895,64 +825,13 @@ class IndexManager:
         recursive: bool = False,
         max_depth: int = 1,
     ) -> Dict[str, Any]:
-        """Index web content.
+        """Index web content using :class:`WebpageIndexer`."""
 
-        Args:
-            url: URL to index
-            recursive: Whether to follow links
-            max_depth: Maximum crawl depth. 0 = unlimited, 1 = starting URL +
-                     direct children, 2 = includes grandchildren, etc.
-
-        Returns:
-            Statistics about the indexing operation
-        """
-        logger.info(
-            f"Starting webpage indexing: {url} "
-            f"(recursive={recursive}, max_depth={max_depth})"
+        return self._web_indexer.index(
+            url, recursive=recursive, max_depth=max_depth
         )
 
-        try:
-            # Load content
-            loader = LoaderFactory.get_loader(
-                SourceType.WEBPAGE,
-                delay_seconds=self.config.crawl_delay_seconds,
-            )
-            pages = loader.load(url, recursive=recursive, max_depth=max_depth)
-
-            if not pages:
-                return {"error": "Could not load any web pages"}
-
-            # Process pages
-            chunks_added = 0
-            for page_url, content in pages:
-                chunks_added += self._process_content(
-                    content, page_url, SourceType.WEBPAGE
-                )
-
-            # Auto-save after successful indexing
-            self._auto_save()
-
-            # Ensure embedder loaded before accessing provider/model info
-            self._ensure_embedder_loaded()
-            stats = {
-                "pages_processed": len(pages),
-                "chunks_added": chunks_added,
-                "source_type": "webpage",
-                "recursive": recursive,
-                "max_depth": max_depth,
-                "embedding_provider": self.embedder.get_provider_name(),
-                "embedding_model": self.embedder.get_model_name(),
-            }
-
-            logger.info(f"Completed webpage indexing: {stats}")
-            return stats
-
-        except Exception as e:
-            error_msg = f"Failed to index webpage {url}: {str(e)}"
-            logger.error(error_msg)
-            return {"error": error_msg}
-
-    def _process_content(
+    def process_content(
         self, content: str, source_path: str, source_type: SourceType
     ) -> int:
         """Process content into chunks and add to index.
@@ -1047,7 +926,7 @@ class IndexManager:
         """
         from pathlib import Path
 
-        from .indexer_pdf_loader import PDFLoader
+        from .index_document import PDFLoader
 
         # Get source_path safely, handling both real objects and mocks
         source_path = getattr(chunk, "source_path", "/unknown")
@@ -1569,7 +1448,7 @@ class IndexManager:
             Save operation result
         """
         try:
-            self._auto_save()
+            self.auto_save()
             return {"success": True}
         except Exception as e:
             error_msg = f"Failed to save index: {str(e)}"
