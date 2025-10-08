@@ -149,6 +149,31 @@ def handle_mcp_errors(operation_name: str, func_impl, *args):
         return {"error": error_msg}
 
 
+async def handle_mcp_errors_async(operation_name: str, func_impl, *args):
+    """Common error handling for async MCP functions.
+
+    Args:
+        operation_name: Name of the operation for error messages
+        func_impl: The actual async implementation function to call
+        *args: Arguments to pass to the function
+
+    Returns:
+        Result from function or structured error dict
+    """
+    try:
+        return await func_impl(*args)
+    except ValueError as e:
+        # Validation errors - return structured error
+        error_msg = str(e)
+        logger.warning(f"{operation_name} validation error: {error_msg}")
+        return {"error": error_msg}
+    except Exception as e:
+        # Unexpected errors - log and return structured error
+        error_msg = f"{operation_name} failed: {str(e)}"
+        logger.error(error_msg)
+        return {"error": error_msg}
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the MCP server."""
     parser = argparse.ArgumentParser(
@@ -447,7 +472,9 @@ def index_document(path: str) -> Dict[str, Any]:
     return handle_mcp_errors("Document indexing", _index_document_impl, path)
 
 
-def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, Any]:
+async def _index_webpage_impl(
+    url: str, recursive: bool, max_depth: int
+) -> Dict[str, Any]:
     """Implementation for index_webpage with validation and business logic."""
     # Validate parameters
     url = validate_string_param(url, "url")
@@ -466,7 +493,7 @@ def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, 
 
     # Initialize manager and index
     mgr = initialize_manager()
-    result = mgr.index_webpage(
+    result = await mgr.index_webpage(
         url,
         recursive=recursive,
         max_depth=max_depth,
@@ -477,7 +504,7 @@ def _index_webpage_impl(url: str, recursive: bool, max_depth: int) -> Dict[str, 
 
 
 @mcp.tool
-def index_webpage(
+async def index_webpage(
     url: str,
     recursive: bool = False,
     max_depth: int = 1,
@@ -497,7 +524,7 @@ def index_webpage(
     Returns:
         Dictionary with indexing statistics including pages processed and chunks added
     """
-    return handle_mcp_errors(
+    return await handle_mcp_errors_async(
         "Webpage indexing",
         _index_webpage_impl,
         url,
@@ -790,7 +817,7 @@ def status() -> Dict[str, Any]:
         }
 
 
-def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> None:
+async def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> None:
     """Perform initial document and codebase indexing if specified in CLI args.
 
     Args:
@@ -900,7 +927,7 @@ def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> Non
                         f"Adjusted max_crawl_depth to {max_depth} (valid range: 1-3)"
                     )
 
-                result = mgr.index_webpage(
+                result = await mgr.index_webpage(
                     webpage_url, recursive=recursive, max_depth=max_depth
                 )
                 if "error" not in result:
@@ -1056,9 +1083,23 @@ def main():
         mgr = initialize_manager(config_overrides)
 
         # Perform initial indexing if specified
-        if args.initial_documents or args.initial_codebase:
+        if args.initial_documents or args.initial_codebase or args.initial_webpages:
             logger.info("Performing initial indexing...")
-            perform_initial_indexing(args, mgr)
+            import asyncio
+
+            try:
+                asyncio.run(perform_initial_indexing(args, mgr))
+            except RuntimeError as e:
+                if "event loop is already running" in str(e).lower():
+                    # If there's already a running event loop, use it
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(perform_initial_indexing(args, mgr))
+                    finally:
+                        loop.close()
+                else:
+                    raise
             logger.info("Initial indexing completed, starting MCP server")
         else:
             logger.info("No initial indexing requested")

@@ -8,6 +8,8 @@ import logging
 import math
 import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -105,7 +107,18 @@ def _install_crawl4ai_browsers() -> bool:
         return False
 
     try:
+        # Set encoding environment for Windows
+        env = os.environ.copy()
+        if sys.platform == "win32":
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUTF8"] = "1"
+
         crawl4ai_install.install_playwright()
+    except UnicodeEncodeError as enc_exc:  # pragma: no cover - Windows specific
+        logger.warning(
+            "Automatic Crawl4AI Playwright install failed due to encoding: %s", enc_exc
+        )
+        return False
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Automatic Crawl4AI Playwright install failed: %s", exc)
         return False
@@ -169,6 +182,38 @@ class WebpageLoader:
         recursive: bool = False,
         max_depth: Optional[int] = None,
     ) -> List[Tuple[str, str]]:
+        """Load webpage content synchronously.
+
+        This is a synchronous wrapper around the async implementation
+        to maintain backwards compatibility with existing tests and usage.
+        """
+        try:
+            # Try to use existing event loop if available
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're already in an event loop context, create a new one
+                new_loop = asyncio.new_event_loop()
+                try:
+                    return new_loop.run_until_complete(
+                        self._load_async(url, recursive, max_depth)
+                    )
+                finally:
+                    new_loop.close()
+            else:
+                return loop.run_until_complete(
+                    self._load_async(url, recursive, max_depth)
+                )
+        except RuntimeError:
+            # No event loop exists, create a new one
+            return asyncio.run(self._load_async(url, recursive, max_depth))
+
+    async def _load_async(
+        self,
+        url: str,
+        recursive: bool = False,
+        max_depth: Optional[int] = None,
+    ) -> List[Tuple[str, str]]:
+        """Load webpage content asynchronously."""
         self.visited_urls.clear()
         effective_depth = self.max_depth if max_depth is None else max_depth
 
@@ -180,11 +225,11 @@ class WebpageLoader:
                     ),
                     stream=False,
                 )
-                results = self._execute_crawl(url, run_config)
+                results = await self._execute_crawl(url, run_config)
                 pages = self._results_to_pages(results, url)
             else:
                 run_config = self._build_run_config()
-                results = self._execute_crawl(url, run_config)
+                results = await self._execute_crawl(url, run_config)
                 pages = self._results_to_pages(results, url, stop_after_first=True)
         except Exception as exc:  # pragma: no cover - defensive guard
             message = str(exc)
@@ -211,54 +256,45 @@ class WebpageLoader:
             run_config.deep_crawl_strategy = deep_crawl_strategy
         return run_config
 
-    def _execute_crawl(
+    async def _execute_crawl(
         self, url: str, run_config: "CrawlerRunConfigType"
     ) -> List["CrawlResultType"]:
         self._ensure_runtime()
 
         try:
-            return self._run_crawl(url, run_config)
+            return await self._run_crawl(url, run_config)
         except Exception as exc:
             if self._retry_after_runtime_error(exc):
-                return self._run_crawl(url, run_config)
+                return await self._run_crawl(url, run_config)
             raise
 
-    def _run_crawl(
+    async def _run_crawl(
         self, url: str, run_config: "CrawlerRunConfigType"
     ) -> List["CrawlResultType"]:
         if _async_crawler_cls is None:
             raise RuntimeError("Crawl4AI runtime not initialized")
 
-        async def _crawl(
-            target_url: str, config: "CrawlerRunConfigType"
-        ) -> List["CrawlResultType"]:
-            async with _async_crawler_cls() as crawler:
-                response = crawler.arun(
-                    url=target_url, config=config, browser_config=self._browser_config
-                )
+        # Use proper async context manager directly without nested asyncio.run()
+        async with _async_crawler_cls(config=self._browser_config) as crawler:
+            try:
+                response = crawler.arun(url=url, config=run_config)
 
                 if inspect.isasyncgen(response):
-                    return [item async for item in response]
+                    results = []
+                    async for item in response:
+                        results.append(item)
+                    return results
 
                 try:
                     result = await asyncio.wait_for(response, timeout=300.0)
                 except asyncio.TimeoutError:
-                    logger.error("Crawl timed out after 300 seconds for %s", target_url)
+                    logger.error("Crawl timed out after 300 seconds for %s", url)
                     raise TimeoutError("Crawl operation timed out after 300 seconds")
 
                 return self._coerce_results(result)
-
-        try:
-            return asyncio.run(_crawl(url, run_config))
-        except RuntimeError as exc:
-            if "event loop is already running" not in str(exc).lower():
+            except Exception as exc:
+                logger.error("Error during crawl execution for %s: %s", url, exc)
                 raise
-
-            loop = asyncio.new_event_loop()
-            try:
-                return loop.run_until_complete(_crawl(url, run_config))
-            finally:
-                loop.close()
 
     def _coerce_results(self, result: Any) -> List["CrawlResultType"]:
         """Normalize Crawl4AI responses into a list."""
@@ -354,7 +390,8 @@ class WebpageLoader:
 
         converter = _html2text_fn
         if converter is None:
-            converter = lambda value: re.sub(r"<[^>]+>", " ", value)
+            def converter(value):
+                return re.sub(r"<[^>]+>", " ", value)
 
         try:
             converted = converter(html_content)
@@ -408,7 +445,7 @@ class WebpageIndexer:
         self._manager = manager
         self._loader = WebpageLoader(delay_seconds=manager.config.crawl_delay_seconds)
 
-    def index(
+    async def index(
         self,
         url: str,
         *,
@@ -422,7 +459,9 @@ class WebpageIndexer:
             max_depth,
         )
         try:
-            pages = self._loader.load(url, recursive=recursive, max_depth=max_depth)
+            pages = await self._loader._load_async(
+                url, recursive=recursive, max_depth=max_depth
+            )
             if not pages:
                 return {"error": "Could not load any web pages"}
 

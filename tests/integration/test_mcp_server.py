@@ -497,7 +497,7 @@ class TestMCPUtilityFunctions:
         assert overrides["embedding_model"] == "text-embedding-3-small"
 
     @patch("pycontextify.mcp.IndexManager")
-    def test_perform_initial_indexing(self, mock_manager_class):
+    async def test_perform_initial_indexing(self, mock_manager_class):
         """Test initial indexing functionality."""
         mock_manager = Mock()
         mock_manager.index_document.return_value = {"chunks_added": 3}
@@ -522,7 +522,7 @@ class TestMCPUtilityFunctions:
                 args.initial_codebase = [temp_dir]
                 (Path(temp_dir) / "test.py").write_text("print('hello')")
 
-                perform_initial_indexing(args, mock_manager)
+                await perform_initial_indexing(args, mock_manager)
 
                 # Should have called both indexing methods
                 assert mock_manager.index_document.called

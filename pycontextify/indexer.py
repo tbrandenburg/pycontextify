@@ -820,7 +820,7 @@ class IndexManager:
 
         return self._document_indexer.index(path)
 
-    def index_webpage(
+    async def index_webpage(
         self,
         url: str,
         recursive: bool = False,
@@ -828,7 +828,9 @@ class IndexManager:
     ) -> Dict[str, Any]:
         """Index web content using :class:`WebpageIndexer`."""
 
-        return self._web_indexer.index(url, recursive=recursive, max_depth=max_depth)
+        return await self._web_indexer.index(
+            url, recursive=recursive, max_depth=max_depth
+        )
 
     def process_content(
         self, content: str, source_path: str, source_type: SourceType
