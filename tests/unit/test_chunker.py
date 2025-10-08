@@ -8,8 +8,7 @@ import pytest
 
 from pycontextify.chunker import BaseChunker, SimpleChunker
 from pycontextify.config import Config
-from pycontextify.storage_metadata import ChunkMetadata
-from pycontextify.types import SourceType
+from pycontextify.types import Chunk, SourceType
 
 
 class TestBaseChunker:
@@ -31,7 +30,7 @@ class TestBaseChunker:
                 self, text, source_path, embedding_provider, embedding_model
             ):
                 return [
-                    self._create_chunk_metadata(
+                    self._create_chunk(
                         chunk_text=text,
                         source_path=source_path,
                         source_type=SourceType.DOCUMENT,
@@ -51,7 +50,7 @@ class TestBaseChunker:
             )
 
             assert len(results) == 1
-            assert isinstance(results[0], ChunkMetadata)
+            assert isinstance(results[0], Chunk)
             assert results[0].chunk_text == "Test text"
 
 
@@ -108,9 +107,9 @@ class TestSimpleChunker:
 
             assert len(chunks) > 1
 
-            # Verify chunks are ChunkMetadata objects
+            # Verify chunks are Chunk objects
             for chunk in chunks:
-                assert isinstance(chunk, ChunkMetadata)
+                assert isinstance(chunk, Chunk)
                 assert chunk.source_type == SourceType.DOCUMENT
                 assert chunk.embedding_provider == "openai"
                 assert chunk.embedding_model == "text-embedding-3-small"

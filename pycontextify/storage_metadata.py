@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from .types import SourceType
+from .types import Chunk, SourceType
 
 
 @dataclass
@@ -94,6 +94,32 @@ class ChunkMetadata:
             "code_symbols": self.code_symbols,
             "metadata": self.metadata,
         }
+
+    @classmethod
+    def from_chunk(cls, chunk: Chunk) -> "ChunkMetadata":
+        """Create ChunkMetadata from a Chunk DTO.
+
+        Args:
+            chunk: Chunk object from the chunking pipeline
+
+        Returns:
+            ChunkMetadata with storage-specific fields (chunk_id, created_at)
+        """
+        return cls(
+            source_path=chunk.source_path,
+            source_type=chunk.source_type,
+            chunk_text=chunk.chunk_text,
+            start_char=chunk.start_char,
+            end_char=chunk.end_char,
+            file_extension=chunk.file_extension,
+            embedding_provider=chunk.embedding_provider,
+            embedding_model=chunk.embedding_model,
+            tags=chunk.tags.copy(),
+            references=chunk.references.copy(),
+            parent_section=chunk.parent_section,
+            code_symbols=chunk.code_symbols.copy(),
+            metadata=chunk.metadata.copy(),
+        )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ChunkMetadata":

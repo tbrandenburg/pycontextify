@@ -899,9 +899,12 @@ class IndexManager:
             self._initialize_vector_store()
         faiss_ids = self.vector_store.add_vectors(embeddings)
 
-        # Add metadata
+        # Add metadata (convert Chunk DTO to ChunkMetadata for storage)
+        from .storage_metadata import ChunkMetadata
+
         for chunk, faiss_id in zip(chunks, faiss_ids):
-            self.metadata_store.add_chunk(chunk)
+            chunk_metadata = ChunkMetadata.from_chunk(chunk)
+            self.metadata_store.add_chunk(chunk_metadata)
 
         return len(chunks)
 

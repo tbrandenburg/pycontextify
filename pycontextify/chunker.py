@@ -11,8 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .config import Config
-from .storage_metadata import ChunkMetadata
-from .types import SourceType
+from .types import Chunk, SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class BaseChunker(ABC):
     @abstractmethod
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
-    ) -> List[ChunkMetadata]:
+    ) -> List[Chunk]:
         """Chunk text into semantic units with relationship extraction.
 
         Args:
@@ -49,11 +48,11 @@ class BaseChunker(ABC):
             embedding_model: Embedding model name
 
         Returns:
-            List of ChunkMetadata objects with extracted relationships
+            List of Chunk objects with extracted relationships
         """
         pass
 
-    def _create_chunk_metadata(
+    def _create_chunk(
         self,
         chunk_text: str,
         source_path: str,
@@ -63,8 +62,8 @@ class BaseChunker(ABC):
         embedding_provider: str,
         embedding_model: str,
         **kwargs,
-    ) -> ChunkMetadata:
-        """Create chunk metadata with embedding provider information.
+    ) -> Chunk:
+        """Create chunk with embedding provider information.
 
         Args:
             chunk_text: The chunk text content
@@ -77,12 +76,12 @@ class BaseChunker(ABC):
             **kwargs: Additional metadata fields
 
         Returns:
-            ChunkMetadata object with relationship information
+            Chunk object with relationship information
         """
-        metadata = ChunkMetadata(
+        chunk = Chunk(
+            chunk_text=chunk_text,
             source_path=source_path,
             source_type=source_type,
-            chunk_text=chunk_text,
             start_char=start_char,
             end_char=end_char,
             embedding_provider=embedding_provider,
@@ -93,18 +92,18 @@ class BaseChunker(ABC):
 
         # Extract relationships if enabled
         if self.enable_relationships:
-            self._extract_relationships(metadata)
+            self._extract_relationships(chunk)
 
-        return metadata
+        return chunk
 
-    def _extract_relationships(self, chunk: ChunkMetadata) -> None:
+    def _extract_relationships(self, chunk: Chunk) -> None:
         """Extract relationship hints from chunk text.
 
         This base implementation extracts basic patterns. Subclasses
         should override for content-specific extraction.
 
         Args:
-            chunk: ChunkMetadata object to populate with relationships
+            chunk: Chunk object to populate with relationships
         """
         # Extract basic references (words that might be important entities)
         # Look for capitalized words that might be proper nouns
@@ -171,7 +170,7 @@ class SimpleChunker(BaseChunker):
 
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
-    ) -> List[ChunkMetadata]:
+    ) -> List[Chunk]:
         """Chunk text using simple token-based approach.
 
         Args:
@@ -192,7 +191,7 @@ class SimpleChunker(BaseChunker):
         # Create metadata objects
         chunks = []
         for chunk_text, start_char, end_char in chunk_tuples:
-            chunk = self._create_chunk_metadata(
+            chunk = self._create_chunk(
                 chunk_text=chunk_text,
                 source_path=source_path,
                 source_type=SourceType.DOCUMENT,
@@ -211,7 +210,7 @@ class CodeChunker(SimpleChunker):
 
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
-    ) -> List[ChunkMetadata]:
+    ) -> List[Chunk]:
         """Chunk code text with awareness of code structure.
 
         Args:
@@ -251,7 +250,7 @@ class CodeChunker(SimpleChunker):
         # Create metadata objects
         chunks = []
         for chunk_text, start_char, end_char in final_chunks:
-            chunk = self._create_chunk_metadata(
+            chunk = self._create_chunk(
                 chunk_text=chunk_text,
                 source_path=source_path,
                 source_type=SourceType.CODE,
@@ -315,11 +314,11 @@ class CodeChunker(SimpleChunker):
 
         return chunks
 
-    def _extract_relationships(self, chunk: ChunkMetadata) -> None:
+    def _extract_relationships(self, chunk: Chunk) -> None:
         """Extract code-specific relationships.
 
         Args:
-            chunk: ChunkMetadata object to populate with relationships
+            chunk: Chunk object to populate with relationships
         """
         text = chunk.chunk_text
 
@@ -364,7 +363,7 @@ class DocumentChunker(SimpleChunker):
 
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
-    ) -> List[ChunkMetadata]:
+    ) -> List[Chunk]:
         """Chunk document text with awareness of document structure.
 
         Args:
@@ -404,7 +403,7 @@ class DocumentChunker(SimpleChunker):
         # Create metadata objects
         chunks = []
         for chunk_text, start_char, end_char, section in final_chunks:
-            chunk = self._create_chunk_metadata(
+            chunk = self._create_chunk(
                 chunk_text=chunk_text,
                 source_path=source_path,
                 source_type=SourceType.DOCUMENT,
@@ -475,11 +474,11 @@ class DocumentChunker(SimpleChunker):
 
         return chunks
 
-    def _extract_relationships(self, chunk: ChunkMetadata) -> None:
+    def _extract_relationships(self, chunk: Chunk) -> None:
         """Extract document-specific relationships.
 
         Args:
-            chunk: ChunkMetadata object to populate with relationships
+            chunk: Chunk object to populate with relationships
         """
         text = chunk.chunk_text
 
@@ -531,7 +530,7 @@ class WebPageChunker(DocumentChunker):
 
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
-    ) -> List[ChunkMetadata]:
+    ) -> List[Chunk]:
         """Chunk web page content with HTML structure awareness.
 
         Args:
@@ -573,7 +572,7 @@ class WebPageChunker(DocumentChunker):
         # Create metadata objects
         chunks = []
         for chunk_text, start_char, end_char, section, web_metadata in final_chunks:
-            chunk = self._create_chunk_metadata(
+            chunk = self._create_chunk(
                 chunk_text=chunk_text,
                 source_path=source_path,
                 source_type=SourceType.WEBPAGE,
@@ -644,11 +643,11 @@ class WebPageChunker(DocumentChunker):
 
         return metadata
 
-    def _extract_relationships(self, chunk: ChunkMetadata) -> None:
+    def _extract_relationships(self, chunk: Chunk) -> None:
         """Extract web-specific relationships.
 
         Args:
-            chunk: ChunkMetadata object to populate with relationships
+            chunk: Chunk object to populate with relationships
         """
         # Call parent document extraction first
         super()._extract_relationships(chunk)
