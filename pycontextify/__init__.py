@@ -3,7 +3,7 @@
 from importlib import metadata as _metadata
 
 from .config import Config
-from .indexer_manager import IndexManager
+from .indexer import IndexManager
 from . import mcp as mcp
 
 try:  # pragma: no cover - exercised when installed as a package

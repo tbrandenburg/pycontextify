@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from fastmcp import FastMCP
 
 from .config import Config
-from .indexer_manager import IndexManager
+from .indexer import IndexManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
