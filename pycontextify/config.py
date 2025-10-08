@@ -122,9 +122,6 @@ class Config:
             "PYCONTEXTIFY_MAX_FILE_SIZE_MB", 10
         )
         self.batch_size = self._get_int_config("PYCONTEXTIFY_BATCH_SIZE", 32)
-        self.crawl_delay_seconds = self._get_int_config(
-            "PYCONTEXTIFY_CRAWL_DELAY_SECONDS", 1, override_key="crawl_delay_seconds"
-        )
 
         # Validate configuration
         self._validate_config()
@@ -259,10 +256,6 @@ class Config:
             raise ValueError("Max file size must be positive")
         if self.batch_size <= 0:
             raise ValueError("Batch size must be positive")
-        if self.crawl_delay_seconds < 1:
-            raise ValueError(
-                "Crawl delay must be at least 1 second for respectful crawling"
-            )
 
         self._validate_bootstrap_config()
 

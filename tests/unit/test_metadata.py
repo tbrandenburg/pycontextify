@@ -298,11 +298,8 @@ class TestMetadataStore:
 
         code_chunk = ChunkMetadata(source_type=SourceType.CODE, chunk_text="code")
         doc_chunk = ChunkMetadata(source_type=SourceType.DOCUMENT, chunk_text="doc")
-        web_chunk = ChunkMetadata(source_type=SourceType.WEBPAGE, chunk_text="web")
-
         store.add_chunk(code_chunk)
         store.add_chunk(doc_chunk)
-        store.add_chunk(web_chunk)
 
         code_chunks = store.get_chunks_by_source_type(SourceType.CODE)
         doc_chunks = store.get_chunks_by_source_type(SourceType.DOCUMENT)

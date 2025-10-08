@@ -3,7 +3,7 @@
 This test verifies the complete user workflow:
 1. Getting initial status
 2. Indexing a document
-3. Indexing a webpage (simulated with markdown)
+3. Indexing a supplemental guide (markdown)
 4. Indexing a codebase
 5. Getting status after indexing
 6. Performing searches
@@ -61,9 +61,9 @@ Delete a user account.
                 encoding="utf-8",
             )
 
-            # Create sample "webpage" content (markdown simulating HTML content)
-            webpage_path = temp_path / "webpage_content.md"
-            webpage_path.write_text(
+            # Create supplemental guide content (markdown simulating an external reference)
+            guide_path = temp_path / "reference_guide.md"
+            guide_path.write_text(
                 """# Python Best Practices Guide
 
 ## Introduction
@@ -233,7 +233,7 @@ module.exports = ApiClient;
             yield {
                 "temp_path": temp_path,
                 "doc_path": doc_path,
-                "webpage_path": webpage_path,
+                "guide_path": guide_path,
                 "code_dir": code_dir,
                 "config": config,
             }
@@ -289,20 +289,20 @@ module.exports = ApiClient;
             print(f"   - Source type: {doc_result['source_type']}")
 
             # ================================================================
-            # STEP 3: Index webpage content (simulated with markdown)
+            # STEP 3: Index supplemental guide content (simulated with markdown)
             # ================================================================
-            print("\n🌐 STEP 3: Indexing webpage content...")
-            
-            webpage_result = manager.index_document(str(env["webpage_path"]))
-            
-            # Verify webpage indexing
-            assert "error" not in webpage_result, f"Webpage indexing failed: {webpage_result}"
-            assert webpage_result["chunks_added"] > 0, "Should have added chunks from webpage"
-            
-            print(f"✅ Webpage content indexed successfully:")
-            print(f"   - File: {env['webpage_path'].name}")
-            print(f"   - Chunks added: {webpage_result['chunks_added']}")
-            print(f"   - Source type: {webpage_result['source_type']}")
+            print("\n📘 STEP 3: Indexing supplemental guide content...")
+
+            guide_result = manager.index_document(str(env["guide_path"]))
+
+            # Verify guide indexing
+            assert "error" not in guide_result, f"Guide indexing failed: {guide_result}"
+            assert guide_result["chunks_added"] > 0, "Should have added chunks from the guide"
+
+            print(f"✅ Guide content indexed successfully:")
+            print(f"   - File: {env['guide_path'].name}")
+            print(f"   - Chunks added: {guide_result['chunks_added']}")
+            print(f"   - Source type: {guide_result['source_type']}")
 
             # ================================================================
             # STEP 4: Index codebase
@@ -333,7 +333,7 @@ module.exports = ApiClient;
             # Calculate expected totals
             total_chunks_expected = (
                 doc_result["chunks_added"] +
-                webpage_result["chunks_added"] +
+                guide_result["chunks_added"] +
                 code_result["chunks_added"]
             )
             
@@ -361,7 +361,7 @@ module.exports = ApiClient;
             test_queries = [
                 ("API documentation", "Should find document content"),
                 ("authentication Bearer token", "Should find auth section"),
-                ("Python best practices", "Should find webpage content"),
+                ("Python best practices", "Should find supplemental guide content"),
                 ("list comprehension", "Should find Python patterns"),
                 ("process_data function", "Should find code content"),
                 ("DataProcessor class", "Should find Python class"),

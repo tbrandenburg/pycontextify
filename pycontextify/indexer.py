@@ -26,7 +26,6 @@ from .config import Config
 from .embedder_factory import EmbedderFactory
 from .index_codebase import CodebaseIndexer
 from .index_document import DocumentIndexer
-from .index_webpage import WebpageIndexer
 from .search_models import (
     SearchErrorCode,
     SearchPerformanceLogger,
@@ -77,7 +76,6 @@ class IndexManager:
         # Prepare source-specific indexers
         self._code_indexer = CodebaseIndexer(self)
         self._document_indexer = DocumentIndexer(self)
-        self._web_indexer = WebpageIndexer(self)
 
         # Auto-load existing index if enabled
         if self.config.auto_load:
@@ -820,18 +818,6 @@ class IndexManager:
 
         return self._document_indexer.index(path)
 
-    async def index_webpage(
-        self,
-        url: str,
-        recursive: bool = False,
-        max_depth: int = 1,
-    ) -> Dict[str, Any]:
-        """Index web content using :class:`WebpageIndexer`."""
-
-        return await self._web_indexer.index(
-            url, recursive=recursive, max_depth=max_depth
-        )
-
     def process_content(
         self, content: str, source_path: str, source_type: SourceType
     ) -> int:
@@ -969,12 +955,10 @@ class IndexManager:
                     source_info["filename"] = file_path.name
                     source_info["file_extension"] = file_path.suffix.lower()
             except (OSError, ValueError, TypeError) as e:
-                # Handle URLs or invalid paths gracefully
+                # Handle invalid paths gracefully
                 logger.debug(f"Could not extract file metadata: {e}")
                 try:
                     source_info["filename"] = Path(source_path).name
-                    if source_path.startswith(("http://", "https://")):
-                        source_info["source_type"] = "webpage"
                 except Exception:
                     source_info["filename"] = "unknown"
 
@@ -1068,11 +1052,11 @@ class IndexManager:
             if self.vector_store is None or self.vector_store.is_empty():
                 return SearchResponse.create_error(
                     query=query,
-                    error="No indexed content available. Please index some documents, code, or webpages first.",
+                    error="No indexed content available. Please index some documents or code first.",
                     error_code=SearchErrorCode.NO_CONTENT.value,
                     search_config=self._get_search_config(),
                     recovery_suggestions=[
-                        "Use index_document(), index_codebase(), or index_webpage() to add content",
+                        "Use index_document() or index_codebase() to add content",
                         "Check if auto_load is enabled and index files exist",
                         "Verify the vector store was initialized properly",
                     ],

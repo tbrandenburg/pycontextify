@@ -11,7 +11,6 @@ uv run pytest tests/
 
 ### Run Fast Tests (Recommended for Development)
 ```bash
-# Excludes slow web crawling tests (~21s vs ~98s)
 uv run pytest tests/ -m "not slow"
 ```
 
@@ -41,7 +40,7 @@ Tests are organized with pytest markers for selective execution:
 @pytest.mark.unit          # Fast unit tests
 @pytest.mark.integration   # Integration tests  
 @pytest.mark.system        # System-level tests
-@pytest.mark.slow          # Slow tests (web crawling, etc.)
+@pytest.mark.slow          # Slow tests (long-running scenarios)
 @pytest.mark.embedding     # Tests requiring embedding models
 ```
 
@@ -83,8 +82,6 @@ The following tests are marked `@pytest.mark.slow` and can be skipped:
 
 | Test | Duration | Type | Skip Impact |
 |------|----------|------|-------------|
-| `test_recursive_crawl_simple_site` | 75.68s | Integration | None - web crawling only |
-| `test_single_page_non_recursive` | 3.16s | Integration | None - web crawling only |
 | Embedding generation tests | Variable | Integration | Minimal |
 
 ### Development Workflow
@@ -201,12 +198,11 @@ Tests the complete workflow through IndexManager:
 
 1. ✅ Get initial status (empty index)
 2. ✅ Index document (API documentation)
-3. ✅ Index webpage content (Python guide)
-4. ✅ Index codebase (Python + JavaScript)
-5. ✅ Get status after indexing
-6. ✅ Perform searches (7 diverse queries)
-7. ✅ Reset index
-8. ✅ Verify clean state
+3. ✅ Index codebase (Python + JavaScript)
+4. ✅ Get status after indexing
+5. ✅ Perform searches (7 diverse queries)
+6. ✅ Reset index
+7. ✅ Verify clean state
 
 **Result**: 16 chunks indexed, 100% search success rate
 
@@ -247,7 +243,6 @@ uv run pytest tests/system/test_mcp_system.py::TestMCPServerSystem::test_complet
 
 #### Good Coverage Modules (70-89%)
 - ✅ `config.py` - 79%
-- ✅ `index_webpage.py` - 74%
 - ✅ `index_codebase.py` - 74%
 - ✅ `embedder_factory.py` - 71%
 

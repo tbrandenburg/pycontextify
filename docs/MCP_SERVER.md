@@ -18,22 +18,20 @@ uv run pycontextify --index-path ./my_index
 ```bash
 uv run pycontextify \
   --initial-documents ./README.md \
-  --initial-codebase ./src \
-  --initial-webpages https://docs.example.com
+  --initial-codebase ./src
 ```
 
 ---
 
 ## MCP Tools
 
-The server exposes 6 tools for semantic search and indexing:
+The server exposes 5 tools for semantic search and indexing:
 
 | Tool | Purpose | Parameters |
 |------|---------|------------|
 | `status` | Get index statistics | None |
 | `index_document` | Index a document file | `file_path` (required) |
 | `index_code` | Index a codebase directory | `directory_path` (required) |
-| `index_webpage` | Index a webpage/website | `url` (required), `recursive`, `max_depth` |
 | `search` | Semantic search | `query` (required), `top_k`, `output_format` |
 | `reset_index` | Clear the index | `remove_files`, `confirm` (required) |
 
@@ -106,15 +104,6 @@ The server exposes 6 tools for semantic search and indexing:
 |--------|-------------|
 | `--initial-documents [FILES...]` | Documents to index at startup |
 | `--initial-codebase [DIRS...]` | Codebases to index at startup |
-| `--initial-webpages [URLS...]` | Webpages to index at startup |
-
-### Web Crawling
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--recursive-crawling` | Enable recursive crawling | Disabled |
-| `--max-crawl-depth N` | Maximum crawl depth (1-3) | 1 |
-| `--crawl-delay N` | Delay between requests (seconds) | 1.0 |
-
 ### Embedding Configuration
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -141,7 +130,6 @@ All CLI options can be set via environment variables:
 | `PYCONTEXTIFY_AUTO_LOAD` | `--no-auto-load` (inverted) |
 | `PYCONTEXTIFY_EMBEDDING_PROVIDER` | `--embedding-provider` |
 | `PYCONTEXTIFY_EMBEDDING_MODEL` | `--embedding-model` |
-| `PYCONTEXTIFY_CRAWL_DELAY_SECONDS` | `--crawl-delay` |
 
 **Priority**: CLI arguments > Environment variables > Defaults
 
@@ -233,24 +221,12 @@ uv run pycontextify \
   --initial-documents ./README.md ./docs/api.md
 ```
 
-### Example 3: Crawl Documentation Website
-```bash
-uv run pycontextify \
-  --index-path ./web_docs \
-  --initial-webpages https://docs.python.org/3/ \
-  --recursive-crawling \
-  --max-crawl-depth 2 \
-  --crawl-delay 2
-```
-
-### Example 4: Multi-Source Index
+### Example 3: Multi-Source Index
 ```bash
 uv run pycontextify \
   --index-path ./knowledge_base \
   --initial-documents ./specs/*.pdf \
-  --initial-codebase ./backend ./frontend \
-  --initial-webpages https://api-docs.example.com \
-  --recursive-crawling
+  --initial-codebase ./backend ./frontend
 ```
 
 ---
@@ -274,7 +250,6 @@ uv run python -c "from pycontextify import mcp; print(list(mcp.mcp._tool_manager
 - `status`
 - `index_document`
 - `index_code`
-- `index_webpage`
 - `search`
 - `reset_index`
 
@@ -316,8 +291,8 @@ print(f'Tool count: {len(tools)}')
 
 Expected output:
 ```
-Available tools: ['status', 'index_document', 'index_code', 'index_webpage', 'search', 'reset_index']
-Tool count: 6
+Available tools: ['status', 'index_document', 'index_code', 'search', 'reset_index']
+Tool count: 5
 ```
 
 ### Performance Issues
@@ -327,9 +302,6 @@ uv run pycontextify --embedding-model all-MiniLM-L6-v2
 
 # Disable auto-persist for testing
 uv run pycontextify --no-auto-persist --no-auto-load
-
-# Reduce crawl load
-uv run pycontextify --crawl-delay 3
 ```
 
 ---
@@ -379,9 +351,8 @@ mcp.reset_manager()
 ### Production Deployment
 1. Use dedicated index directory
 2. Enable auto-persist for state preservation
-3. Set reasonable crawl delays (2-3 seconds)
-4. Use environment variables for configuration
-5. Monitor memory usage with large indexes
+3. Use environment variables for configuration
+4. Monitor memory usage with large indexes
 
 ### Development Setup
 1. Use separate index per project
@@ -391,51 +362,48 @@ mcp.reset_manager()
 
 ### Security
 1. Validate file paths before indexing
-2. Sanitize URLs before crawling
-3. Use confirm flag for destructive operations
-4. Limit crawl depth to prevent abuse
-5. Monitor disk usage for index growth
+2. Use confirm flag for destructive operations
+3. Monitor disk usage for index growth
 
 ---
 
-## Architecture
+  ## Architecture
 
-### Components
-- **FastMCP**: MCP protocol implementation
-- **IndexManager**: Core indexing and search logic
-- **ChunkProcessor**: Text chunking and analysis
-- **EmbeddingGenerator**: Vector embeddings
-- **VectorStore**: FAISS-based similarity search
-- **MetadataStore**: Chunk metadata and relationships
+  ### Components
+  - **FastMCP**: MCP protocol implementation
+  - **IndexManager**: Core indexing and search logic
+  - **ChunkProcessor**: Text chunking and analysis
+  - **EmbeddingGenerator**: Vector embeddings
+  - **VectorStore**: FAISS-based similarity search
+  - **MetadataStore**: Chunk metadata and relationships
 
-### Data Flow
-```
-Input (Document/Code/Webpage)
-    ↓
-Chunking & Analysis
-    ↓
-Embedding Generation
-    ↓
-Vector Storage (FAISS)
-    ↓
-Metadata Storage
-    ↓
-Search & Retrieval
-```
+  ### Data Flow
+  ```
+  Input (Document/Code)
+      ↓
+  Chunking & Analysis
+      ↓
+  Embedding Generation
+      ↓
+  Vector Storage (FAISS)
+      ↓
+  Metadata Storage
+      ↓
+  Search & Retrieval
+  ```
 
----
+  ---
 
-## Summary
+  ## Summary
 
-- ✅ **6 MCP tools** for indexing and search
-- ✅ **Multiple content types** supported (documents, code, webpages)
-- ✅ **Flexible configuration** via CLI and environment variables
-- ✅ **Claude Desktop integration** ready
-- ✅ **Comprehensive testing** included
-- ✅ **Production-ready** with proper error handling
+  - ✅ **5 MCP tools** for indexing and search
+  - ✅ **Multiple content types** supported (documents and code)
+  - ✅ **Flexible configuration** via CLI and environment variables
+  - ✅ **Claude Desktop integration** ready
+  - ✅ **Comprehensive testing** included
+  - ✅ **Production-ready** with proper error handling
 
-For more information:
-- Documentation Index: See `docs/INDEX.md`
-- Testing: See `docs/TESTING.md`
-- Web Crawling: See `docs/WEB_CRAWLING.md`
-- Index Bootstrap: See `docs/BOOTSTRAP.md`
+  For more information:
+  - Documentation Index: See `docs/INDEX.md`
+  - Testing: See `docs/TESTING.md`
+  - Index Bootstrap: See `docs/BOOTSTRAP.md`

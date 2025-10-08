@@ -380,9 +380,9 @@ class TestMCPServerSystem:
         # Get tools
         tools = list(mcp.mcp._tool_manager._tools.keys())
         
-        assert len(tools) == 6, f"Expected 6 tools, got {len(tools)}"
-        
-        expected = ["status", "index_document", "index_code", "index_webpage", "search", "reset_index"]
+        assert len(tools) == 5, f"Expected 5 tools, got {len(tools)}"
+
+        expected = ["status", "index_document", "index_code", "search", "reset_index"]
         for tool in expected:
             assert tool in tools, f"Tool '{tool}' not found"
         

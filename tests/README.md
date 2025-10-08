@@ -17,18 +17,16 @@ tests/
 
 ### 📦 Unit tests (`tests/unit`)
 - `test_chunker.py`, `test_cli_args.py`, `test_config.py`,
-  `test_embeddings.py`, `test_loaders.py`, `test_metadata.py`,
+  `test_embeddings.py`, `test_metadata.py`,
   `test_models.py`, `test_pdf_loader.py`, `test_persistence.py`,
   `test_vector_store.py`, and related helpers cover the focused
   components that make up the indexing runtime.
 
 ### 🔧 Integration tests (`tests/integration`)
 - `test_bootstrap_integration.py`, `test_hybrid_search.py`,
-  `test_integration.py`, `test_loaders.py`, `test_mcp_server.py`,
-  `test_persistence.py`, and
-  `test_recursive_crawling.py` exercise end-to-end behaviour such as
-  bootstrap archives, metadata-backed search, MCP workflows, and
-  real-world crawling scenarios.
+  `test_integration.py`, `test_mcp_server.py`,
+  `test_persistence.py` exercise end-to-end behaviour such as
+  bootstrap archives, metadata-backed search, and MCP workflows.
 
 ## Running the suite
 

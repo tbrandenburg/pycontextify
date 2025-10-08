@@ -54,7 +54,7 @@ class SearchResult:
     # Core fields (always present)
     chunk_id: str
     source_path: str
-    source_type: str  # "codebase", "document", "webpage"
+    source_type: str  # "codebase", "document"
     text: str  # Unified field name (was chunk_text)
     relevance_score: float  # Primary unified score
 
@@ -433,7 +433,6 @@ class SearchResponse:
         icons = {
             "document": "📄",
             "codebase": "💻",
-            "webpage": "🌐",
             "pdf": "📄",
             "markdown": "📝",
             "text": "📄",
