@@ -4,9 +4,20 @@ This module now serves as the single entry point for index related
 configuration and orchestration utilities.
 """
 
-from .indexer_loaders import LoaderFactory
+from .index_codebase import CodeLoader, CodebaseIndexer
+from .index_document import DocumentIndexer, DocumentLoader, PDFLoader
+from .index_webpage import WebpageIndexer, WebpageLoader
 from .indexer_manager import IndexManager
-from .indexer_pdf_loader import PDFLoader
 from .config import Config
 
-__all__ = ["IndexManager", "LoaderFactory", "PDFLoader", "Config"]
+__all__ = [
+    "Config",
+    "IndexManager",
+    "CodeLoader",
+    "CodebaseIndexer",
+    "DocumentLoader",
+    "DocumentIndexer",
+    "PDFLoader",
+    "WebpageLoader",
+    "WebpageIndexer",
+]
