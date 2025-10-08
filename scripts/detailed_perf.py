@@ -43,7 +43,7 @@ def main():
 
         # Initialize embedder
         print("\n3. Embedder initialization...")
-        from pycontextify.embedder import EmbedderFactory
+        from pycontextify.embedder_factory import EmbedderFactory
 
         def create_embedder():
             embedding_config = config.get_embedding_config()

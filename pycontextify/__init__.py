@@ -6,9 +6,6 @@ from .config import Config
 from .indexer_manager import IndexManager
 from . import mcp as mcp
 
-# Backwards compatibility alias
-mcp_server = mcp
-
 try:  # pragma: no cover - exercised when installed as a package
     __version__ = _metadata.version("pycontextify")
 except _metadata.PackageNotFoundError:  # pragma: no cover - local editable installs
@@ -22,7 +19,6 @@ __all__ = [
     "IndexManager",
     "Config",
     "mcp",
-    "mcp_server",
     "__version__",
     "__author__",
     "__email__",

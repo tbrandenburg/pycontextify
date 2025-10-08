@@ -38,8 +38,6 @@ def _mk_crawl_result(url: str, text: str, *, links=None) -> CrawlResult:
 from pycontextify.index_codebase import CodeLoader
 from pycontextify.index_document import DocumentLoader
 from pycontextify.index_webpage import WebpageLoader
-from pycontextify.indexer_loaders import LoaderFactory
-from pycontextify.storage_metadata import SourceType
 
 # Disable the automatic sentence transformer mocking for this file
 pytestmark = pytest.mark.no_mock_st
@@ -258,53 +256,5 @@ class TestWebpageLoaderRuntimeBootstrap:
         assert should_retry is False
         assert WebpageLoader._playwright_ready is False
 
-
-class TestLoaderFactorySimple:
-    """Simple tests for LoaderFactory."""
-
-    def test_get_code_loader(self):
-        """Test creating CodeLoader."""
-        with pytest.warns(DeprecationWarning):
-            loader = LoaderFactory.get_loader(SourceType.CODE)
-        assert isinstance(loader, CodeLoader)
-
-    def test_get_document_loader(self):
-        """Test creating DocumentLoader."""
-        with pytest.warns(DeprecationWarning):
-            loader = LoaderFactory.get_loader(SourceType.DOCUMENT)
-        assert isinstance(loader, DocumentLoader)
-
-    def test_get_webpage_loader(self):
-        """Test creating WebpageLoader."""
-        with pytest.warns(DeprecationWarning):
-            loader = LoaderFactory.get_loader(SourceType.WEBPAGE)
-        assert isinstance(loader, WebpageLoader)
-
-    def test_unsupported_type(self):
-        """Test error for unsupported type."""
-        with pytest.warns(DeprecationWarning), pytest.raises(
-            ValueError, match="Unsupported source type"
-        ):
-            LoaderFactory.get_loader("invalid_type")
-
-    def test_loader_with_params(self):
-        """Test creating loaders with parameters."""
-        # CodeLoader with params
-        with pytest.warns(DeprecationWarning):
-            loader = LoaderFactory.get_loader(SourceType.CODE, max_file_size_mb=5)
-        assert isinstance(loader, CodeLoader)
-        assert loader.max_file_size_bytes == 5 * 1024 * 1024
-
-        # DocumentLoader with params
-        with pytest.warns(DeprecationWarning):
-            loader = LoaderFactory.get_loader(SourceType.DOCUMENT, pdf_engine="pypdf2")
-        assert isinstance(loader, DocumentLoader)
-        assert loader.pdf_engine == "pypdf2"
-
-        # WebpageLoader with params
-        with pytest.warns(DeprecationWarning):
-            loader = LoaderFactory.get_loader(SourceType.WEBPAGE, delay_seconds=3)
-        assert isinstance(loader, WebpageLoader)
-        assert loader.delay_seconds == 3
 
 
