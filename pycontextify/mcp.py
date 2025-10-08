@@ -1,7 +1,7 @@
 """FastMCP server for PyContextify.
 
 This module implements the MCP server with simplified interface providing
-6 essential functions for semantic search over codebases, documents, and webpages.
+5 essential functions for semantic search over codebases and documents.
 """
 
 import argparse
@@ -241,8 +241,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="pycontextify",
         description=(
-            "PyContextify MCP Server - Semantic search over codebases, "
-            "documents, and webpages"
+            "PyContextify MCP Server - Semantic search over codebases and documents"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
@@ -255,17 +254,9 @@ def parse_args() -> argparse.Namespace:
   # Start with initial codebase and custom index
   pycontextify --index-path ./project_index --initial-codebase ./src
 
-  # Start with initial webpages
-  pycontextify --initial-webpages https://docs.python.org
-
-  # Recursive webpage crawling with depth limit
-  pycontextify --initial-webpages https://docs.example.com \
-               --recursive-crawling --max-crawl-depth 2 --crawl-delay 2
-
-  # Full example with all content types
+  # Full example with mixed content types
   pycontextify --index-path ./my_index --index-name project_search \
-               --initial-documents ./README.md --initial-codebase ./src \
-               --initial-webpages https://api-docs.com --recursive-crawling
+               --initial-documents ./README.md --initial-codebase ./src
 
 Configuration priority: CLI arguments > Environment variables > Defaults
 
@@ -312,34 +303,6 @@ Environment variables can still be used for all settings. Use --help for details
         type=str,
         help="Directory paths to codebases to index at startup",
     )
-    parser.add_argument(
-        "--initial-webpages",
-        nargs="*",
-        type=str,
-        help="URLs to webpages to index at startup (http/https only)",
-    )
-
-    # Webpage crawling options
-    parser.add_argument(
-        "--recursive-crawling",
-        action="store_true",
-        help="Enable recursive crawling for initial webpages",
-    )
-    parser.add_argument(
-        "--max-crawl-depth",
-        type=int,
-        default=1,
-        help="Maximum crawl depth for recursive crawling (1-3, default: 1)",
-    )
-    parser.add_argument(
-        "--crawl-delay",
-        type=int,
-        help=(
-            "Delay between web requests in seconds "
-            "(overrides PYCONTEXTIFY_CRAWL_DELAY_SECONDS)"
-        ),
-    )
-
     # Server configuration
     parser.add_argument(
         "--no-auto-persist",
@@ -534,127 +497,12 @@ def index_document(path: str) -> Dict[str, Any]:
     return handle_mcp_errors("Document indexing", _index_document_impl, path)
 
 
-async def _index_webpage_impl(
-    url: str, recursive: bool, max_depth: int
-) -> Dict[str, Any]:
-    """Implementation for index_webpage with validation and business logic."""
-    import time
-
-    # Validate parameters
-    url = validate_string_param(url, "url")
-
-    if not url.startswith(("http://", "https://")):
-        raise ValueError("URL must start with http:// or https://")
-
-    recursive = validate_bool_param(recursive, "recursive")
-
-    # Validate and limit max_depth
-    original_depth = max_depth
-    max_depth = validate_int_param(max_depth, "max_depth", min_val=1, max_val=3)
-
-    if original_depth > 3:
-        logger.warning(f"Limited max_depth from {original_depth} to 3 for safety")
-
-    # Initialize manager and index
-    mgr = initialize_manager()
-
-    logger.info(
-        f"Starting webpage indexing for {url} with recursive={recursive}, max_depth={max_depth}"
-    )
-    result = await mgr.index_webpage(
-        url,
-        recursive=recursive,
-        max_depth=max_depth,
-    )
-
-    # Validate result before returning
-    if result is None:
-        logger.error(f"Webpage indexing returned None for {url}")
-        return {"error": "Indexing completed but returned no data"}
-
-    if not isinstance(result, dict):
-        logger.error(
-            f"Webpage indexing returned non-dict result for {url}: {type(result)}"
-        )
-        return {"error": f"Indexing returned invalid result type: {type(result)}"}
-
-    # Add metadata to help with debugging
-    result["indexed_url"] = url
-    result["indexing_timestamp"] = int(time.time())
-    result["mcp_version"] = "0.1.0"
-
-    logger.info(f"Webpage indexing completed successfully for {url}: {result}")
-    return result
-
-
-@mcp.tool
-async def index_webpage(
-    url: str,
-    recursive: bool = False,
-    max_depth: int = 1,
-) -> Dict[str, Any]:
-    """Index web content for semantic search with optional recursive crawling.
-
-    This function indexes web pages and can optionally follow links to index
-    related pages. It extracts web content structure.
-
-    Args:
-        url: URL of the webpage to index
-        recursive: Whether to follow links and index linked pages
-        max_depth: Maximum depth for recursive crawling. 0 = unlimited,
-                  1 = starting URL + direct children, 2 includes grandchildren, etc.
-                  Ignored if recursive=False. Max allowed: 3
-
-    Returns:
-        Dictionary with indexing statistics including pages processed and chunks added
-    """
-    logger.info(
-        f"MCP index_webpage called with url={url}, recursive={recursive}, max_depth={max_depth}"
-    )
-
-    try:
-        result = await handle_mcp_errors_async(
-            "Webpage indexing",
-            _index_webpage_impl,
-            url,
-            recursive,
-            max_depth,
-        )
-
-        # Ensure we have a valid response structure
-        if not isinstance(result, dict):
-            logger.error(
-                f"MCP index_webpage received invalid result type: {type(result)}"
-            )
-            result = {"error": f"Invalid result type: {type(result)}", "url": url}
-
-        # Validate required fields are present
-        if "error" not in result:
-            if "pages_processed" not in result:
-                result["pages_processed"] = 1  # Default fallback
-            if "chunks_added" not in result:
-                result["chunks_added"] = 0  # Default fallback
-
-        logger.info(f"MCP index_webpage completed for {url}")
-        return result
-
-    except Exception as e:
-        error_msg = f"MCP index_webpage failed: {str(e)}"
-        logger.error(error_msg)
-        return {
-            "error": error_msg,
-            "url": url,
-            "recursive": recursive,
-            "max_depth": max_depth,
-        }
-
-
 @mcp.tool
 def search(query: str, top_k: int = 5, display_format: str = "structured") -> Any:
     """Perform semantic search across all indexed content.
 
     This function searches for content similar to the provided query across
-    all indexed codebases, documents, and webpages using vector similarity.
+    all indexed codebases and documents using vector similarity.
     The default output format is structured data for programmatic use.
 
     Args:
@@ -912,7 +760,6 @@ def status() -> Dict[str, Any]:
             "mcp_functions": [
                 "index_code",
                 "index_document",
-                "index_webpage",
                 "search",
                 "reset_index",
                 "status",
@@ -1015,54 +862,6 @@ async def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) 
             except Exception as e:
                 logger.error(f"Error indexing codebase {codebase_path}: {e}")
 
-    # Index initial webpages
-    if args.initial_webpages:
-        logger.info(f"Indexing {len(args.initial_webpages)} initial webpages...")
-        for webpage_url in args.initial_webpages:
-            try:
-                # Validate URL
-                if not webpage_url.startswith(("http://", "https://")):
-                    logger.warning(
-                        "Invalid URL (must start with http:// or https://), "
-                        f"skipping: {webpage_url}"
-                    )
-                    continue
-
-                # Apply crawling settings
-                recursive = (
-                    args.recursive_crawling
-                    if hasattr(args, "recursive_crawling")
-                    else False
-                )
-                max_depth = getattr(args, "max_crawl_depth", 1)
-
-                # Validate and limit max_depth
-                if max_depth < 1 or max_depth > 3:
-                    max_depth = min(max(max_depth, 1), 3)
-                    logger.warning(
-                        f"Adjusted max_crawl_depth to {max_depth} (valid range: 1-3)"
-                    )
-
-                result = await mgr.index_webpage(
-                    webpage_url, recursive=recursive, max_depth=max_depth
-                )
-                if "error" not in result:
-                    pages_processed = result.get("pages_processed", 1)
-                    chunks_added = result.get("chunks_added", 0)
-                    total_indexed += chunks_added
-                    logger.info(
-                        f"Successfully indexed webpage {webpage_url}: "
-                        f"{pages_processed} pages, {chunks_added} chunks "
-                        f"(recursive={recursive}, max_depth={max_depth})"
-                    )
-                else:
-                    logger.error(
-                        f"Failed to index webpage {webpage_url}: {result['error']}"
-                    )
-
-            except Exception as e:
-                logger.error(f"Error indexing webpage {webpage_url}: {e}")
-
     if total_indexed > 0:
         logger.info(f"Initial indexing completed: {total_indexed} total chunks indexed")
 
@@ -1107,10 +906,6 @@ def args_to_config_overrides(args: argparse.Namespace) -> Dict[str, Any]:
         overrides["embedding_provider"] = args.embedding_provider
     if args.embedding_model:
         overrides["embedding_model"] = args.embedding_model
-
-    # Webpage crawling configuration
-    if hasattr(args, "crawl_delay") and args.crawl_delay is not None:
-        overrides["crawl_delay_seconds"] = args.crawl_delay
 
     return overrides
 
@@ -1180,10 +975,9 @@ def main():
         setup_logging(args)
 
         logger.info("Starting PyContextify MCP Server...")
-        logger.info("Server provides 6 essential MCP functions:")
+        logger.info("Server provides 5 essential MCP functions:")
         logger.info("  - index_code(path): Index codebase directory")
         logger.info("  - index_document(path): Index document")
-        logger.info("  - index_webpage(url, recursive, max_depth): Index web content")
         logger.info("  - search(query, top_k): Basic semantic search")
         logger.info("  - reset_index(confirm=True): Clear all indexed content")
         logger.info("  - status(): Get system status and statistics")
@@ -1199,7 +993,7 @@ def main():
         mgr = initialize_manager(config_overrides)
 
         # Perform initial indexing if specified
-        if args.initial_documents or args.initial_codebase or args.initial_webpages:
+        if args.initial_documents or args.initial_codebase:
             logger.info("Performing initial indexing...")
             import asyncio
 

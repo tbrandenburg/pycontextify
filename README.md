@@ -1,16 +1,16 @@
 # PyContextify ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Tests](https://img.shields.io/badge/tests-247_passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-69%25-green)
 
-**One-line:** Semantic search server with relationship-aware discovery across codebases, documents, and webpages.
+**One-line:** Semantic search server with relationship-aware discovery across codebases and documents.
 
-PyContextify is a Python-based MCP (Model Context Protocol) server that provides intelligent semantic search capabilities over diverse knowledge sources. It combines vector similarity search with basic relationship tracking to help developers, researchers, and technical writers discover contextually relevant information across codebases, documentation, and web resources.
+PyContextify is a Python-based MCP (Model Context Protocol) server that provides intelligent semantic search capabilities over diverse knowledge sources. It combines vector similarity search with basic relationship tracking to help developers, researchers, and technical writers discover contextually relevant information across codebases and documentation.
 
 **Main Features:**
 - 🔍 **Semantic Search**: Vector similarity with FAISS + hybrid keyword search
-- 📚 **Multi-Source**: Index code, documents (PDF/MD/TXT), and webpages
+- 📚 **Multi-Source**: Index code and documents (PDF/MD/TXT)
 - 🧠 **Smart Chunking**: Content-aware processing (code boundaries, document hierarchy)
 - ⚡ **Fast Startup**: Lazy loading with optimized component initialization
 - 🔗 **Relationship Tracking**: Basic relationship extraction (tags, references, code symbols)
-- 🛠️ **MCP Protocol**: 6 essential functions for seamless AI assistant integration
+- 🛠️ **MCP Protocol**: 5 essential functions for seamless AI assistant integration
 
 ---
 
@@ -24,10 +24,6 @@ uv sync
 # Run MCP server
 uv run pycontextify --verbose
 ```
-
-> **Note:** PyContextify bootstraps Crawl4AI's Playwright runtime on the first
-> crawl attempt. The initial request may take longer while Chromium downloads,
-> but no manual `crawl4ai-setup` step is required when using `uv` or `uvx`.
 
 ### Run with `uvx`
 
@@ -109,10 +105,9 @@ Minimal example:
 uv run pycontextify
 
 # Index content (via MCP client/AI assistant)
-# The server exposes 6 MCP functions:
+# The server exposes 5 MCP functions:
 # - index_code(path) - Index codebase directory
 # - index_document(path) - Index documents (PDF, MD, TXT)
-# - index_webpage(url, recursive=False, max_depth=1) - Index web content
 # - search(query, top_k=5) - Semantic search
 # - reset_index(remove_files=True, confirm=False) - Clear index data
 # - status() - Get system status and statistics
@@ -122,10 +117,9 @@ Expected output:
 
 ```
 Starting PyContextify MCP Server...
-Server provides 6 essential MCP functions:
+Server provides 5 essential MCP functions:
   - index_code(path): Index codebase directory
   - index_document(path): Index document
-  - index_webpage(url, recursive, max_depth): Index web content
   - search(query, top_k): Basic semantic search
   - reset_index(confirm=True): Clear all indexed content
   - status(): Get system status and statistics
@@ -152,13 +146,6 @@ PyContextify employs a **hierarchical chunking system** with specialized process
 - **Relationship Extraction**: Links `[text](url)`, citations `[1]`, `(Smith 2020)`, emphasized terms
 - **Fallback**: Token-based splitting when no structure is detected
 
-#### **Webpage Chunking** (`WebPageChunker`)
-- **Primary Strategy**: HTML semantic structure awareness (extends DocumentChunker)
-- **Web-Specific Processing**: Domain extraction, URL path analysis, link discovery
-- **Content Processing**: Works with cleaned HTML text content
-- **Relationship Extraction**: External links (max 10), email addresses, domain tags
-- **Metadata Enhancement**: URL parsing, path segmentation, contact information
-
 #### **Simple Chunking** (`SimpleChunker`)
 - **Fallback Strategy**: Pure token-based chunking for unstructured content
 - **Basic Relationships**: Capitalized word extraction for entity hints
@@ -181,7 +168,7 @@ max_relationships_per_chunk: int  # Limit relationships to avoid noise
 - **Metadata Preservation**: Source path, embedding info, creation timestamps, and custom metadata
 - **Relationship Graph**: Lightweight knowledge extraction (imports, references, citations, links)
 
-**Bottom Line**: PyContextify's chunking system intelligently adapts to content structure—respecting code boundaries, document hierarchy, and web semantics—while maintaining configurable token limits and extracting contextual relationships for enhanced semantic search.
+**Bottom Line**: PyContextify's chunking system intelligently adapts to content structure—respecting code boundaries and document hierarchy—while maintaining configurable token limits and extracting contextual relationships for enhanced semantic search.
 
 ## Configuration
 
@@ -200,14 +187,13 @@ Copy `.env.example` to `.env` and customize as needed.
 
 ## API Reference
 
-PyContextify exposes 6 MCP (Model Context Protocol) functions for semantic search and indexing:
+PyContextify exposes 5 MCP (Model Context Protocol) functions for semantic search and indexing:
 
 1. **`index_code(path)`** - Index codebase directory with relationship extraction
-2. **`index_document(path)`** - Index documents (PDF, MD, TXT) 
-3. **`index_webpage(url, recursive=False, max_depth=1)`** - Index web content with optional recursion
-4. **`search(query, top_k=5)`** - Hybrid semantic + keyword search
-5. **`reset_index(remove_files=True, confirm=False)`** - Clear index data
-6. **`status()`** - Get system statistics and health
+2. **`index_document(path)`** - Index documents (PDF, MD, TXT)
+3. **`search(query, top_k=5)`** - Hybrid semantic + keyword search
+4. **`reset_index(remove_files=True, confirm=False)`** - Clear index data
+5. **`status()`** - Get system statistics and health
 
 Full docs: See [WARP.md](./WARP.md) for development guidance and architecture details
 

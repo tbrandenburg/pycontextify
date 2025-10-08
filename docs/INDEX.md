@@ -10,7 +10,6 @@ Complete documentation guide for PyContextify MCP server.
 |----------|-------------|----------|
 | **[MCP_SERVER.md](MCP_SERVER.md)** | Complete MCP server guide | Users & Developers |
 | **[TESTING.md](TESTING.md)** | Testing guide and strategies | Developers |
-| **[WEB_CRAWLING.md](WEB_CRAWLING.md)** | Web crawling configuration | Users |
 | **[BOOTSTRAP.md](BOOTSTRAP.md)** | Index bootstrapping | Advanced Users |
 
 ---
@@ -27,7 +26,6 @@ Complete documentation guide for PyContextify MCP server.
 **Common Tasks:**
 - [Index documents](MCP_SERVER.md#tool-examples)
 - [Index codebase](MCP_SERVER.md#tool-examples)
-- [Crawl webpages](WEB_CRAWLING.md)
 - [Configure the server](MCP_SERVER.md#command-line-options)
 
 ### For Developers
@@ -50,7 +48,7 @@ Complete documentation guide for PyContextify MCP server.
 
 Topics covered:
 - Server startup and configuration
-- 6 MCP tools (status, index_document, index_code, index_webpage, search, reset_index)
+- 5 MCP tools (status, index_document, index_code, search, reset_index)
 - Command-line options and environment variables
 - Claude Desktop integration
 - Usage examples
@@ -71,17 +69,6 @@ Topics covered:
 
 **Start here if you're:** Developing or contributing to PyContextify
 
-### WEB_CRAWLING.md
-**Webpage crawling and indexing guide**
-
-Topics covered:
-- Crawler setup and configuration
-- Recursive crawling
-- Best practices
-- Rate limiting
-
-**Start here if you're:** Indexing documentation websites or web content
-
 ### BOOTSTRAP.md
 **Index bootstrapping and distribution**
 
@@ -101,7 +88,7 @@ Topics covered:
 
 ✅ **MCP Server**
 - Complete command-line reference
-- All 6 MCP tools with examples
+- All 5 MCP tools with examples
 - Configuration options
 - Integration guides
 
@@ -112,7 +99,6 @@ Topics covered:
 - Coverage reports
 
 ✅ **Features**
-- Web crawling
 - Index bootstrapping
 - Multi-source indexing
 
@@ -148,21 +134,16 @@ uv run pytest tests/ -m "not slow"
 uv run pytest tests/ --cov=pycontextify
 ```
 
-**Crawl webpage:**
-```bash
-uv run pycontextify --initial-webpages https://docs.example.com --recursive-crawling
-```
-
 ### Key Statistics
 
 | Metric | Value |
 |--------|-------|
-| **MCP Tools** | 6 |
+| **MCP Tools** | 5 |
 | **Test Cases** | 285 |
 | **Code Coverage** | 71% |
 | **Fast Test Time** | ~21s |
 | **Full Test Time** | ~98s |
-| **Supported Content** | Documents, Code, Webpages |
+| **Supported Content** | Documents, Code |
 
 ---
 

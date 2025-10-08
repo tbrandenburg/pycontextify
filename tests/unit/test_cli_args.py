@@ -17,7 +17,7 @@ def parse_args_with_custom_argv(argv):
     """Parse command-line arguments with custom argv for testing."""
     parser = argparse.ArgumentParser(
         prog="pycontextify",
-        description="PyContextify MCP Server - Semantic search over codebases, documents, and webpages",
+        description="PyContextify MCP Server - Semantic search over codebases and documents",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

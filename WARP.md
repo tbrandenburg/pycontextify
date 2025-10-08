@@ -47,7 +47,7 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 - **VectorStore**: FAISS wrapper with persistence (`vector_store.py`)
 - **EmbedderFactory**: Provider system (`embedders/factory.py`) — currently ships with the sentence-transformers implementation and validation stubs for future providers
 - **HybridSearchEngine**: Vector + keyword search (`hybrid_search.py`)
-- **Content Chunkers**: Code/document/web-aware processing (`chunker.py`)
+- **Content Chunkers**: Code/document-aware processing (`chunker.py`)
 - **Relationship Extraction**: Lightweight knowledge graph integrated into `chunker.py` and `models.py`
 
 ### Pipeline: Load → Chunk → Embed → Store → Search
@@ -62,10 +62,6 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
   - Breaks content along Markdown-style headers while enforcing minimum section length, with token-based fallback for unstructured prose.
   - Extracts contextual relationships from links, citations, emphasized terms, and section titles; PDF files are first converted to text via `DocumentLoader`/`PDFLoader` and then treated like other documents.
 
-- **Web pages** → `WebPageChunker`
-  - Reuses the document strategy after HTML cleanup, augmenting each chunk with metadata such as external links, domain, and URL path segments.
-  - Adds web-specific relationship tags (domains, external links, contacts) on top of document-level extraction for richer search pivots.
-
 - **Fallback/Unknown sources** → `SimpleChunker`
   - Applies configurable token windows with overlap and basic capitalized-entity extraction when the source type is not recognized or lacks structure.
 
@@ -78,13 +74,12 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 
 ## MCP Interface
 
-6 essential functions:
+5 essential functions:
 1. `index_code(path)` - Codebase with relationship extraction
 2. `index_document(path)` - Documents (PDF, MD, TXT)
-3. `index_webpage(url, recursive=False, max_depth=1)` - Web content with optional recursion
-4. `search(query, top_k=5)` - Hybrid semantic + keyword search
-5. `reset_index(remove_files=True, confirm=False)` - Clear index data
-6. `status()` - System statistics
+3. `search(query, top_k=5)` - Hybrid semantic + keyword search
+4. `reset_index(remove_files=True, confirm=False)` - Clear index data
+5. `status()` - System statistics
 
 ### Search Result JSON Outline
 
@@ -145,7 +140,6 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 
 **Code**: Python, JS/TS, Java, C/C++, Rust, Go, etc.  
 **Documents**: PDF (PyPDF2/pdfplumber), Markdown, Text  
-**Web**: HTML with recursive crawling, content filtering
 
 ## Performance
 
@@ -182,18 +176,17 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 - **scripts/README.md** – Catalogs available utility scripts, their purposes, and execution notes.
 
 ### Python Sources
-- **examples/cli_usage_examples.py** – Demonstrates command-line indexing and searching workflows across representative project types.
 - **pycontextify/__init__.py** – Exposes the package’s primary configuration and indexing interfaces for external consumers.
 - **pycontextify/index/__init__.py** – Maintains backwards-compatible exports while forwarding to the new architectural blocks.
 - **pycontextify/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
 - **pycontextify/embedder/** – Hosts the embedding abstractions, provider implementations, and factory wiring.
-- **pycontextify/chunker/__init__.py** – Provides base and specialized chunkers for code, documents, and web pages, handling splitting and metadata extraction.
+- **pycontextify/chunker.py** – Provides base and specialized chunkers for code and documents, handling splitting and metadata extraction.
 - **pycontextify/storage/metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.
 - **pycontextify/storage/vector.py** – Wraps FAISS vector storage operations, including persistence, backup, and validation routines.
 - **pycontextify/search/hybrid.py** – Implements keyword-based hybrid search that complements vector similarity results.
 - **pycontextify/search/models.py** – Defines search-related data structures, response formatting helpers, and analytics utilities.
 - **pycontextify/indexer/manager.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
-- **pycontextify/indexer/loaders.py** – Supplies loaders for code, documents, and web pages, orchestrating ingestion workflows per source type.
+- **pycontextify/index_document.py** / **index_codebase.py** – Supply loaders for documents and codebases, orchestrating ingestion workflows per source type.
 - **pycontextify/indexer/pdf_loader.py** – Handles PDF extraction via multiple backends and enriches pages with contextual metadata.
 - **pycontextify/mcp/server.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
 - **scripts/debug_lazy_loading.py** – Prints diagnostics to inspect lazy-loading behavior of the index manager.

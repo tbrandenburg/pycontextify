@@ -511,7 +511,6 @@ class TestMCPUtilityFunctions:
         args = argparse.Namespace()
         args.initial_documents = ["test.md"]
         args.initial_codebase = ["./src"]
-        args.initial_webpages = None
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md") as temp_file:
             temp_file.write("# Test")

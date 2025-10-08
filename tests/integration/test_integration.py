@@ -342,10 +342,10 @@ class SearchEngine:
         # Code ingestion flows are covered by the MCP server tests to avoid
         # re-indexing large temporary directories in this integration suite.
 
-    def test_webpage_embedding_generation(self, index_manager):
-        """Test complete pipeline for webpage-like content: Markdown → chunks → embeddings → search."""
-        # Sample webpage-like content in Markdown format (equivalent to HTML content)
-        webpage_content = """# Machine Learning Tutorial: A Complete Guide
+    def test_reference_guide_embedding_generation(self, index_manager):
+        """Test complete pipeline for supplemental guide content: Markdown → chunks → embeddings → search."""
+        # Sample supplemental guide content in Markdown format (equivalent to HTML content)
+        guide_content = """# Machine Learning Tutorial: A Complete Guide
 
 **Meta**: Comprehensive guide to machine learning concepts and algorithms
 
@@ -451,11 +451,11 @@ print(f'Mean Squared Error: {mse}')
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".md", delete=False, encoding="utf-8"
         ) as temp_file:
-            temp_file.write(webpage_content)
+            temp_file.write(guide_content)
             temp_file.flush()
 
             try:
-                # Test webpage-like content indexing
+                # Test supplemental guide content indexing
                 result = index_manager.index_document(temp_file.name)
 
                 # Verify indexing succeeded
@@ -463,10 +463,10 @@ print(f'Mean Squared Error: {mse}')
                 assert result["chunks_added"] > 0
                 assert result["source_type"] == "document"
 
-                print(f"✅ Successfully indexed webpage content: {result}")
+                print(f"✅ Successfully indexed guide content: {result}")
 
-                # Test webpage-specific semantic search
-                webpage_queries = [
+                # Test guide-specific semantic search
+                guide_queries = [
                     ("machine learning tutorial", "Should find ML tutorial content"),
                     (
                         "neural networks deep learning",
@@ -480,7 +480,7 @@ print(f'Mean Squared Error: {mse}')
                     ("regression classification", "Should find algorithm descriptions"),
                 ]
 
-                for query, description in webpage_queries:
+                for query, description in guide_queries:
                     response = index_manager.search(query, top_k=3)
 
                     assert (

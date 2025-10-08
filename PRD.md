@@ -2,21 +2,21 @@
 
 ## Executive Summary
 
-Knowledge workers face the challenge of finding relevant information scattered across codebases, documentation, and web resources. Traditional search tools miss semantic connections between related concepts, forcing users to manually connect information from disconnected knowledge silos. This leads to missed insights, duplicated research, and reduced productivity.
+Knowledge workers face the challenge of finding relevant information scattered across codebases and documentation. Traditional search tools miss semantic connections between related concepts, forcing users to manually connect information from disconnected knowledge silos. This leads to missed insights, duplicated research, and reduced productivity.
 
 PyContextify provides an intelligent semantic search server that indexes multiple knowledge sources and extracts basic relationship information from content. Through vector similarity search combined with simple relationship tracking (tags, references, and code symbols), it delivers contextually relevant results that connect related information across diverse content types.
 
-The solution targets software developers, technical writers, and researchers who need to quickly discover contextually relevant information across codebases, documentation, and web resources. By providing relationship-aware discovery, PyContextify transforms isolated search results into connected insights that accelerate understanding and decision-making.
+The solution targets software developers, technical writers, and researchers who need to quickly discover contextually relevant information across codebases and documentation. By providing relationship-aware discovery, PyContextify transforms isolated search results into connected insights that accelerate understanding and decision-making.
 
 ## User Stories
 
 ### 1. Developer Documentation Search
 **As a** software developer,  
-**I want to** search across my codebase, documentation, and relevant web resources simultaneously,  
-**So that** I can quickly find connections between implementation details and documentation.  
+**I want to** search across my codebase and documentation simultaneously,
+**So that** I can quickly find connections between implementation details and reference material.
 
 **Acceptance Criteria:**
-- Given a search query about a specific function, when searching, then results include relevant code files, documentation, and web references
+- Given a search query about a specific function, when searching, then results include relevant code files and documentation references
 - Given indexed content from multiple sources, when viewing search results, then relationships between code and documentation are clearly indicated
 
 ### 2. Context-Aware Code Understanding
@@ -30,12 +30,12 @@ The solution targets software developers, technical writers, and researchers who
 
 ### 3. Technical Research
 **As a** technical researcher,  
-**I want to** index academic papers and related web resources,  
+**I want to** index academic papers and internal research notes,
 **So that** I can discover connections between concepts across different documents.
 
 **Acceptance Criteria:**
 - Given indexed research materials, when searching for a concept, then results include semantically related concepts even if exact terms don't match
-- Given a collection of PDFs and websites, when indexing them, then cross-document relationships are automatically extracted
+- Given a collection of PDFs and notes, when indexing them, then cross-document relationships are automatically extracted
 
 ### 4. Documentation Writer
 **As a** technical writer,  
@@ -53,7 +53,7 @@ The solution targets software developers, technical writers, and researchers who
 
 **Acceptance Criteria:**
 - Given an indexed knowledge base, when searching for an introductory topic, then results include related advanced topics
-- Given web-based resources, when searching with relationship context, then results show the conceptual hierarchy of topics
+- Given complex documentation, when searching with relationship context, then results show the conceptual hierarchy of topics
 
 ### 6. Project Setup
 **As a** system administrator,  
@@ -85,12 +85,10 @@ The solution targets software developers, technical writers, and researchers who
 ## Functional Requirements
 
 ### Content Processing
-- Index and process multiple content types (code files, documentation, web pages)
+- Index and process multiple content types (code files and documentation)
 - Extract text from various file formats (PDF, Markdown, plain text)
 - Recognize code structure across multiple programming languages
 - Identify document hierarchies and sections
-- Parse webpage content with awareness of HTML structure
-- Filter out boilerplate web content (navigation, footers, ads)
 
 ### Basic Relationship Tracking
 - Extract simple tags and references from content chunks
@@ -141,7 +139,7 @@ The platform integrates with existing workflows through standardized protocol in
 
 ✅ **Current Achievement:**
 1. **System Reliability**: 100% test success rate with 247 passing tests and 69% code coverage
-2. **Content Processing**: Successfully indexes code, documents (PDF/MD/TXT), and web pages without critical errors
+2. **Content Processing**: Successfully indexes code and documents (PDF/MD/TXT) without critical errors
 3. **Performance**: Fast startup with lazy loading and optimized component initialization
 4. **Data Persistence**: Robust auto-save/auto-load functionality with 100% data integrity
 5. **Protocol Interface**: 6 stable MCP functions with comprehensive error handling
@@ -151,7 +149,7 @@ The platform integrates with existing workflows through standardized protocol in
 7. **Context Discovery**: Users discover relevant contextual information in 40% of searches they wouldn't find with traditional search
 8. **Relationship Identification**: System correctly identifies at least 70% of explicit relationships between indexed content
 9. **Time Efficiency**: Average time to find relevant information decreases by 50% compared to manual searching across multiple sources
-10. **Cross-Source Connections**: Users successfully find connections between different content types (code-to-docs, docs-to-web) in 60% of searches
+10. **Cross-Source Connections**: Users successfully find connections between different content types (code-to-docs) in 60% of searches
 11. **User Adoption**: >80% of users report improved productivity in information discovery tasks
 
 ## Risks & Assumptions
@@ -159,7 +157,7 @@ The platform integrates with existing workflows through standardized protocol in
 ### Risks
 1. Large codebases may require substantial memory resources
 2. Embedding models might not capture domain-specific semantics effectively
-3. Web crawling could encounter rate limiting or access restrictions
+3. Processing large documents may require additional memory or time
 4. Relationship extraction accuracy might vary across different content types
 5. Indexing performance could degrade with very large document collections
 

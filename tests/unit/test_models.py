@@ -393,7 +393,6 @@ class TestSearchResponseFormatting:
 
         assert response._get_source_icon("document") == "📄"
         assert response._get_source_icon("codebase") == "💻"
-        assert response._get_source_icon("webpage") == "🌐"
         assert response._get_source_icon("pdf") == "📄"
         assert response._get_source_icon("unknown") == "📄"  # default
 

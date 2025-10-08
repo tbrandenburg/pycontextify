@@ -15,7 +15,6 @@ class SourceType(Enum):
 
     CODE = "code"
     DOCUMENT = "document"
-    WEBPAGE = "webpage"
 
 
 @dataclass
