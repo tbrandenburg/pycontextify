@@ -28,7 +28,7 @@ from unittest import mock
 import pytest
 
 from pycontextify.config import Config
-from pycontextify.indexer_manager import IndexManager
+from pycontextify.indexer import IndexManager
 
 # ============================================================================
 # Fixtures for Archive Creation
@@ -668,7 +668,7 @@ class TestBootstrapIntegration:
             return wrapper
 
         # Patch the download method to track HTTP attempts
-        from pycontextify.indexer_manager import IndexManager
+        from pycontextify.indexer import IndexManager
 
         original_download = IndexManager._download_to_path
         IndexManager._download_to_path = mock_download_to_path(original_download)

@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from pycontextify.config import Config
-from pycontextify.indexer_manager import IndexManager
+from pycontextify.indexer import IndexManager
 from pycontextify.storage_metadata import SourceType
 
 
