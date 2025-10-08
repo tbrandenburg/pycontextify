@@ -4,7 +4,10 @@ from importlib import metadata as _metadata
 
 from .config import Config
 from .indexer_manager import IndexManager
-from . import mcp_server as mcp_server
+from . import mcp as mcp
+
+# Backwards compatibility alias
+mcp_server = mcp
 
 try:  # pragma: no cover - exercised when installed as a package
     __version__ = _metadata.version("pycontextify")
@@ -18,6 +21,7 @@ __license__ = "MIT"
 __all__ = [
     "IndexManager",
     "Config",
+    "mcp",
     "mcp_server",
     "__version__",
     "__author__",
