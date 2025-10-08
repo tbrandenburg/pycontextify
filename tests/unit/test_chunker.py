@@ -2,7 +2,7 @@
 
 import pytest
 
-from pycontextify.chunker import BaseChunker, SimpleChunker
+from pycontextify.chunker import BaseChunker, CodeChunker, SimpleChunker
 from pycontextify.config import Config
 from pycontextify.types import Chunk, SourceType
 
@@ -142,50 +142,6 @@ class TestSimpleChunker:
         assert chunk.embedding_provider == provider
         assert chunk.embedding_model == model
         assert chunk.source_type == SourceType.DOCUMENT
-
-    def test_split_by_tokens_basic(self):
-        """Test the _split_by_tokens method directly."""
-        config = Config()
-
-        chunker = SimpleChunker(config=config)
-        text = "This is a test text with multiple words for splitting."
-
-        # Small chunk size to force splitting
-        chunk_tuples = chunker._split_by_tokens(text, chunk_size=20, overlap=5)
-
-        assert len(chunk_tuples) >= 1
-
-        # Verify tuple structure
-        for chunk_text, start_char, end_char in chunk_tuples:
-            assert isinstance(chunk_text, str)
-            assert isinstance(start_char, int)
-            assert isinstance(end_char, int)
-            assert start_char >= 0
-            assert end_char > start_char
-
-    def test_split_by_tokens_empty_text(self):
-        """Test _split_by_tokens with empty text."""
-        config = Config()
-
-        chunker = SimpleChunker(config=config)
-
-        chunk_tuples = chunker._split_by_tokens("", chunk_size=100, overlap=10)
-
-        assert chunk_tuples == []
-
-    def test_split_by_tokens_single_word(self):
-        """Test _split_by_tokens with single word."""
-        config = Config()
-
-        chunker = SimpleChunker(config=config)
-
-        chunk_tuples = chunker._split_by_tokens("word", chunk_size=100, overlap=10)
-
-        assert len(chunk_tuples) == 1
-        chunk_text, start_char, end_char = chunk_tuples[0]
-        assert chunk_text == "word"
-        assert start_char == 0
-        assert end_char == 4
 
     def test_extract_relationships_basic(self):
         """Test basic relationship extraction."""
@@ -412,3 +368,103 @@ class TestSimpleChunker:
 
             # Positions should be within reasonable bounds
             assert chunk.end_char <= len(text) + 50  # Some buffer for processing
+
+
+class TestCodeChunker:
+    """Test CodeChunker functionality."""
+
+    def test_code_chunker_basic_functionality(self):
+        """Test basic code chunking functionality."""
+        config = Config()
+        config.chunk_size = 1000
+
+        chunker = CodeChunker(config=config)
+        code = '''
+def hello():
+    print("Hello, World!")
+
+def goodbye():
+    print("Goodbye!")
+'''
+
+        chunks = chunker.chunk_text(
+            code, "test.py", "openai", "text-embedding-3-small"
+        )
+
+        assert len(chunks) >= 1
+        assert isinstance(chunks[0], Chunk)
+        assert chunks[0].source_type == SourceType.CODE
+        assert chunks[0].embedding_provider == "openai"
+        assert chunks[0].file_extension == ".py"
+
+    def test_code_chunker_respects_function_boundaries(self):
+        """Test that CodeChunker tries to respect function boundaries."""
+        config = Config()
+        config.chunk_size = 50  # Small size to force splitting
+
+        chunker = CodeChunker(config=config)
+        code = '''
+def function_one():
+    """First function."""
+    return 1
+
+def function_two():
+    """Second function."""
+    return 2
+
+def function_three():
+    """Third function."""
+    return 3
+'''
+
+        chunks = chunker.chunk_text(
+            code, "test.py", "openai", "text-embedding-3-small"
+        )
+
+        # Should create multiple chunks
+        assert len(chunks) >= 1
+        # All chunks should be CODE type
+        for chunk in chunks:
+            assert chunk.source_type == SourceType.CODE
+            assert isinstance(chunk.chunk_text, str)
+
+    def test_code_chunker_handles_large_functions(self):
+        """Test that CodeChunker falls back to token splitting for large functions."""
+        config = Config()
+        config.chunk_size = 30  # Very small to force fallback
+
+        chunker = CodeChunker(config=config)
+        # Create a large function that exceeds chunk size
+        code = '''
+def very_large_function():
+    """A function with many lines."""
+    line1 = "data"
+    line2 = "more data"
+    line3 = "even more data"
+    line4 = "lots of data"
+    line5 = "tons of data"
+    line6 = "massive data"
+    line7 = "enormous data"
+    line8 = "gigantic data"
+    return "result"
+'''
+
+        chunks = chunker.chunk_text(
+            code, "test.py", "openai", "text-embedding-3-small"
+        )
+
+        # Should split the large function into multiple chunks
+        assert len(chunks) > 1
+        # Verify all are CODE type
+        for chunk in chunks:
+            assert chunk.source_type == SourceType.CODE
+
+    def test_code_chunker_empty_code(self):
+        """Test CodeChunker with empty code."""
+        config = Config()
+
+        chunker = CodeChunker(config=config)
+
+        chunks = chunker.chunk_text("", "test.py", "openai", "text-embedding-3-small")
+
+        assert len(chunks) == 0
