@@ -389,16 +389,21 @@ class TestMCPServerSystem:
                 help="Directory path for vector storage and index files",
             )
             parser.add_argument(
-                "--initial-documents",
-                nargs="*",
+                "--initial-filebase",
                 type=str,
-                help="File paths to documents to index at startup",
+                help="Directory path to index at startup",
+            )
+            parser.add_argument(
+                "--topic",
+                type=str,
+                help="Topic label for initial indexing",
             )
             
             help_text = parser.format_help()
             
             assert "PyContextify MCP Server" in help_text
             assert "index-path" in help_text
+            assert "initial-filebase" in help_text
             assert "usage:" in help_text
             
             print("\n✅ MCP server help functionality works")

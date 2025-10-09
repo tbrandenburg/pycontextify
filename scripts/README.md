@@ -28,14 +28,14 @@ uv run python scripts/run_mcp_tests.py --smoke
 ```
 🚀 PyContextify MCP Server Test Suite
 ==================================================
-📁 Running tests from: tests\test_mcp_simple.py
-📊 Testing all 5 MCP functions with multiple document types
+📁 Running tests from: tests\integration\test_mcp_server.py
+📊 Testing all 5 MCP functions with unified filebase indexing
 
 ✅ status() - System status reporting
-✅ index_document() - Single file indexing  
-✅ index_code() - Codebase directory indexing
-✅ search() - Basic semantic search
-✅ search_with_context() - Enhanced search
+✅ index_filebase() - Unified filebase indexing
+✅ discover() - Indexed topic discovery
+✅ search() - Semantic search with scoring
+✅ reset_index() - Index lifecycle management
 ✅ Error handling - Invalid input testing
 ✅ Full workflow - End-to-end pipeline
 ✅ Function availability - Direct access verification
@@ -44,6 +44,7 @@ uv run python scripts/run_mcp_tests.py --smoke
 • Markdown (.md) - Documentation, guides
 • Text (.txt) - Code files, configs, general content
 • Codebase indexing - Multi-file directory processing
+• Mixed repositories - Topic discovery checks
 
 🎉 All MCP tests passed successfully!
 ```

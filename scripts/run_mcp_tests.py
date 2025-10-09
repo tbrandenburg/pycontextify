@@ -20,13 +20,13 @@ def run_mcp_tests():
     start_time = time.time()
 
     # Check if test file exists
-    test_file = Path("tests/test_mcp_simple.py")
+    test_file = Path("tests/integration/test_mcp_server.py")
     if not test_file.exists():
         print(f"❌ Test file not found: {test_file}")
         return False
 
     print(f"📁 Running tests from: {test_file}")
-    print(f"📊 Testing all 6 MCP functions with multiple document types\n")
+    print(f"📊 Testing all 5 MCP functions with unified filebase indexing\n")
 
     # Run pytest with comprehensive options
     cmd = [
@@ -56,10 +56,10 @@ def run_mcp_tests():
             # Summary of what was tested
             print(f"\n📋 Test Summary:")
             print(f"   ✅ status() - System status reporting")
-            print(f"   ✅ index_document() - Single file indexing")
-            print(f"   ✅ index_code() - Codebase directory indexing")
-            print(f"   ✅ search() - Basic semantic search")
-            print(f"   ✅ search_with_context() - Enhanced search")
+            print(f"   ✅ index_filebase() - Unified filebase indexing")
+            print(f"   ✅ discover() - Indexed topic discovery")
+            print(f"   ✅ search() - Semantic search with scoring")
+            print(f"   ✅ reset_index() - Index lifecycle management")
             print(f"   ✅ Error handling - Invalid input testing")
             print(f"   ✅ Full workflow - End-to-end pipeline")
             print(f"   ✅ Function availability - Direct access verification")
@@ -68,6 +68,7 @@ def run_mcp_tests():
             print(f"   • Markdown (.md) - Documentation, guides")
             print(f"   • Text (.txt) - Code files, configs, general content")
             print(f"   • Codebase indexing - Multi-file directory processing")
+            print(f"   • Mixed repositories - Topic discovery checks")
 
             return True
         else:
@@ -88,8 +89,8 @@ def run_quick_smoke_test():
         sys.executable,
         "-m",
         "pytest",
-        "tests/test_mcp_simple.py::TestMCPFunctions::test_status_function",
-        "tests/test_mcp_simple.py::TestMCPFunctions::test_index_document_function",
+        "tests/integration/test_mcp_server.py::TestMCPServerFunctions::test_status_function",
+        "tests/integration/test_mcp_server.py::TestMCPServerFunctions::test_index_filebase_success",
         "-v",
         "--tb=short",
     ]

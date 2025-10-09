@@ -40,16 +40,14 @@ def parse_args_with_custom_argv(argv):
 
     # Initial indexing
     parser.add_argument(
-        "--initial-documents",
-        nargs="*",
+        "--initial-filebase",
         type=str,
-        help="File paths to documents to index at startup",
+        help="Directory path to index at startup using unified pipeline",
     )
     parser.add_argument(
-        "--initial-codebase",
-        nargs="*",
+        "--topic",
         type=str,
-        help="Directory paths to codebases to index at startup",
+        help="Topic label for initial indexing (required when --initial-filebase is used)",
     )
 
     # Server configuration
@@ -127,8 +125,8 @@ class TestCLIArguments(unittest.TestCase):
         args = parse_args_with_custom_argv([])
         self.assertIsNone(args.index_path)
         self.assertIsNone(args.index_name)
-        self.assertIsNone(args.initial_documents)
-        self.assertIsNone(args.initial_codebase)
+        self.assertIsNone(args.initial_filebase)
+        self.assertIsNone(args.topic)
         self.assertFalse(args.no_auto_persist)
         self.assertFalse(args.no_auto_load)
         self.assertFalse(args.verbose)
@@ -143,20 +141,13 @@ class TestCLIArguments(unittest.TestCase):
         self.assertEqual(args.index_name, "my_search")
         self.assertIsNone(args.index_bootstrap_archive_url)
 
-    def test_initial_documents(self):
-        """Test initial document arguments."""
+    def test_initial_filebase_arguments(self):
+        """Test initial filebase arguments."""
         args = parse_args_with_custom_argv(
-            ["--initial-documents", "doc1.pdf", "doc2.md", "doc3.txt"]
+            ["--initial-filebase", "./repo", "--topic", "docs"]
         )
-        self.assertEqual(args.initial_documents, ["doc1.pdf", "doc2.md", "doc3.txt"])
-        self.assertIsNone(args.index_bootstrap_archive_url)
-
-    def test_initial_codebase(self):
-        """Test initial codebase arguments."""
-        args = parse_args_with_custom_argv(
-            ["--initial-codebase", "src", "tests", "lib"]
-        )
-        self.assertEqual(args.initial_codebase, ["src", "tests", "lib"])
+        self.assertEqual(args.initial_filebase, "./repo")
+        self.assertEqual(args.topic, "docs")
         self.assertIsNone(args.index_bootstrap_archive_url)
 
     def test_server_configuration(self):
@@ -205,12 +196,10 @@ class TestCLIArguments(unittest.TestCase):
                 "project_search",
                 "--index-bootstrap-archive-url",
                 "https://example.com/bootstrap.tar.gz",
-                "--initial-documents",
-                "README.md",
-                "docs/api.md",
-                "--initial-codebase",
-                "src",
-                "tests",
+                "--initial-filebase",
+                "./repo",
+                "--topic",
+                "docs",
                 "--no-auto-persist",
                 "--embedding-provider",
                 "ollama",
@@ -225,8 +214,8 @@ class TestCLIArguments(unittest.TestCase):
         self.assertEqual(
             args.index_bootstrap_archive_url, "https://example.com/bootstrap.tar.gz"
         )
-        self.assertEqual(args.initial_documents, ["README.md", "docs/api.md"])
-        self.assertEqual(args.initial_codebase, ["src", "tests"])
+        self.assertEqual(args.initial_filebase, "./repo")
+        self.assertEqual(args.topic, "docs")
         self.assertTrue(args.no_auto_persist)
         self.assertEqual(args.embedding_provider, "ollama")
         self.assertEqual(args.embedding_model, "nomic-embed-text")

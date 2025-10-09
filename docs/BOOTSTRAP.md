@@ -407,7 +407,7 @@ jobs:
       - name: Build Index
         run: |
           # Build your index
-          pycontextify --initial-documents docs/**/*.md
+          pycontextify --initial-filebase docs --topic docs
           
       - name: Create Bootstrap Archive
         run: |
