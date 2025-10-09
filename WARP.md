@@ -75,8 +75,8 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 ## MCP Interface
 
 5 essential functions:
-1. `index_code(path)` - Codebase with relationship extraction
-2. `index_document(path)` - Documents (PDF, MD, TXT)
+1. `index_filebase(path, topic)` - Unified code/document indexing with relationship extraction
+2. `discover()` - List indexed topics to aid navigation
 3. `search(query, top_k=5)` - Hybrid semantic + keyword search
 4. `reset_index(remove_files=True, confirm=False)` - Clear index data
 5. `status()` - System statistics
@@ -177,18 +177,16 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 
 ### Python Sources
 - **pycontextify/__init__.py** – Exposes the package’s primary configuration and indexing interfaces for external consumers.
-- **pycontextify/index/__init__.py** – Maintains backwards-compatible exports while forwarding to the new architectural blocks.
 - **pycontextify/config.py** – Loads, validates, and summarizes configuration for indexing, chunking, embeddings, and persistence.
-- **pycontextify/embedder/** – Hosts the embedding abstractions, provider implementations, and factory wiring.
+- **pycontextify/embedder.py / embedder_factory.py** – Host the embedding abstractions, provider implementations, and factory wiring.
 - **pycontextify/chunker.py** – Provides base and specialized chunkers for code and documents, handling splitting and metadata extraction.
-- **pycontextify/storage/metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.
-- **pycontextify/storage/vector.py** – Wraps FAISS vector storage operations, including persistence, backup, and validation routines.
-- **pycontextify/search/hybrid.py** – Implements keyword-based hybrid search that complements vector similarity results.
-- **pycontextify/search/models.py** – Defines search-related data structures, response formatting helpers, and analytics utilities.
-- **pycontextify/indexer/manager.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
-- **pycontextify/index_document.py** / **index_codebase.py** – Supply loaders for documents and codebases, orchestrating ingestion workflows per source type.
-- **pycontextify/indexer/pdf_loader.py** – Handles PDF extraction via multiple backends and enriches pages with contextual metadata.
-- **pycontextify/mcp/server.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
+- **pycontextify/storage_metadata.py** – Defines source types, chunk metadata, and persistent metadata storage for the knowledge graph.
+- **pycontextify/storage_vector.py** – Wraps FAISS vector storage operations, including persistence, backup, and validation routines.
+- **pycontextify/search_hybrid.py** – Implements keyword-based hybrid search that complements vector similarity results.
+- **pycontextify/search_models.py** – Defines search-related data structures, response formatting helpers, and analytics utilities.
+- **pycontextify/indexer.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
+- **pycontextify/loader.py** – Supplies loaders for documents and codebases, orchestrating ingestion workflows per source type.
+- **pycontextify/mcp.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
 - **scripts/debug_lazy_loading.py** – Prints diagnostics to inspect lazy-loading behavior of the index manager.
 - **scripts/detailed_perf.py** – Measures fine-grained startup timings for key indexing components.
 - **scripts/fast_startup_test.py** – Benchmarks configuration options and lazy-loading strategies for faster startup.
@@ -201,5 +199,5 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 **UV**: Fast dependency management, lockfiles, optional dependencies  
 **FAISS**: High-performance vector search with CPU/GPU support  
 **Lazy Loading**: Fast startup, components loaded on demand  
-**Simplified MCP**: 6 essential functions, clean and focused API
+**Simplified MCP**: 5 essential functions, clean and focused API
 **No External DB**: File-based persistence, lightweight knowledge graph

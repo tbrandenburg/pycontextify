@@ -217,8 +217,8 @@ Tests the same workflow via actual MCP tools:
 
 1. ✅ Check tool availability
 2. ✅ Get status via `status` tool
-3. ✅ Index document via `index_document` tool
-4. ✅ Index code via `index_code` tool
+3. ✅ Index document directory via `index_filebase` tool
+4. ✅ Index code via `index_filebase` tool (separate topic)
 5. ✅ Search via `search` tool
 6. ✅ Reset via `reset_index` tool
 
@@ -243,14 +243,14 @@ uv run pytest tests/system/test_mcp_system.py::TestMCPServerSystem::test_complet
 
 #### Good Coverage Modules (70-89%)
 - ✅ `config.py` - 79%
-- ✅ `index_codebase.py` - 74%
+- ✅ `loader.py` - 74%
 - ✅ `embedder_factory.py` - 71%
 
 #### Coverage Focus Areas
 - `chunker.py` - 69%
 - `search_models.py` - 70%
 - `indexer.py` - 64%
-- `index_document.py` - 65%
+- `postprocess.py` - 62%
 
 ### Measuring Coverage
 

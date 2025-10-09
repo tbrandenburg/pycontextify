@@ -17,8 +17,8 @@ uv run pycontextify --index-path ./my_index
 ### With Initial Content
 ```bash
 uv run pycontextify \
-  --initial-documents ./README.md \
-  --initial-codebase ./src
+  --initial-filebase ./src \
+  --topic my-project
 ```
 
 ---
@@ -30,9 +30,9 @@ The server exposes 5 tools for semantic search and indexing:
 | Tool | Purpose | Parameters |
 |------|---------|------------|
 | `status` | Get index statistics | None |
-| `index_document` | Index a document file | `file_path` (required) |
-| `index_code` | Index a codebase directory | `directory_path` (required) |
-| `search` | Semantic search | `query` (required), `top_k`, `output_format` |
+| `index_filebase` | Index a filebase (code + docs) | `base_path` (required), `topic` (required), `include`, `exclude`, `exclude_dirs` |
+| `discover` | List indexed topics | None |
+| `search` | Semantic search | `query` (required), `top_k`, `display_format` |
 | `reset_index` | Clear the index | `remove_files`, `confirm` (required) |
 
 ### Tool Examples
@@ -45,23 +45,24 @@ The server exposes 5 tools for semantic search and indexing:
 }
 ```
 
-**Index Document:**
+**Index Filebase:**
 ```json
 {
-  "tool": "index_document",
+  "tool": "index_filebase",
   "arguments": {
-    "file_path": "/path/to/document.pdf"
+    "base_path": "/path/to/repository",
+    "topic": "documentation",
+    "include": ["*.py", "*.md"],
+    "exclude_dirs": [".git", "node_modules"]
   }
 }
 ```
 
-**Index Codebase:**
+**Discover Topics:**
 ```json
 {
-  "tool": "index_code",
-  "arguments": {
-    "directory_path": "/path/to/codebase"
-  }
+  "tool": "discover",
+  "arguments": {}
 }
 ```
 
@@ -102,8 +103,8 @@ The server exposes 5 tools for semantic search and indexing:
 ### Initial Indexing
 | Option | Description |
 |--------|-------------|
-| `--initial-documents [FILES...]` | Documents to index at startup |
-| `--initial-codebase [DIRS...]` | Codebases to index at startup |
+| `--initial-filebase DIR` | Directory tree to index at startup |
+| `--topic NAME` | Topic label for the initial indexing run (required with `--initial-filebase`) |
 ### Embedding Configuration
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -190,10 +191,10 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
         "pycontextify",
         "--index-path",
         "C:\\path\\to\\index",
-        "--initial-codebase",
-        "C:\\path\\to\\project\\src",
-        "--initial-documents",
-        "C:\\path\\to\\project\\README.md"
+        "--initial-filebase",
+        "C:\\path\\to\\project",
+        "--topic",
+        "project-docs"
       ]
     }
   }
@@ -208,7 +209,8 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 ```bash
 uv run pycontextify \
   --index-path ./docs_index \
-  --initial-documents ./docs/*.md \
+  --initial-filebase ./docs \
+  --topic documentation \
   --quiet
 ```
 
@@ -217,16 +219,18 @@ uv run pycontextify \
 uv run pycontextify \
   --index-path ./project_index \
   --index-name my_project \
-  --initial-codebase ./src \
-  --initial-documents ./README.md ./docs/api.md
+  --initial-filebase ./project \
+  --topic project-docs \
+  --quiet
 ```
 
 ### Example 3: Multi-Source Index
 ```bash
 uv run pycontextify \
   --index-path ./knowledge_base \
-  --initial-documents ./specs/*.pdf \
-  --initial-codebase ./backend ./frontend
+  --initial-filebase ./knowledge_base_sources \
+  --topic unified-knowledge \
+  --quiet
 ```
 
 ---
@@ -248,8 +252,8 @@ uv run python -c "from pycontextify import mcp; print(list(mcp.mcp._tool_manager
 
 **Expected tools:**
 - `status`
-- `index_document`
-- `index_code`
+- `index_filebase`
+- `discover`
 - `search`
 - `reset_index`
 
@@ -291,7 +295,7 @@ print(f'Tool count: {len(tools)}')
 
 Expected output:
 ```
-Available tools: ['status', 'index_document', 'index_code', 'search', 'reset_index']
+Available tools: ['status', 'index_filebase', 'discover', 'search', 'reset_index']
 Tool count: 5
 ```
 
@@ -332,8 +336,9 @@ mcp.initialize_manager({"index_dir": "./test_index"})
 status = mcp.mcp._tool_manager._tools["status"].fn()
 print(status)
 
-# Index a document
-result = mcp.mcp._tool_manager._tools["index_document"].fn("./README.md")
+# Index a filebase (code or docs)
+index_filebase = mcp.mcp._tool_manager._tools["index_filebase"].fn
+result = index_filebase(base_path="./docs", topic="documentation")
 print(result)
 
 # Search

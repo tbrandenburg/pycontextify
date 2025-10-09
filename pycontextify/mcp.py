@@ -958,8 +958,8 @@ def main():
 
         logger.info("Starting PyContextify MCP Server...")
         logger.info("Server provides 5 essential MCP functions:")
-        logger.info("  - index_code(path): Index codebase directory")
-        logger.info("  - index_document(path): Index document")
+        logger.info("  - index_filebase(path, topic): Unified filebase indexing")
+        logger.info("  - discover(): List indexed topics")
         logger.info("  - search(query, top_k): Basic semantic search")
         logger.info("  - reset_index(confirm=True): Clear all indexed content")
         logger.info("  - status(): Get system status and statistics")
@@ -975,7 +975,7 @@ def main():
         mgr = initialize_manager(config_overrides)
 
         # Perform initial indexing if specified
-        if args.initial_documents or args.initial_codebase:
+        if getattr(args, "initial_filebase", None):
             logger.info("Performing initial indexing...")
             import asyncio
 
