@@ -323,7 +323,7 @@ class TestMCPServerFunctions:
 
         # MCP server info should be added
         assert status["mcp_server"]["name"] == "PyContextify"
-        assert len(status["mcp_server"]["mcp_functions"]) == 6
+        assert len(status["mcp_server"]["mcp_functions"]) == 5
 
     @patch("pycontextify.mcp.IndexManager")
     def test_reset_index_success(self, mock_manager_class):
