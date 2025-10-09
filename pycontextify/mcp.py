@@ -248,15 +248,14 @@ def parse_args() -> argparse.Namespace:
   # Start server with custom index path
   pycontextify --index-path ./my_index
 
-  # Start with initial documents
-  pycontextify --initial-documents ./docs/readme.md ./docs/api.md
+  # Start with initial filebase indexing
+  pycontextify --initial-filebase ./src --topic my-project
 
-  # Start with initial codebase and custom index
-  pycontextify --index-path ./project_index --initial-codebase ./src
+  # Index with custom index path and topic
+  pycontextify --index-path ./project_index --initial-filebase ./src --topic codebase
 
-  # Full example with mixed content types
-  pycontextify --index-path ./my_index --index-name project_search \
-               --initial-documents ./README.md --initial-codebase ./src
+  # Index documentation with topic
+  pycontextify --initial-filebase ./docs --topic documentation
 
 Configuration priority: CLI arguments > Environment variables > Defaults
 
@@ -292,16 +291,14 @@ Environment variables can still be used for all settings. Use --help for details
 
     # Initial indexing
     parser.add_argument(
-        "--initial-documents",
-        nargs="*",
+        "--initial-filebase",
         type=str,
-        help="File paths to documents to index at startup (PDF, Markdown, Text files)",
+        help="Directory path to index at startup using unified filebase pipeline",
     )
     parser.add_argument(
-        "--initial-codebase",
-        nargs="*",
+        "--topic",
         type=str,
-        help="Directory paths to codebases to index at startup",
+        help="Topic name for initial indexing (required with --initial-filebase)",
     )
     # Server configuration
     parser.add_argument(
@@ -418,83 +415,108 @@ def reset_manager() -> None:
 mcp = FastMCP("PyContextify")
 
 
-def _index_code_impl(path: str) -> Dict[str, Any]:
-    """Implementation for index_code with validation and business logic."""
+def _index_filebase_impl(
+    base_path: str,
+    topic: str,
+    include: Optional[List[str]] = None,
+    exclude: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Implementation for index_filebase with validation and business logic."""
     # Validate parameters
-    path = validate_string_param(path, "path")
-
-    path_obj = Path(path).resolve()
-    if not path_obj.exists():
-        raise ValueError(f"Path does not exist: {path}")
-
-    if not path_obj.is_dir():
-        raise ValueError(f"Path is not a directory: {path}")
+    base_path = validate_string_param(base_path, "base_path")
+    topic = validate_string_param(topic, "topic")
 
     # Initialize manager and index
     mgr = initialize_manager()
-    result = mgr.index_codebase(str(path_obj))
+    result = mgr.index_filebase(
+        base_path=base_path,
+        topic=topic,
+        include=include,
+        exclude=exclude,
+        exclude_dirs=exclude_dirs,
+    )
 
-    logger.info(f"Code indexing completed for {path}: {result}")
+    logger.info(
+        f"Filebase indexing completed for {base_path} (topic: {topic}): {result}"
+    )
     return result
 
 
 @mcp.tool
-def index_code(path: str) -> Dict[str, Any]:
-    """Index a codebase directory for semantic search.
+def index_filebase(
+    base_path: str,
+    topic: str,
+    include: Optional[List[str]] = None,
+    exclude: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Index a filebase (directory tree) for semantic search.
 
-    This function recursively scans a directory for code files and indexes them
-    for semantic search. It supports various programming languages.
+    This is the unified indexing function that handles all file types
+    (code, documents, PDFs) with a single consistent pipeline.
 
     Args:
-        path: Path to the codebase directory to index
+        base_path: Root directory path to index
+        topic: Topic name for organizing indexed content (required)
+        include: Optional list of fnmatch patterns to include (e.g., ["*.py", "*.md"])
+        exclude: Optional list of fnmatch patterns to exclude (e.g., ["*_test.py"])
+        exclude_dirs: Optional list of directory names to exclude (e.g., ["node_modules", ".git"])
 
     Returns:
-        Dictionary with indexing statistics including files processed and chunks added
+        Dictionary with indexing statistics including:
+        - topic: The topic name
+        - base_path: Root directory indexed
+        - files_crawled: Total files discovered
+        - files_loaded: Files successfully loaded
+        - chunks_created: Total chunks created
+        - vectors_embedded: Vectors generated
+        - errors: Number of errors encountered
+        - duration_seconds: Time taken
     """
-    return handle_mcp_errors("Code indexing", _index_code_impl, path)
-
-
-def _index_document_impl(path: str) -> Dict[str, Any]:
-    """Implementation for index_document with validation and business logic."""
-    # Validate parameters
-    path = validate_string_param(path, "path")
-
-    path_obj = Path(path).resolve()
-    if not path_obj.exists():
-        raise ValueError(f"File does not exist: {path}")
-
-    if not path_obj.is_file():
-        raise ValueError(f"Path is not a file: {path}")
-
-    # Check supported extensions
-    supported_extensions = {".pdf", ".md", ".txt"}
-    if path_obj.suffix.lower() not in supported_extensions:
-        raise ValueError(
-            f"Unsupported file type. Supported: {', '.join(supported_extensions)}"
-        )
-
-    # Initialize manager and index
-    mgr = initialize_manager()
-    result = mgr.index_document(str(path_obj))
-
-    logger.info(f"Document indexing completed for {path}: {result}")
-    return result
+    return handle_mcp_errors(
+        "Filebase indexing",
+        _index_filebase_impl,
+        base_path,
+        topic,
+        include,
+        exclude,
+        exclude_dirs,
+    )
 
 
 @mcp.tool
-def index_document(path: str) -> Dict[str, Any]:
-    """Index a single document (PDF, Markdown, or text file) for semantic search.
+def discover() -> Dict[str, Any]:
+    """Discover all indexed topics.
 
-    This function indexes individual documents and extracts their structure
-    for semantic search capabilities.
-
-    Args:
-        path: Path to the document file to index
+    Returns a list of unique topic names from all indexed content,
+    useful for browsing and filtering indexed material.
 
     Returns:
-        Dictionary with indexing statistics including chunks added
+        Dictionary with:
+        - topics: Sorted list of unique topic names
+        - count: Number of unique topics
     """
-    return handle_mcp_errors("Document indexing", _index_document_impl, path)
+    try:
+        mgr = initialize_manager()
+        topics = mgr.metadata_store.discover_topics()
+
+        result = {
+            "topics": topics,
+            "count": len(topics),
+        }
+
+        logger.info(f"Discovered {len(topics)} topics")
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to discover topics: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "error": error_msg,
+            "topics": [],
+            "count": 0,
+        }
 
 
 @mcp.tool
@@ -758,13 +780,13 @@ def status() -> Dict[str, Any]:
             "name": "PyContextify",
             "version": "0.1.0",
             "mcp_functions": [
-                "index_code",
-                "index_document",
+                "index_filebase",
+                "discover",
                 "search",
                 "reset_index",
                 "status",
             ],
-            "interface": "simplified",  # Simplified vector search interface
+            "interface": "unified_filebase",  # Unified filebase indexing
         }
 
         logger.info("Status request completed successfully")
@@ -781,99 +803,59 @@ def status() -> Dict[str, Any]:
 
 
 async def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) -> None:
-    """Perform initial document and codebase indexing if specified in CLI args.
+    """Perform initial filebase indexing if specified in CLI args.
 
     Args:
         args: Parsed command-line arguments
         mgr: Initialized IndexManager instance
     """
-    total_indexed = 0
+    # Index initial filebase (safe attribute access)
+    if getattr(args, "initial_filebase", None):
+        # Validate that topic is provided
+        if not getattr(args, "topic", None):
+            logger.error(
+                "ERROR: --topic is required when using --initial-filebase\n"
+                "Example: pycontextify --initial-filebase ./src --topic my-project"
+            )
+            import sys
 
-    # Index initial documents
-    if args.initial_documents:
-        logger.info(f"Indexing {len(args.initial_documents)} initial documents...")
-        for doc_path in args.initial_documents:
-            try:
-                path_obj = Path(doc_path).resolve()
-                if not path_obj.exists():
-                    logger.warning(f"Document not found, skipping: {doc_path}")
-                    continue
+            sys.exit(1)
 
-                if not path_obj.is_file():
-                    logger.warning(f"Path is not a file, skipping: {doc_path}")
-                    continue
+        logger.info(
+            f"Indexing initial filebase: {args.initial_filebase} (topic: {args.topic})"
+        )
 
-                # Check supported extensions
-                supported_extensions = {".pdf", ".md", ".txt"}
-                if path_obj.suffix.lower() not in supported_extensions:
-                    logger.warning(
-                        f"Unsupported file type {path_obj.suffix}, skipping: {doc_path}"
-                    )
-                    continue
-
-                result = mgr.index_document(str(path_obj))
-                if "error" not in result:
-                    chunks_added = result.get("chunks_added", 0)
-                    total_indexed += chunks_added
-                    logger.info(
-                        f"Successfully indexed document {doc_path}: "
-                        f"{chunks_added} chunks"
-                    )
-                else:
-                    logger.error(
-                        f"Failed to index document {doc_path}: {result['error']}"
-                    )
-
-            except Exception as e:
-                logger.error(f"Error indexing document {doc_path}: {e}")
-
-    # Index initial codebases
-    if args.initial_codebase:
-        logger.info(f"Indexing {len(args.initial_codebase)} initial codebases...")
-        for codebase_path in args.initial_codebase:
-            try:
-                path_obj = Path(codebase_path).resolve()
-                if not path_obj.exists():
-                    logger.warning(
-                        f"Codebase directory not found, skipping: {codebase_path}"
-                    )
-                    continue
-
-                if not path_obj.is_dir():
-                    logger.warning(
-                        f"Path is not a directory, skipping: {codebase_path}"
-                    )
-                    continue
-
-                result = mgr.index_codebase(str(path_obj))
-                if "error" not in result:
-                    files_processed = result.get("files_processed", 0)
-                    chunks_added = result.get("chunks_added", 0)
-                    total_indexed += chunks_added
-                    logger.info(
-                        f"Successfully indexed codebase {codebase_path}: "
-                        f"{files_processed} files, {chunks_added} chunks"
-                    )
-                else:
-                    logger.error(
-                        f"Failed to index codebase {codebase_path}: {result['error']}"
-                    )
-
-            except Exception as e:
-                logger.error(f"Error indexing codebase {codebase_path}: {e}")
-
-    if total_indexed > 0:
-        logger.info(f"Initial indexing completed: {total_indexed} total chunks indexed")
-
-        # Save the index if auto-persist is enabled
         try:
-            if mgr.config.auto_persist:
-                mgr.save_index()
-                logger.info("Initial index saved to disk")
+            result = mgr.index_filebase(
+                base_path=args.initial_filebase,
+                topic=args.topic,
+            )
+
+            if "error" not in result:
+                logger.info(
+                    f"Successfully indexed filebase: "
+                    f"{result.get('chunks_created', 0)} chunks from "
+                    f"{result.get('files_loaded', 0)} files in "
+                    f"{result.get('duration_seconds', 0)}s"
+                )
+
+                # Print stats to stdout for user visibility
+                print("\n=== Indexing Complete ===")
+                print(f"Topic: {result.get('topic')}")
+                print(f"Files crawled: {result.get('files_crawled', 0)}")
+                print(f"Files loaded: {result.get('files_loaded', 0)}")
+                print(f"Chunks created: {result.get('chunks_created', 0)}")
+                print(f"Vectors embedded: {result.get('vectors_embedded', 0)}")
+                print(f"Errors: {result.get('errors', 0)}")
+                print(f"Duration: {result.get('duration_seconds', 0)}s")
+                print("========================\n")
+            else:
+                logger.error(f"Failed to index filebase: {result.get('error')}")
+
         except Exception as e:
-            logger.warning(f"Failed to save initial index: {e}")
+            logger.error(f"Error indexing filebase: {e}")
     else:
-        logger.info("No initial indexing performed")
+        logger.info("No initial indexing requested")
 
 
 def args_to_config_overrides(args: argparse.Namespace) -> Dict[str, Any]:

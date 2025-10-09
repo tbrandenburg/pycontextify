@@ -97,23 +97,26 @@ from web development to data science and artificial intelligence.
         self, sample_markdown_content, index_manager
     ):
         """Test complete pipeline: markdown → chunks → embeddings → search."""
-        # Create temporary markdown file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8"
-        ) as temp_file:
-            temp_file.write(sample_markdown_content)
-            temp_file.flush()
+        # Create temporary directory with markdown file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            doc_file = temp_path / "python_guide.md"
+            doc_file.write_text(sample_markdown_content, encoding="utf-8")
 
             try:
-                # Test document indexing
-                result = index_manager.index_document(temp_file.name)
+                # Test document indexing with new unified API
+                result = index_manager.index_filebase(
+                    base_path=str(temp_path),
+                    topic="documents"
+                )
 
-                # Verify indexing succeeded
+                # Verify indexing succeeded with new stats structure
                 assert "error" not in result
-                assert result["chunks_added"] > 0
-                assert result["source_type"] == "document"
+                assert result["files_loaded"] > 0
+                assert result["chunks_created"] > 0
+                assert result["vectors_embedded"] > 0
 
-                print(f"Successfully indexed document: {result}")
+                print(f"Successfully indexed filebase: {result}")
 
                 # Get status to verify embeddings were created
                 status = index_manager.get_status()
@@ -129,13 +132,9 @@ from web development to data science and artificial intelligence.
                 # Test relationship-aware search
                 self._test_relationship_search(index_manager)
 
-            finally:
-                # Clean up temporary file (Windows-safe)
-                try:
-                    Path(temp_file.name).unlink(missing_ok=True)
-                except PermissionError:
-                    # Windows file permission issue - ignore for test cleanup
-                    pass
+            except Exception as e:
+                print(f"Test failed: {e}")
+                raise
 
     def _verify_embeddings_properties(self, index_manager, status):
         """Verify that generated embeddings have expected properties."""
@@ -304,40 +303,39 @@ class SearchEngine:
             ),
         ]
 
-        for doc_type, content in test_documents:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".md", delete=False, encoding="utf-8"
-            ) as temp_file:
-                temp_file.write(content)
-                temp_file.flush()
+        # Create temp directory for all test documents
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            for idx, (doc_type, content) in enumerate(test_documents):
+                doc_file = temp_path / f"doc_{idx}.md"
+                doc_file.write_text(content, encoding="utf-8")
 
-                try:
-                    result = index_manager.index_document(temp_file.name)
-                    assert "error" not in result
-                    assert result["chunks_added"] > 0
-                    print(
-                        f"✅ Successfully indexed {doc_type}: {result['chunks_added']} chunks"
-                    )
+            # Index all documents at once using unified API
+            result = index_manager.index_filebase(
+                base_path=str(temp_path),
+                topic="mixed_documents"
+            )
+            
+            assert "error" not in result
+            assert result["files_loaded"] == len(test_documents)
+            assert result["chunks_created"] > 0
+            print(
+                f"✅ Successfully indexed {result['files_loaded']} documents: {result['chunks_created']} chunks"
+            )
 
-                finally:
-                    # Windows-safe cleanup
-                    try:
-                        Path(temp_file.name).unlink(missing_ok=True)
-                    except PermissionError:
-                        pass
+            # After indexing multiple documents, test cross-document search
+            response = index_manager.search("API documentation", top_k=5)
+            assert response.success, f"Search should succeed: {response.error}"
+            assert (
+                len(response.results) > 0
+            ), "Should find results across different document types"
 
-        # After indexing multiple documents, test cross-document search
-        response = index_manager.search("API documentation", top_k=5)
-        assert response.success, f"Search should succeed: {response.error}"
-        assert (
-            len(response.results) > 0
-        ), "Should find results across different document types"
-
-        final_status = index_manager.get_status()
-        print(
-            f"✅ Final index status: {final_status['metadata']['total_chunks']} chunks, "
-            f"{final_status['vector_store']['total_vectors']} vectors"
-        )
+            final_status = index_manager.get_status()
+            print(
+                f"✅ Final index status: {final_status['metadata']['total_chunks']} chunks, "
+                f"{final_status['vector_store']['total_vectors']} vectors"
+            )
 
         # Code ingestion flows are covered by the MCP server tests to avoid
         # re-indexing large temporary directories in this integration suite.
@@ -447,21 +445,23 @@ print(f'Mean Squared Error: {mse}')
 **Copyright**: 2024 Machine Learning Tutorial. All rights reserved.
 """
 
-        # Create temporary Markdown file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8"
-        ) as temp_file:
-            temp_file.write(guide_content)
-            temp_file.flush()
+        # Create temporary directory with guide file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            guide_file = temp_path / "ml_guide.md"
+            guide_file.write_text(guide_content, encoding="utf-8")
 
             try:
                 # Test supplemental guide content indexing
-                result = index_manager.index_document(temp_file.name)
+                result = index_manager.index_filebase(
+                    base_path=str(temp_path),
+                    topic="guides"
+                )
 
                 # Verify indexing succeeded
                 assert "error" not in result
-                assert result["chunks_added"] > 0
-                assert result["source_type"] == "document"
+                assert result["files_loaded"] > 0
+                assert result["chunks_created"] > 0
 
                 print(f"✅ Successfully indexed guide content: {result}")
 
@@ -501,16 +501,13 @@ print(f'Mean Squared Error: {mse}')
                         assert math.isfinite(
                             score
                         ), f"Score should be finite for '{query}': {score}"
-                        print(f"✅ Webpage query '{query}': score {score:.4f}")
+                        print(f"✅ Guide query '{query}': score {score:.4f}")
                     else:
-                        print(f"⚠️  Webpage query '{query}': No results found")
+                        print(f"⚠️  Guide query '{query}': No results found")
 
-            finally:
-                # Clean up temporary file (Windows-safe)
-                try:
-                    Path(temp_file.name).unlink(missing_ok=True)
-                except PermissionError:
-                    pass
+            except Exception as e:
+                print(f"Test failed: {e}")
+                raise
 
 
 @pytest.mark.integration
@@ -537,46 +534,43 @@ It contains some basic content for indexing and search testing.
 
             manager = IndexManager(config)
             try:
-                # Create and index a test document
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".md", delete=False, encoding="utf-8"
-                ) as temp_file:
-                    temp_file.write(sample_markdown_content)
-                    temp_file.flush()
+                # Create temp directory and test document
+                doc_dir = Path(temp_dir) / "docs"
+                doc_dir.mkdir()
+                doc_file = doc_dir / "test.md"
+                doc_file.write_text(sample_markdown_content, encoding="utf-8")
 
-                    # Index the document
-                    result = manager.index_document(temp_file.name)
-                    assert "error" not in result
+                # Index the document using unified API
+                result = manager.index_filebase(
+                    base_path=str(doc_dir),
+                    topic="test_documents"
+                )
+                assert "error" not in result
+                assert result["files_loaded"] > 0
 
-                    # Test status
-                    status = manager.get_status()
+                # Test status
+                status = manager.get_status()
 
-                    # Verify status structure
-                    assert "metadata" in status
-                    assert "vector_store" in status
-                    assert "embedding" in status
-                    assert "performance" in status
-                    assert "memory_usage_mb" in status["performance"]
+                # Verify status structure
+                assert "metadata" in status
+                assert "vector_store" in status
+                assert "embedding" in status
+                assert "performance" in status
+                assert "memory_usage_mb" in status["performance"]
 
-                    # Verify content was indexed
-                    assert status["metadata"]["total_chunks"] > 0
-                    assert status["vector_store"]["total_vectors"] > 0
-                    assert status["embedding"]["provider"] == "sentence_transformers"
+                # Verify content was indexed
+                assert status["metadata"]["total_chunks"] > 0
+                assert status["vector_store"]["total_vectors"] > 0
+                assert status["embedding"]["provider"] == "sentence_transformers"
 
-                    print(f"✅ MCP Status test passed:")
-                    print(f"   - Total chunks: {status['metadata']['total_chunks']}")
-                    print(
-                        f"   - Total vectors: {status['vector_store']['total_vectors']}"
-                    )
-                    print(
-                        f"   - Memory usage: {status['performance']['memory_usage_mb']:.2f} MB"
-                    )
-
-                    # Clean up temp file (Windows-safe)
-                    try:
-                        Path(temp_file.name).unlink(missing_ok=True)
-                    except PermissionError:
-                        pass
+                print(f"✅ MCP Status test passed:")
+                print(f"   - Total chunks: {status['metadata']['total_chunks']}")
+                print(
+                    f"   - Total vectors: {status['vector_store']['total_vectors']}"
+                )
+                print(
+                    f"   - Memory usage: {status['performance']['memory_usage_mb']:.2f} MB"
+                )
 
             finally:
                 # Cleanup

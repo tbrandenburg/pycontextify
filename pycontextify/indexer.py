@@ -24,8 +24,6 @@ import requests
 from .chunker import ChunkerFactory
 from .config import Config
 from .embedder_factory import EmbedderFactory
-from .index_codebase import CodebaseIndexer
-from .index_document import DocumentIndexer
 from .search_models import (
     SearchErrorCode,
     SearchPerformanceLogger,
@@ -72,10 +70,6 @@ class IndexManager:
 
         # Initialize hybrid search (lightweight)
         self._initialize_hybrid_search()
-
-        # Prepare source-specific indexers
-        self._code_indexer = CodebaseIndexer(self)
-        self._document_indexer = DocumentIndexer(self)
 
         # Auto-load existing index if enabled
         if self.config.auto_load:
@@ -808,15 +802,308 @@ class IndexManager:
 
         self._ensure_embedder_loaded()
 
-    def index_codebase(self, path: str) -> Dict[str, Any]:
-        """Index a codebase directory using :class:`CodebaseIndexer`."""
+    def index_filebase(
+        self,
+        base_path: str,
+        topic: str,
+        include: Optional[List[str]] = None,
+        exclude: Optional[List[str]] = None,
+        exclude_dirs: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Index a filebase (directory) using unified pipeline.
 
-        return self._code_indexer.index(path)
+        This is the new unified indexing pipeline that replaces index_code() and
+        index_document() with a single, consistent flow.
 
-    def index_document(self, path: str) -> Dict[str, Any]:
-        """Index a single document using :class:`DocumentIndexer`."""
+        Args:
+            base_path: Root directory to index
+            topic: Topic name (required, used for organization)
+            include: List of fnmatch patterns to include
+            exclude: List of fnmatch patterns to exclude
+            exclude_dirs: List of directory patterns to exclude
 
-        return self._document_indexer.index(path)
+        Returns:
+            Dictionary with pipeline statistics
+
+        Raises:
+            ValueError: If topic is empty or None
+            FileNotFoundError: If base_path does not exist
+        """
+        from datetime import datetime, timezone
+
+        from .crawler import FileCrawler
+        from .loader import FileLoaderFactory
+        from .postprocess import postprocess_file, postprocess_filebase
+
+        # Validate topic (required)
+        if not topic or not isinstance(topic, str) or not topic.strip():
+            raise ValueError("topic is required and must be a non-empty string")
+
+        topic = topic.strip()
+
+        # Validate base_path
+        base_path_obj = Path(base_path).resolve()
+        if not base_path_obj.exists():
+            raise FileNotFoundError(f"Base path does not exist: {base_path}")
+        if not base_path_obj.is_dir():
+            raise ValueError(f"Base path is not a directory: {base_path}")
+
+        # Track timing
+        started_at = datetime.now(timezone.utc)
+        start_time = time.time()
+
+        logger.info(f"Starting filebase indexing: {base_path} (topic: {topic})")
+
+        # Initialize stats
+        stats = {
+            "topic": topic,
+            "base_path": str(base_path_obj),
+            "started_at": started_at.isoformat(),
+            "files_crawled": 0,
+            "files_loaded": 0,
+            "chunks_created": 0,
+            "vectors_embedded": 0,
+            "errors": 0,
+            "error_samples": [],
+        }
+
+        # Step 1: Crawl file tree
+        logger.info("Step 1/8: Crawling file tree")
+        try:
+            crawler = FileCrawler(
+                include=include,
+                exclude=exclude,
+                exclude_dirs=exclude_dirs,
+            )
+            file_paths = crawler.crawl(str(base_path_obj))
+            stats["files_crawled"] = len(file_paths)
+            logger.info(f"Crawled {len(file_paths)} files")
+        except Exception as e:
+            logger.error(f"Crawl failed: {e}")
+            stats["errors"] += 1
+            stats["error_samples"].append({"stage": "crawl", "error": str(e)})
+            return self._finalize_stats(stats, start_time)
+
+        if not file_paths:
+            logger.warning("No files found to index")
+            return self._finalize_stats(stats, start_time)
+
+        # Prepare loader and ensure embedder is ready
+        loader = FileLoaderFactory()
+        self._ensure_embedder_loaded()
+
+        # Get embedding info for chunks
+        embedding_provider = self.embedder.get_provider_name()
+        embedding_model = self.embedder.get_model_name()
+
+        all_chunks_to_store = []
+
+        # Step 2-5: Load, Chunk, Postprocess (per-file)
+        logger.info("Step 2-5: Loading, chunking, and postprocessing files")
+        for file_idx, file_path in enumerate(file_paths):
+            try:
+                # Step 2: Load/Normalize
+                logger.debug(f"Loading {file_idx + 1}/{len(file_paths)}: {file_path}")
+                normalized_docs = loader.load(
+                    path=file_path,
+                    topic=topic,
+                    base_path=str(base_path_obj),
+                )
+
+                if not normalized_docs:
+                    # File skipped (binary or error), already logged by loader
+                    continue
+
+                # Add embedding info to each doc's metadata
+                for doc in normalized_docs:
+                    doc["metadata"]["embedding_provider"] = embedding_provider
+                    doc["metadata"]["embedding_model"] = embedding_model
+
+                # Step 3: Chunk
+                file_chunks = ChunkerFactory.chunk_normalized_docs(
+                    normalized_docs=normalized_docs,
+                    config=self.config,
+                )
+
+                if not file_chunks:
+                    continue
+
+                # Step 4: Postprocess (file-level)
+                file_chunks = postprocess_file(file_chunks)
+
+                # Collect chunks
+                all_chunks_to_store.extend(file_chunks)
+                stats["files_loaded"] += 1
+
+            except Exception as e:
+                logger.error(f"Error processing {file_path}: {e}")
+                stats["errors"] += 1
+                if len(stats["error_samples"]) < 10:
+                    stats["error_samples"].append(
+                        {
+                            "stage": "load/chunk",
+                            "file": str(file_path),
+                            "error": str(e),
+                        }
+                    )
+
+        if not all_chunks_to_store:
+            logger.warning("No chunks created from files")
+            return self._finalize_stats(stats, start_time)
+
+        logger.info(
+            f"Created {len(all_chunks_to_store)} chunks from {stats['files_loaded']} files"
+        )
+        stats["chunks_created"] = len(all_chunks_to_store)
+
+        # Step 6: Postprocess (filebase-level)
+        logger.info("Step 6/8: Postprocessing entire filebase")
+        all_chunks_to_store = postprocess_filebase(all_chunks_to_store)
+
+        # Step 7: Embed
+        logger.info("Step 7/8: Generating embeddings")
+        try:
+            texts_to_embed = [chunk["text"] for chunk in all_chunks_to_store]
+            embeddings = self.embedder.embed_texts(texts_to_embed)
+            stats["vectors_embedded"] = len(embeddings)
+        except Exception as e:
+            logger.error(f"Embedding failed: {e}")
+            stats["errors"] += 1
+            stats["error_samples"].append({"stage": "embed", "error": str(e)})
+            return self._finalize_stats(stats, start_time)
+
+        # Step 8: Store
+        logger.info("Step 8/8: Storing vectors and metadata")
+        try:
+            # Ensure vector store is initialized
+            if self.vector_store is None:
+                self._initialize_vector_store()
+
+            # Add vectors to FAISS
+            faiss_ids = self.vector_store.add_vectors(embeddings)
+
+            # Add metadata (convert normalized chunks to ChunkMetadata)
+            for chunk_dict, faiss_id in zip(all_chunks_to_store, faiss_ids):
+                # Create ChunkMetadata from normalized chunk
+                chunk_metadata = self._create_chunk_metadata_from_dict(chunk_dict)
+                self.metadata_store.add_chunk(chunk_metadata)
+
+            # Auto-save if enabled
+            self._auto_save()
+
+            logger.info(f"Stored {len(faiss_ids)} vectors and metadata")
+
+        except Exception as e:
+            logger.error(f"Storage failed: {e}")
+            stats["errors"] += 1
+            stats["error_samples"].append({"stage": "store", "error": str(e)})
+            return self._finalize_stats(stats, start_time)
+
+        # Finalize stats
+        return self._finalize_stats(stats, start_time)
+
+    def _create_chunk_metadata_from_dict(
+        self, chunk_dict: Dict[str, Any]
+    ) -> ChunkMetadata:
+        """Convert normalized chunk dict to ChunkMetadata.
+
+        Args:
+            chunk_dict: Normalized chunk with {"text": str, "metadata": dict}
+
+        Returns:
+            ChunkMetadata object ready for storage
+        """
+        metadata = chunk_dict["metadata"]
+
+        # Determine source type from file extension
+        file_ext = metadata.get("file_extension", "")
+        source_type = self._infer_source_type_from_extension(file_ext)
+
+        # Create ChunkMetadata
+        chunk_metadata = ChunkMetadata(
+            source_path=metadata.get("full_path", ""),
+            source_type=source_type,
+            chunk_text=chunk_dict["text"],
+            start_char=metadata.get("start_char", 0),
+            end_char=metadata.get("end_char", 0),
+            file_extension=file_ext,
+            embedding_provider=metadata.get(
+                "embedding_provider", "sentence_transformers"
+            ),
+            embedding_model=metadata.get("embedding_model", "all-mpnet-base-v2"),
+            tags=metadata.get("tags", []),
+            references=metadata.get("references", []),
+            parent_section=metadata.get("chunk_name"),
+            code_symbols=metadata.get("code_symbols", []),
+            metadata=metadata.copy(),  # Store all metadata
+        )
+
+        return chunk_metadata
+
+    def _infer_source_type_from_extension(self, file_extension: str) -> SourceType:
+        """Infer SourceType from file extension.
+
+        Args:
+            file_extension: File extension without dot
+
+        Returns:
+            SourceType enum value
+        """
+        code_extensions = {
+            "py",
+            "js",
+            "ts",
+            "jsx",
+            "tsx",
+            "java",
+            "cpp",
+            "c",
+            "h",
+            "hpp",
+            "cs",
+            "go",
+            "rs",
+            "swift",
+            "kt",
+            "scala",
+            "rb",
+            "php",
+        }
+
+        if file_extension in code_extensions:
+            return SourceType.CODE
+        else:
+            return SourceType.DOCUMENT
+
+    def _finalize_stats(
+        self, stats: Dict[str, Any], start_time: float
+    ) -> Dict[str, Any]:
+        """Finalize pipeline statistics with timing info.
+
+        Args:
+            stats: Statistics dictionary to finalize
+            start_time: Start time from time.time()
+
+        Returns:
+            Finalized statistics dictionary
+        """
+        from datetime import datetime, timezone
+
+        duration_seconds = time.time() - start_time
+        stats["finished_at"] = datetime.now(timezone.utc).isoformat()
+        stats["duration_seconds"] = round(duration_seconds, 2)
+
+        # Limit error samples
+        if len(stats.get("error_samples", [])) > 10:
+            stats["error_samples"] = stats["error_samples"][:10]
+
+        logger.info(
+            f"Filebase indexing complete: "
+            f"{stats['chunks_created']} chunks from {stats['files_loaded']} files "
+            f"in {duration_seconds:.2f}s (topic: {stats['topic']})"
+        )
+
+        return stats
 
     def process_content(
         self, content: str, source_path: str, source_type: SourceType
@@ -916,8 +1203,6 @@ class IndexManager:
         """
         from pathlib import Path
 
-        from .index_document import PDFLoader
-
         # Get source_path safely, handling both real objects and mocks
         source_path = getattr(chunk, "source_path", "/unknown")
         source_type_val = getattr(chunk, "source_type", None)
@@ -963,24 +1248,17 @@ class IndexManager:
                     source_info["filename"] = "unknown"
 
             # PDF-specific metadata extraction
+            # Note: PDF metadata extraction has been moved to the loader module
             if source_type_str == "document" and source_path.lower().endswith(".pdf"):
-                try:
-                    pdf_loader = PDFLoader()
-                    pdf_metadata = pdf_loader.get_pdf_info(source_path)
-                    source_info.update(pdf_metadata)
-                except Exception as e:
-                    logger.debug(f"Could not extract PDF metadata: {e}")
+                # PDF info is already in chunk metadata if available
+                pass
 
         # Page and section context from chunk text (safe to do even with mocks)
+        # Note: Page context is now extracted during loading phase
         chunk_text = getattr(chunk, "chunk_text", "")
         if chunk_text and isinstance(chunk_text, str):
-            try:
-                pdf_loader = PDFLoader()
-                page_info = pdf_loader.extract_page_context(chunk_text)
-                if page_info:
-                    source_info.update(page_info)
-            except Exception as e:
-                logger.debug(f"Could not extract page context: {e}")
+            # Page info should already be in chunk metadata if available
+            pass
 
         # Add chunk-specific metadata
         if hasattr(chunk, "parent_section"):
@@ -1056,7 +1334,7 @@ class IndexManager:
                     error_code=SearchErrorCode.NO_CONTENT.value,
                     search_config=self._get_search_config(),
                     recovery_suggestions=[
-                        "Use index_document() or index_codebase() to add content",
+                        "Use index_filebase() to add content",
                         "Check if auto_load is enabled and index files exist",
                         "Verify the vector store was initialized properly",
                     ],

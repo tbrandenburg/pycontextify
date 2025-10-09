@@ -193,77 +193,83 @@ class TestMCPServerFunctions:
         reset_manager()
 
     @patch("pycontextify.mcp.IndexManager")
-    def test_index_code_success(self, mock_manager_class):
-        """Test successful code indexing."""
-        # Create test directory
-        test_code_dir = self.test_dir / "test_code"
-        test_code_dir.mkdir()
-        test_file = test_code_dir / "test.py"
+    def test_index_filebase_success(self, mock_manager_class):
+        """Test successful filebase indexing with unified API."""
+        # Create test directory with files
+        test_dir = self.test_dir / "test_files"
+        test_dir.mkdir()
+        test_file = test_dir / "test.py"
         test_file.write_text("def hello(): return 'world'")
 
         # Mock IndexManager
         mock_manager = Mock()
-        mock_manager.index_codebase.return_value = {
-            "files_processed": 1,
-            "chunks_added": 5,
-            "source_type": "code",
+        mock_manager.index_filebase.return_value = {
+            "topic": "test_code",
+            "base_path": str(test_dir),
+            "files_crawled": 1,
+            "files_loaded": 1,
+            "chunks_created": 5,
+            "vectors_embedded": 5,
+            "errors": 0,
         }
         mock_manager_class.return_value = mock_manager
 
         # Access the actual function through FastMCP
-        index_code_fn = mcp_module.mcp._tool_manager._tools["index_code"].fn
-        result = index_code_fn(str(test_code_dir))
-
-        assert "error" not in result
-        assert result["files_processed"] == 1
-        assert result["chunks_added"] == 5
-        mock_manager.index_codebase.assert_called_once_with(
-            str(test_code_dir.resolve())
+        index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
+        result = index_filebase_fn(
+            base_path=str(test_dir),
+            topic="test_code"
         )
 
-    def test_index_code_nonexistent_path(self):
-        """Test indexing nonexistent path."""
-        index_code_fn = mcp_module.mcp._tool_manager._tools["index_code"].fn
-        result = index_code_fn("/nonexistent/path")
-        assert "error" in result
-        assert "does not exist" in result["error"]
+        assert "error" not in result
+        assert result["files_loaded"] == 1
+        assert result["chunks_created"] == 5
+        assert result["topic"] == "test_code"
+        mock_manager.index_filebase.assert_called_once()
 
-    def test_index_code_empty_path(self):
-        """Test indexing with empty path."""
-        index_code_fn = mcp_module.mcp._tool_manager._tools["index_code"].fn
-        result = index_code_fn("")
+    def test_index_filebase_nonexistent_path(self):
+        """Test indexing nonexistent path."""
+        index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
+        result = index_filebase_fn(
+            base_path="/nonexistent/path",
+            topic="test"
+        )
         assert "error" in result
-        assert "cannot be empty" in result["error"]
+        assert "does not exist" in result["error"].lower()
+
+    def test_index_filebase_missing_topic(self):
+        """Test indexing without required topic."""
+        test_dir = self.test_dir / "test_files"
+        test_dir.mkdir()
+        
+        index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
+        result = index_filebase_fn(
+            base_path=str(test_dir),
+            topic=""  # Empty topic
+        )
+        assert "error" in result
+        assert "topic" in result["error"].lower()
 
     @patch("pycontextify.mcp.IndexManager")
-    def test_index_document_success(self, mock_manager_class):
-        """Test successful document indexing."""
-        test_doc = self.test_dir / "test.pdf"
-        test_doc.write_text("dummy pdf content")
-
+    def test_discover_topics(self, mock_manager_class):
+        """Test discover function returns indexed topics."""
         mock_manager = Mock()
-        mock_manager.index_document.return_value = {
-            "chunks_added": 3,
-            "source_type": "document",
-        }
+        
+        # Mock storage with discover_topics method
+        mock_storage = Mock()
+        mock_storage.discover_topics.return_value = ["code", "docs", "guides"]
+        mock_manager.metadata_store = mock_storage
         mock_manager_class.return_value = mock_manager
 
-        index_document_fn = mcp_module.mcp._tool_manager._tools["index_document"].fn
-        result = index_document_fn(str(test_doc))
+        # Access discover function
+        discover_fn = mcp_module.mcp._tool_manager._tools["discover"].fn
+        result = discover_fn()
 
-        assert "error" not in result
-        assert result["chunks_added"] == 3
-        mock_manager.index_document.assert_called_once_with(str(test_doc.resolve()))
-
-    def test_index_document_unsupported_extension(self):
-        """Test indexing unsupported file type."""
-        test_file = self.test_dir / "test.exe"
-        test_file.write_text("binary content")
-
-        index_document_fn = mcp_module.mcp._tool_manager._tools["index_document"].fn
-        result = index_document_fn(str(test_file))
-        assert "error" in result
-        assert "Unsupported file type" in result["error"]
+        assert "topics" in result
+        assert len(result["topics"]) == 3
+        assert "code" in result["topics"]
+        assert "docs" in result["topics"]
+        assert "guides" in result["topics"]
 
     @patch("pycontextify.mcp.IndexManager")
     def test_search_success(self, mock_manager_class):
@@ -408,7 +414,7 @@ class TestMCPIntegration:
         assert status["metadata"]["total_chunks"] == 0
         print("✅ Initial status verified")
 
-        # Step 2: Index a document
+        # Step 2: Index a document using unified API
         test_content = """# API Reference Guide
         
 ## REST Endpoints
@@ -420,17 +426,20 @@ class TestMCPIntegration:
 Use Bearer tokens in the Authorization header.
 """
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8"
-        ) as f:
-            f.write(test_content)
-            f.flush()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            doc_dir = Path(temp_dir) / "docs"
+            doc_dir.mkdir()
+            doc_file = doc_dir / "api_guide.md"
+            doc_file.write_text(test_content, encoding="utf-8")
 
             try:
-                result = mcp_isolated.index_document.fn(f.name)
+                result = mcp_isolated.index_filebase.fn(
+                    base_path=str(doc_dir),
+                    topic="api_docs"
+                )
                 assert "error" not in result
-                assert result["chunks_added"] > 0
-                print(f"✅ Document indexed: {result['chunks_added']} chunks")
+                assert result["chunks_created"] > 0
+                print(f"✅ Document indexed: {result['chunks_created']} chunks")
 
                 # Step 3: Verify search works
                 results = mcp_isolated.search.fn("API authentication", top_k=3)
@@ -449,23 +458,28 @@ Use Bearer tokens in the Authorization header.
                     score, (int, float, np.integer, np.floating)
                 ), f"Score should be numeric: {score}"
 
-            finally:
-                try:
-                    Path(f.name).unlink(missing_ok=True)
-                except PermissionError:
-                    pass
+            except Exception as e:
+                print(f"Test failed: {e}")
+                raise
 
     def test_error_handling_integration(self, mcp_isolated):
         """Test MCP function error handling."""
-        # Test non-existent file
-        result = mcp_isolated.index_document.fn("/non/existent/file.txt")
-        assert "error" in result
-        print("✅ Error handling for missing files")
-
         # Test non-existent directory
-        result = mcp_isolated.index_code.fn("/non/existent/directory")
+        result = mcp_isolated.index_filebase.fn(
+            base_path="/non/existent/directory",
+            topic="test"
+        )
         assert "error" in result
         print("✅ Error handling for missing directories")
+
+        # Test empty topic
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = mcp_isolated.index_filebase.fn(
+                base_path=temp_dir,
+                topic=""  # Empty topic should fail
+            )
+            assert "error" in result
+            print("✅ Error handling for empty topic")
 
         # Test invalid search
         results = mcp_isolated.search.fn("", top_k=5)
@@ -498,31 +512,31 @@ class TestMCPUtilityFunctions:
 
     @patch("pycontextify.mcp.IndexManager")
     async def test_perform_initial_indexing(self, mock_manager_class):
-        """Test initial indexing functionality."""
+        """Test initial indexing functionality with new unified API."""
         mock_manager = Mock()
-        mock_manager.index_document.return_value = {"chunks_added": 3}
-        mock_manager.index_codebase.return_value = {
-            "files_processed": 2,
-            "chunks_added": 5,
+        mock_manager.index_filebase.return_value = {
+            "files_crawled": 2,
+            "files_loaded": 2,
+            "chunks_created": 5,
+            "vectors_embedded": 5,
         }
         mock_manager_class.return_value = mock_manager
 
-        # Create mock args
+        # Create mock args for new API
         args = argparse.Namespace()
-        args.initial_documents = ["test.md"]
-        args.initial_codebase = ["./src"]
+        args.initial_filebase = None
+        args.topic = None
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md") as temp_file:
-            temp_file.write("# Test")
-            temp_file.flush()
-            args.initial_documents = [temp_file.name]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "test.py").write_text("print('hello')")
+            
+            # Set up args for filebase indexing
+            args.initial_filebase = temp_dir
+            args.topic = "test_code"
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                args.initial_codebase = [temp_dir]
-                (Path(temp_dir) / "test.py").write_text("print('hello')")
+            await perform_initial_indexing(args, mock_manager)
 
-                await perform_initial_indexing(args, mock_manager)
-
-                # Should have called both indexing methods
-                assert mock_manager.index_document.called
-                assert mock_manager.index_codebase.called
+            # Should have called index_filebase
+            assert mock_manager.index_filebase.called
+            call_args = mock_manager.index_filebase.call_args
+            assert call_args[1]["topic"] == "test_code"

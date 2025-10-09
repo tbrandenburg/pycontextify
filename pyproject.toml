@@ -38,6 +38,8 @@ dependencies = [
     "scikit-learn>=1.3.0",  # For TF-IDF keyword search
     "pymupdf>=1.23.0",      # Alternative PDF parser
     "rank-bm25>=0.2.2",     # BM25 for keyword search
+    "langchain>=0.2.0",     # LangChain core for document processing
+    "langchain-community>=0.2.0",  # Community loaders (PyPDFLoader)
 ]
 
 [project.optional-dependencies]

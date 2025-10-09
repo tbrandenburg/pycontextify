@@ -260,6 +260,21 @@ class MetadataStore:
             symbols.update(chunk.code_symbols)
         return symbols
 
+    def discover_topics(self) -> List[str]:
+        """Discover all unique topics from indexed chunks.
+
+        Returns:
+            Sorted list of unique topic names from chunk metadata
+        """
+        topics = set()
+        for chunk in self._id_to_metadata.values():
+            # Topic should be stored in chunk.metadata["topic"]
+            topic = chunk.metadata.get("topic")
+            if topic and isinstance(topic, str):
+                topics.add(topic)
+
+        return sorted(topics)
+
     def validate_embedding_compatibility(self, provider: str, model: str) -> bool:
         """Check if existing chunks are compatible with current embedding settings."""
         if not self._id_to_metadata:
