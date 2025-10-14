@@ -5,6 +5,7 @@ This module provides unified file loading with MIME detection and normalization.
 
 import logging
 import mimetypes
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -235,15 +236,61 @@ class FileLoaderFactory:
     def _load_pdf(
         self, file_path: Path, base_metadata: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Load PDF using LangChain PyPDFLoader.
+        """Load PDF content, preferring PyMuPDF4LLM for Markdown extraction.
 
-        Args:
-            file_path: Path to PDF file
-            base_metadata: Base metadata to include
-
-        Returns:
-            List of normalized documents (one per page typically)
+        Falls back to the previous LangChain-based implementation when
+        PyMuPDF4LLM is unavailable to preserve backwards compatibility.
         """
+
+        try:
+            return self._load_pdf_with_pymupdf4llm(file_path, base_metadata)
+        except ImportError:
+            logger.debug(
+                "PyMuPDF4LLM not available, falling back to LangChain PyPDFLoader"
+            )
+        except Exception as exc:
+            logger.warning(
+                "PyMuPDF4LLM PDF load failed for %s: %s. Falling back to LangChain",
+                file_path,
+                exc,
+            )
+
+        return self._load_pdf_with_langchain(file_path, base_metadata)
+
+    def _load_pdf_with_pymupdf4llm(
+        self, file_path: Path, base_metadata: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Load PDF as Markdown using PyMuPDF4LLM."""
+
+        import pymupdf  # type: ignore[import]
+        import pymupdf4llm  # type: ignore[import]
+
+        markdown_text = pymupdf4llm.to_markdown(str(file_path))
+        markdown_text = self._clean_markdown(markdown_text)
+
+        total_pages = None
+        try:
+            with pymupdf.open(str(file_path)) as pdf_doc:  # type: ignore[attr-defined]
+                total_pages = pdf_doc.page_count
+        except Exception as exc:
+            logger.debug("Unable to determine PDF page count for %s: %s", file_path, exc)
+
+        metadata = base_metadata.copy()
+        metadata["pdf_loader"] = "pymupdf4llm"
+        if total_pages is not None:
+            metadata["total_pages"] = total_pages
+
+        # Provide a synthetic page number to keep downstream expectations intact
+        metadata.setdefault("page_number", 1)
+
+        logger.info("Loaded PDF via PyMuPDF4LLM: %s", file_path.name)
+        return [{"text": markdown_text, "metadata": metadata}]
+
+    def _load_pdf_with_langchain(
+        self, file_path: Path, base_metadata: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Fallback PDF loader using LangChain's PyPDFLoader."""
+
         try:
             from langchain_community.document_loaders import PyPDFLoader
 
@@ -252,20 +299,15 @@ class FileLoaderFactory:
 
             normalized_docs = []
             for lc_doc in langchain_docs:
-                # Create normalized doc
                 doc = {"text": lc_doc.page_content, "metadata": base_metadata.copy()}
 
-                # Merge any metadata from langchain Document
                 if lc_doc.metadata:
-                    # Preserve links if present
                     if "links" in lc_doc.metadata:
                         doc["metadata"]["links"] = lc_doc.metadata["links"]
 
-                    # Add page number if available
                     if "page" in lc_doc.metadata:
                         doc["metadata"]["page_number"] = lc_doc.metadata["page"]
 
-                    # Merge other useful metadata fields
                     for key in ["source", "total_pages"]:
                         if key in lc_doc.metadata:
                             doc["metadata"][key] = lc_doc.metadata[key]
@@ -273,19 +315,31 @@ class FileLoaderFactory:
                 normalized_docs.append(doc)
 
             logger.info(
-                f"Loaded PDF with {len(normalized_docs)} pages: {file_path.name}"
+                "Loaded PDF with %s pages via LangChain: %s",
+                len(normalized_docs),
+                file_path.name,
             )
             return normalized_docs
 
         except ImportError as e:
             logger.error(
-                f"LangChain PyPDFLoader not available: {e}. "
-                "Install with: pip install langchain-community"
+                "LangChain PyPDFLoader not available: %s. Install with: pip install langchain-community",
+                e,
             )
             return []
         except Exception as exc:
-            logger.error(f"Failed to load PDF {file_path}: {exc}")
+            logger.error("Failed to load PDF %s via LangChain: %s", file_path, exc)
             return []
+
+    def _clean_markdown(self, markdown_text: str) -> str:
+        """Normalize Markdown extracted from PDFs."""
+
+        markdown_text = re.sub(r"\n{3,}", "\n\n", markdown_text)
+        lines = markdown_text.splitlines()
+        clean_lines = [
+            line for line in lines if not re.match(r"^Page \d+$", line.strip())
+        ]
+        return "\n".join(clean_lines).strip()
 
     def _load_text(
         self, file_path: Path, base_metadata: Dict[str, Any]
