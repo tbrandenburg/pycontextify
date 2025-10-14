@@ -81,7 +81,9 @@ class TestSourceTypeBackwardCompatibility:
 
         # Verify warning was logged
         assert len(caplog.records) == 1
-        assert "Unknown SourceType 'unknown_type' converted to 'document'" in caplog.text
+        assert (
+            "Unknown SourceType 'unknown_type' converted to 'document'" in caplog.text
+        )
         assert "test_chunk_456" in caplog.text
 
     def test_valid_sourcetype_unchanged(self):
@@ -156,7 +158,7 @@ class TestSourceTypeBackwardCompatibility:
                 chunk_data.setdefault("parent_section", None)
                 chunk_data.setdefault("code_symbols", [])
                 chunk_data.setdefault("metadata", {})
-                
+
                 chunks.append(ChunkMetadata.from_dict(chunk_data))
 
         # Verify all chunks were created successfully
@@ -177,5 +179,9 @@ class TestSourceTypeBackwardCompatibility:
         # Verify warnings were logged for deprecated and unknown types
         assert len(caplog.records) == 2
         warning_messages = [record.message for record in caplog.records]
-        assert any("webpage" in msg and "deprecated_chunk" in msg for msg in warning_messages)
-        assert any("mystery_type" in msg and "unknown_chunk" in msg for msg in warning_messages)
+        assert any(
+            "webpage" in msg and "deprecated_chunk" in msg for msg in warning_messages
+        )
+        assert any(
+            "mystery_type" in msg and "unknown_chunk" in msg for msg in warning_messages
+        )

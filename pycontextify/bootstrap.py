@@ -107,9 +107,7 @@ class BootstrapService:
             Exception: After max retries exhausted for transient errors
         """
         parsed = urlparse(url)
-        filename = (
-            Path(unquote(parsed.path or "")).name or "bootstrap_archive"
-        )
+        filename = Path(unquote(parsed.path or "")).name or "bootstrap_archive"
         dest_dir.mkdir(parents=True, exist_ok=True)
         target_path = dest_dir / filename
 
@@ -125,10 +123,14 @@ class BootstrapService:
             else:
                 # Fallback - try to extract from URL directly
                 local_path = url.replace("file://", "", 1)
-                if local_path.startswith("/") and len(local_path) > 1 and local_path[2] == ":":
+                if (
+                    local_path.startswith("/")
+                    and len(local_path) > 1
+                    and local_path[2] == ":"
+                ):
                     # Remove leading slash from /C: style paths
                     local_path = local_path[1:]
-            
+
             source_path = Path(local_path)
             if not source_path.exists():
                 raise FileNotFoundError(
@@ -254,10 +256,14 @@ class BootstrapService:
             else:
                 # Fallback - try to extract from URL directly
                 local_path = url.replace("file://", "", 1)
-                if local_path.startswith("/") and len(local_path) > 1 and local_path[2] == ":":
+                if (
+                    local_path.startswith("/")
+                    and len(local_path) > 1
+                    and local_path[2] == ":"
+                ):
                     # Remove leading slash from /C: style paths
                     local_path = local_path[1:]
-            
+
             checksum_path = Path(local_path)
             if not checksum_path.exists():
                 raise FileNotFoundError(

@@ -216,10 +216,7 @@ class TestMCPServerFunctions:
 
         # Access the actual function through FastMCP
         index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
-        result = index_filebase_fn(
-            base_path=str(test_dir),
-            topic="test_code"
-        )
+        result = index_filebase_fn(base_path=str(test_dir), topic="test_code")
 
         assert "error" not in result
         assert result["files_loaded"] == 1
@@ -232,14 +229,13 @@ class TestMCPServerFunctions:
         """Test indexing nonexistent path."""
         # Configure mock to raise FileNotFoundError
         mock_manager = Mock()
-        mock_manager.index_filebase.side_effect = FileNotFoundError("Base path does not exist: /nonexistent/path")
-        mock_manager_class.return_value = mock_manager
-        
-        index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
-        result = index_filebase_fn(
-            base_path="/nonexistent/path",
-            topic="test"
+        mock_manager.index_filebase.side_effect = FileNotFoundError(
+            "Base path does not exist: /nonexistent/path"
         )
+        mock_manager_class.return_value = mock_manager
+
+        index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
+        result = index_filebase_fn(base_path="/nonexistent/path", topic="test")
         assert "error" in result
         assert "does not exist" in result["error"].lower()
 
@@ -247,12 +243,9 @@ class TestMCPServerFunctions:
         """Test indexing without required topic."""
         test_dir = self.test_dir / "test_files"
         test_dir.mkdir()
-        
+
         index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
-        result = index_filebase_fn(
-            base_path=str(test_dir),
-            topic=""  # Empty topic
-        )
+        result = index_filebase_fn(base_path=str(test_dir), topic="")  # Empty topic
         assert "error" in result
         assert "topic" in result["error"].lower()
 
@@ -260,7 +253,7 @@ class TestMCPServerFunctions:
     def test_discover_topics(self, mock_manager_class):
         """Test discover function returns indexed topics."""
         mock_manager = Mock()
-        
+
         # Mock storage with discover_topics method
         mock_storage = Mock()
         mock_storage.discover_topics.return_value = ["code", "docs", "guides"]
@@ -440,8 +433,7 @@ Use Bearer tokens in the Authorization header.
 
             try:
                 result = mcp_isolated.index_filebase.fn(
-                    base_path=str(doc_dir),
-                    topic="api_docs"
+                    base_path=str(doc_dir), topic="api_docs"
                 )
                 assert "error" not in result
                 assert result["chunks_created"] > 0
@@ -472,8 +464,7 @@ Use Bearer tokens in the Authorization header.
         """Test MCP function error handling."""
         # Test non-existent directory
         result = mcp_isolated.index_filebase.fn(
-            base_path="/non/existent/directory",
-            topic="test"
+            base_path="/non/existent/directory", topic="test"
         )
         assert "error" in result
         print("✅ Error handling for missing directories")
@@ -481,8 +472,7 @@ Use Bearer tokens in the Authorization header.
         # Test empty topic
         with tempfile.TemporaryDirectory() as temp_dir:
             result = mcp_isolated.index_filebase.fn(
-                base_path=temp_dir,
-                topic=""  # Empty topic should fail
+                base_path=temp_dir, topic=""  # Empty topic should fail
             )
             assert "error" in result
             print("✅ Error handling for empty topic")
@@ -535,7 +525,7 @@ class TestMCPUtilityFunctions:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             (Path(temp_dir) / "test.py").write_text("print('hello')")
-            
+
             # Set up args for filebase indexing
             args.initial_filebase = temp_dir
             args.topic = "test_code"

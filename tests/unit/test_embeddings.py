@@ -432,6 +432,8 @@ class TestSentenceTransformersEmbedder:
         if memory_info["model_loaded"]:
             # Should have reasonable memory estimate for mpnet
             assert memory_info["estimated_memory_mb"] > 0
+
+
 """Unit tests for EmbedderService."""
 
 import threading
@@ -683,9 +685,7 @@ class TestEmbedderServiceCleanup:
         assert embedder_service.is_loaded() is False
 
     @patch("pycontextify.embedder_factory.EmbedderFactory")
-    def test_cleanup_after_loading(
-        self, mock_factory, embedder_service, mock_embedder
-    ):
+    def test_cleanup_after_loading(self, mock_factory, embedder_service, mock_embedder):
         """Should clean up embedder after loading."""
         mock_factory.create_embedder.return_value = mock_embedder
 

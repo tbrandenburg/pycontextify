@@ -1,8 +1,9 @@
 """Unit tests for FileLoaderFactory module."""
 
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 from pycontextify.loader import FileLoaderFactory
 
@@ -93,7 +94,10 @@ class TestFileLoaderFactory:
 
         loader = FileLoaderFactory()
         docs = loader.load(str(txt_file), topic="test")
-        assert "text" in docs[0]["metadata"]["mime_type"] or docs[0]["metadata"]["mime_type"] is None
+        assert (
+            "text" in docs[0]["metadata"]["mime_type"]
+            or docs[0]["metadata"]["mime_type"] is None
+        )
 
         # Python file
         py_file = tmp_path / "file.py"
@@ -156,7 +160,7 @@ class TestFileLoaderFactory:
         """Test that binary files are skipped."""
         test_file = tmp_path / "binary.bin"
         # Write binary content
-        test_file.write_bytes(b'\x00\x01\x02\x03\x04\x05')
+        test_file.write_bytes(b"\x00\x01\x02\x03\x04\x05")
 
         loader = FileLoaderFactory()
         docs = loader.load(str(test_file), topic="test")
@@ -228,7 +232,7 @@ class TestFileLoaderFactory:
 
     def test_no_extension_file(self, tmp_path):
         """Test file without extension.
-        
+
         Note: Files without extensions may be skipped if they don't have a
         recognized text/ MIME type. This is expected behavior.
         """

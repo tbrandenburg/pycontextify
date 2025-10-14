@@ -137,14 +137,20 @@ class ChunkMetadata:
                 # Map deprecated 'webpage' to 'document'
                 source_type = SourceType.DOCUMENT
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Converting deprecated SourceType 'webpage' to 'document' for chunk {data.get('chunk_id', 'unknown')}")
+                logger.warning(
+                    f"Converting deprecated SourceType 'webpage' to 'document' for chunk {data.get('chunk_id', 'unknown')}"
+                )
             else:
                 # For other unknown types, default to document and log
                 source_type = SourceType.DOCUMENT
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Unknown SourceType '{unknown_type}' converted to 'document' for chunk {data.get('chunk_id', 'unknown')}")
+                logger.warning(
+                    f"Unknown SourceType '{unknown_type}' converted to 'document' for chunk {data.get('chunk_id', 'unknown')}"
+                )
 
         return cls(
             chunk_id=data["chunk_id"],

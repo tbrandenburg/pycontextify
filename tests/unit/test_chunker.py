@@ -379,17 +379,15 @@ class TestCodeChunker:
         config.chunk_size = 1000
 
         chunker = CodeChunker(config=config)
-        code = '''
+        code = """
 def hello():
     print("Hello, World!")
 
 def goodbye():
     print("Goodbye!")
-'''
+"""
 
-        chunks = chunker.chunk_text(
-            code, "test.py", "openai", "text-embedding-3-small"
-        )
+        chunks = chunker.chunk_text(code, "test.py", "openai", "text-embedding-3-small")
 
         assert len(chunks) >= 1
         assert isinstance(chunks[0], Chunk)
@@ -417,9 +415,7 @@ def function_three():
     return 3
 '''
 
-        chunks = chunker.chunk_text(
-            code, "test.py", "openai", "text-embedding-3-small"
-        )
+        chunks = chunker.chunk_text(code, "test.py", "openai", "text-embedding-3-small")
 
         # Should create multiple chunks
         assert len(chunks) >= 1
@@ -449,9 +445,7 @@ def very_large_function():
     return "result"
 '''
 
-        chunks = chunker.chunk_text(
-            code, "test.py", "openai", "text-embedding-3-small"
-        )
+        chunks = chunker.chunk_text(code, "test.py", "openai", "text-embedding-3-small")
 
         # Should split the large function into multiple chunks
         assert len(chunks) > 1

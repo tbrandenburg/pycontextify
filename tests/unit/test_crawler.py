@@ -1,7 +1,8 @@
 """Unit tests for FileCrawler module."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from pycontextify.crawler import FileCrawler
 

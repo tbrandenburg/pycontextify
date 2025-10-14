@@ -42,7 +42,9 @@ def mock_metadata_store():
 
 
 @pytest.fixture
-def pipeline(mock_config, mock_embedder_service, mock_vector_store, mock_metadata_store):
+def pipeline(
+    mock_config, mock_embedder_service, mock_vector_store, mock_metadata_store
+):
     """Create IndexingPipeline instance."""
     return IndexingPipeline(
         mock_config, mock_embedder_service, mock_vector_store, mock_metadata_store
@@ -253,9 +255,7 @@ class TestIndexingPipelineErrorHandling:
             mock_loader_factory.return_value = mock_loader
 
             # Need to mock chunker too
-            with patch(
-                "pycontextify.indexer.ChunkerFactory"
-            ) as mock_chunker:
+            with patch("pycontextify.indexer.ChunkerFactory") as mock_chunker:
                 mock_chunker.chunk_normalized_docs.return_value = [
                     {
                         "text": "chunk",
@@ -266,13 +266,9 @@ class TestIndexingPipelineErrorHandling:
                     }
                 ]
 
-                with patch(
-                    "pycontextify.indexer.postprocess_file"
-                ) as mock_pf:
+                with patch("pycontextify.indexer.postprocess_file") as mock_pf:
                     mock_pf.side_effect = lambda x: x
-                    with patch(
-                        "pycontextify.indexer.postprocess_filebase"
-                    ) as mock_pfb:
+                    with patch("pycontextify.indexer.postprocess_filebase") as mock_pfb:
                         mock_pfb.side_effect = lambda x: x
 
                         stats = pipeline.index_filebase(tmpdir, "test")
@@ -445,7 +441,9 @@ class TestIndexingPipelineStatsTracking:
             "topic": "test",
             "chunks_created": 0,
             "files_loaded": 0,
-            "error_samples": [{"stage": "test", "error": f"error {i}"} for i in range(20)]
+            "error_samples": [
+                {"stage": "test", "error": f"error {i}"} for i in range(20)
+            ],
         }
 
         finalized = pipeline._finalize_stats(stats, 0)

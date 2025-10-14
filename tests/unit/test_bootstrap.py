@@ -208,8 +208,8 @@ class TestDownloadArchive:
         # First call: raise HTTPError with 500 status
         mock_error_response = Mock()
         mock_error_response.status_code = 500
-        mock_error_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=mock_error_response
+        mock_error_response.raise_for_status.side_effect = (
+            requests.exceptions.HTTPError(response=mock_error_response)
         )
 
         # Second call: succeed

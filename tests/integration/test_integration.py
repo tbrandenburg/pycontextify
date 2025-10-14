@@ -106,8 +106,7 @@ from web development to data science and artificial intelligence.
             try:
                 # Test document indexing with new unified API
                 result = index_manager.index_filebase(
-                    base_path=str(temp_path),
-                    topic="documents"
+                    base_path=str(temp_path), topic="documents"
                 )
 
                 # Verify indexing succeeded with new stats structure
@@ -306,17 +305,16 @@ class SearchEngine:
         # Create temp directory for all test documents
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            
+
             for idx, (doc_type, content) in enumerate(test_documents):
                 doc_file = temp_path / f"doc_{idx}.md"
                 doc_file.write_text(content, encoding="utf-8")
 
             # Index all documents at once using unified API
             result = index_manager.index_filebase(
-                base_path=str(temp_path),
-                topic="mixed_documents"
+                base_path=str(temp_path), topic="mixed_documents"
             )
-            
+
             assert "error" not in result
             assert result["files_loaded"] == len(test_documents)
             assert result["chunks_created"] > 0
@@ -454,8 +452,7 @@ print(f'Mean Squared Error: {mse}')
             try:
                 # Test supplemental guide content indexing
                 result = index_manager.index_filebase(
-                    base_path=str(temp_path),
-                    topic="guides"
+                    base_path=str(temp_path), topic="guides"
                 )
 
                 # Verify indexing succeeded
@@ -542,8 +539,7 @@ It contains some basic content for indexing and search testing.
 
                 # Index the document using unified API
                 result = manager.index_filebase(
-                    base_path=str(doc_dir),
-                    topic="test_documents"
+                    base_path=str(doc_dir), topic="test_documents"
                 )
                 assert "error" not in result
                 assert result["files_loaded"] > 0
@@ -565,9 +561,7 @@ It contains some basic content for indexing and search testing.
 
                 print(f"✅ MCP Status test passed:")
                 print(f"   - Total chunks: {status['metadata']['total_chunks']}")
-                print(
-                    f"   - Total vectors: {status['vector_store']['total_vectors']}"
-                )
+                print(f"   - Total vectors: {status['vector_store']['total_vectors']}")
                 print(
                     f"   - Memory usage: {status['performance']['memory_usage_mb']:.2f} MB"
                 )
