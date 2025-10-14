@@ -106,7 +106,9 @@ class TestMCPErrorHandling:
             return {"result": x * 2}
 
         result = handle_mcp_errors("test_op", success_func, 5)
-        assert result == {"result": 10}
+        assert result["result"] == 10
+        assert "operation_timing" in result
+        assert result["operation_timing"]["operation"] == "test_op"
 
     def test_handle_mcp_errors_value_error(self):
         """Test handling of ValueError."""
@@ -115,7 +117,10 @@ class TestMCPErrorHandling:
             raise ValueError("Invalid parameter")
 
         result = handle_mcp_errors("test_op", error_func)
-        assert result == {"error": "Invalid parameter"}
+        assert result["error"] == "Invalid parameter"
+        assert "elapsed_seconds" in result
+        assert "operation" in result
+        assert result["operation"] == "test_op"
 
     def test_handle_mcp_errors_generic_exception(self):
         """Test handling of generic exceptions."""
@@ -124,7 +129,10 @@ class TestMCPErrorHandling:
             raise RuntimeError("Something went wrong")
 
         result = handle_mcp_errors("test_op", error_func)
-        assert result == {"error": "test_op failed: Something went wrong"}
+        assert result["error"] == "test_op failed: Something went wrong"
+        assert "elapsed_seconds" in result
+        assert "operation" in result
+        assert result["operation"] == "test_op"
 
 
 class TestManagerSingleton:

@@ -2,7 +2,7 @@
 
 This module defines the abstract base class that all embedding providers
 must implement, along with common utilities and error handling. Also includes
-the EmbedderService for lazy loading and lifecycle management.
+the EmbedderService for embedder lifecycle management.
 """
 
 from abc import ABC, abstractmethod
@@ -193,11 +193,11 @@ class BaseEmbedder(ABC):
 
 
 class EmbedderService:
-    """Manages embedder lifecycle with lazy loading and thread-safety.
+    """Manages embedder lifecycle with thread-safety.
 
     This service uses double-checked locking to ensure thread-safe
-    lazy initialization of the embedder, minimizing startup time and
-    memory usage when the embedder is not immediately needed.
+    initialization of the embedder. The embedder is typically pre-loaded
+    during MCP server startup for fast first-request performance.
     """
 
     def __init__(self, config):
@@ -212,10 +212,11 @@ class EmbedderService:
         self._lock = __import__("threading").Lock()
 
     def get_embedder(self) -> BaseEmbedder:
-        """Get embedder, loading lazily if needed (thread-safe).
+        """Get embedder, initializing if needed (thread-safe).
 
         Uses double-checked locking pattern to ensure the embedder
         is only initialized once even under concurrent access.
+        Embedders are typically pre-loaded during server startup.
 
         Returns:
             Initialized embedder instance
@@ -235,7 +236,7 @@ class EmbedderService:
 
             try:
                 logger = __import__("logging").getLogger(__name__)
-                logger.info("Lazy loading embedder...")
+                logger.info("Initializing embedder...")
                 embedding_config = self.config.get_embedding_config()
 
                 logger.info(

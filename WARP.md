@@ -43,7 +43,7 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 ## Architecture
 
 ### Key Components
-- **IndexManager**: Central coordinator with lazy loading (`manager.py`)
+- **IndexManager**: Central coordinator with pre-loaded embedders (`manager.py`)
 - **VectorStore**: FAISS wrapper with persistence (`vector_store.py`)
 - **EmbedderFactory**: Provider system (`embedders/factory.py`) — currently ships with the sentence-transformers implementation and validation stubs for future providers
 - **HybridSearchEngine**: Vector + keyword search (`hybrid_search.py`)
@@ -149,14 +149,11 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 
 **Scaling**: Memory scales with corpus size. Use IndexIVFFlat for >100k chunks.
 
-## Performance Scripts
+## Scripts
 
 **Available utilities**:
-- `python scripts/measure_startup_time.py` - Startup performance measurement
-- `python scripts/debug_lazy_loading.py` - Lazy loading verification  
-- `python scripts/detailed_perf.py` - Component performance analysis
-- `python scripts/fast_startup_test.py` - Startup optimization testing
-- `python scripts/test_hf_connectivity.py` - HuggingFace connectivity test
+- `python scripts/run_mcp_tests.py` - MCP test runner with coverage
+- `python scripts/build_package.py` - Build distribution packages
 
 ## Troubleshooting
 
@@ -187,17 +184,13 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 - **pycontextify/indexer.py** – Coordinates indexing, search execution, persistence, and lifecycle management for the entire system.
 - **pycontextify/loader.py** – Supplies loaders for documents and codebases, orchestrating ingestion workflows per source type.
 - **pycontextify/mcp.py** – Exposes MCP server tooling, validation helpers, and CLI entry points for indexing and searching.
-- **scripts/debug_lazy_loading.py** – Prints diagnostics to inspect lazy-loading behavior of the index manager.
-- **scripts/detailed_perf.py** – Measures fine-grained startup timings for key indexing components.
-- **scripts/fast_startup_test.py** – Benchmarks configuration options and lazy-loading strategies for faster startup.
-- **scripts/measure_startup_time.py** – Records startup, indexing, and search timings to monitor performance regressions.
 - **scripts/run_mcp_tests.py** – Runs comprehensive or smoke MCP test suites and reports results.
-- **scripts/test_hf_connectivity.py** – Validates connectivity and compatibility with Hugging Face services and models.
+- **scripts/build_package.py** – Builds wheel and source distributions with metadata validation.
 
 ## Design Decisions
 
 **UV**: Fast dependency management, lockfiles, optional dependencies  
 **FAISS**: High-performance vector search with CPU/GPU support  
-**Lazy Loading**: Fast startup, components loaded on demand  
+**Pre-loaded Models**: Embedders initialize at startup for fast first requests  
 **Simplified MCP**: 5 essential functions, clean and focused API
 **No External DB**: File-based persistence, lightweight knowledge graph

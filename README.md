@@ -8,7 +8,7 @@ PyContextify is a Python-based MCP (Model Context Protocol) server that provides
 - 🔍 **Semantic Search**: Vector similarity with FAISS + hybrid keyword search
 - 📚 **Multi-Source**: Index code and documents (PDF/MD/TXT)
 - 🧠 **Smart Chunking**: Content-aware processing (code boundaries, document hierarchy)
-- ⚡ **Fast Startup**: Lazy loading with optimized component initialization
+- ⚡ **Pre-loaded Models**: Embedders initialize at startup for fast first requests
 - 🔗 **Relationship Tracking**: Basic relationship extraction (tags, references, code symbols)
 - 🛠️ **MCP Protocol**: 5 essential functions for seamless AI assistant integration
 

@@ -70,7 +70,7 @@ class SentenceTransformersEmbedder(BaseEmbedder):
         self._embedding_dimension = None
 
     def _ensure_model_loaded(self) -> None:
-        """Lazy load the sentence transformer model."""
+        """Lazy load the sentence transformer model with progress feedback."""
         if self._model is not None:
             return
 
@@ -81,11 +81,35 @@ class SentenceTransformersEmbedder(BaseEmbedder):
                 "sentence-transformers not installed. Install with: pip install sentence-transformers"
             )
 
+        import time
+        import os
+        start_time = time.time()
+        
         try:
             logger.info(f"Loading sentence-transformers model: {self.model_name}")
+            logger.info("📥 This may take time for first-time model download...")
+            
+            
+            # Check if model is likely cached
+            try:
+                import os
+                from sentence_transformers import util
+                cache_folder = util.torch_utils.get_cache_folder()
+                model_path = os.path.join(cache_folder, self.model_name.replace("/", "_"))
+                if os.path.exists(model_path):
+                    logger.info("📁 Using cached model")
+                else:
+                    logger.info("🌐 First-time download - this may take several minutes")
+                    logger.info("💡 Subsequent loads will be much faster")
+            except Exception:
+                pass  # Cache check is not critical
+            
             self._model = sentence_transformers.SentenceTransformer(
                 self.model_name, device=self.device
             )
+            
+            load_time = time.time() - start_time
+            logger.info(f"⏱️  Model loading took {load_time:.2f}s")
 
             # Get embedding dimension
             test_text = "test"
@@ -93,12 +117,19 @@ class SentenceTransformersEmbedder(BaseEmbedder):
             self._embedding_dimension = test_embedding.shape[1]
 
             self._is_initialized = True
+            total_time = time.time() - start_time
             logger.info(
-                f"Model loaded successfully. Embedding dimension: {self._embedding_dimension}"
+                f"✅ Model loaded successfully in {total_time:.2f}s. Embedding dimension: {self._embedding_dimension}"
             )
+            
+            if total_time > 60:
+                logger.warning(f"⚠️  Model loading took {total_time:.2f}s, which is quite long")
+                logger.info("💡 This usually indicates first-time download or network issues")
+                logger.info("💡 Future loads should be much faster (~2-5s)")
 
         except Exception as e:
-            error_msg = f"Failed to load model '{self.model_name}': {str(e)}"
+            load_time = time.time() - start_time
+            error_msg = f"Failed to load model '{self.model_name}' after {load_time:.2f}s: {str(e)}"
             logger.error(error_msg)
 
             if "not found" in str(e).lower():
