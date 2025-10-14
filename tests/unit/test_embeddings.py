@@ -432,3 +432,357 @@ class TestSentenceTransformersEmbedder:
         if memory_info["model_loaded"]:
             # Should have reasonable memory estimate for mpnet
             assert memory_info["estimated_memory_mb"] > 0
+"""Unit tests for EmbedderService."""
+
+import threading
+import time
+from unittest.mock import Mock, patch
+
+import pytest
+
+from pycontextify.embedder import EmbedderService
+
+
+@pytest.fixture
+def mock_config():
+    """Create mock configuration."""
+    config = Mock()
+    config.get_embedding_config.return_value = {
+        "provider": "sentence_transformers",
+        "model": "all-mpnet-base-v2",
+        "device": "cpu",
+    }
+    return config
+
+
+@pytest.fixture
+def mock_embedder():
+    """Create mock embedder."""
+    embedder = Mock()
+    embedder.get_provider_name.return_value = "sentence_transformers"
+    embedder.get_model_name.return_value = "all-mpnet-base-v2"
+    embedder.get_dimension.return_value = 768
+    embedder.cleanup.return_value = None
+    return embedder
+
+
+@pytest.fixture
+def embedder_service(mock_config):
+    """Create EmbedderService instance."""
+    return EmbedderService(mock_config)
+
+
+class TestEmbedderServiceInitialization:
+    """Tests for EmbedderService initialization."""
+
+    def test_initializes_without_loading_embedder(self, mock_config):
+        """Should initialize without loading embedder."""
+        service = EmbedderService(mock_config)
+
+        assert service.config == mock_config
+        assert service._embedder is None
+        assert service._initialized is False
+        # Config should not be called yet (lazy loading)
+        mock_config.get_embedding_config.assert_not_called()
+
+    def test_is_not_loaded_initially(self, embedder_service):
+        """Should report as not loaded initially."""
+        assert embedder_service.is_loaded() is False
+
+
+class TestEmbedderServiceLazyLoading:
+    """Tests for lazy loading functionality."""
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_loads_embedder_on_first_access(
+        self, mock_factory, embedder_service, mock_embedder, mock_config
+    ):
+        """Should load embedder on first get_embedder() call."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        result = embedder_service.get_embedder()
+
+        assert result == mock_embedder
+        assert embedder_service.is_loaded() is True
+        mock_config.get_embedding_config.assert_called_once()
+        mock_factory.create_embedder.assert_called_once_with(
+            provider="sentence_transformers",
+            model_name="all-mpnet-base-v2",
+            device="cpu",
+        )
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_reuses_embedder_on_subsequent_calls(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should reuse embedder on subsequent calls without recreating."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        # First call
+        result1 = embedder_service.get_embedder()
+        # Second call
+        result2 = embedder_service.get_embedder()
+
+        assert result1 == result2 == mock_embedder
+        # Factory should only be called once
+        mock_factory.create_embedder.assert_called_once()
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_loads_embedder_when_getting_dimension(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should lazy load embedder when getting dimension."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        dimension = embedder_service.get_dimension()
+
+        assert dimension == 768
+        assert embedder_service.is_loaded() is True
+        mock_factory.create_embedder.assert_called_once()
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_loads_embedder_when_getting_provider_name(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should lazy load embedder when getting provider name."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        provider = embedder_service.get_provider_name()
+
+        assert provider == "sentence_transformers"
+        assert embedder_service.is_loaded() is True
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_loads_embedder_when_getting_model_name(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should lazy load embedder when getting model name."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        model = embedder_service.get_model_name()
+
+        assert model == "all-mpnet-base-v2"
+        assert embedder_service.is_loaded() is True
+
+
+class TestEmbedderServiceErrorHandling:
+    """Tests for error handling."""
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_raises_exception_on_load_failure(self, mock_factory, embedder_service):
+        """Should raise exception if embedder loading fails."""
+        mock_factory.create_embedder.side_effect = RuntimeError("Load failed")
+
+        with pytest.raises(RuntimeError, match="Load failed"):
+            embedder_service.get_embedder()
+
+        assert embedder_service.is_loaded() is False
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_allows_retry_after_failed_load(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should allow retry after failed load attempt."""
+        # First call fails
+        mock_factory.create_embedder.side_effect = [
+            RuntimeError("Load failed"),
+            mock_embedder,
+        ]
+
+        # First attempt fails
+        with pytest.raises(RuntimeError):
+            embedder_service.get_embedder()
+
+        assert embedder_service.is_loaded() is False
+
+        # Second attempt succeeds
+        result = embedder_service.get_embedder()
+
+        assert result == mock_embedder
+        assert embedder_service.is_loaded() is True
+
+
+class TestEmbedderServiceThreadSafety:
+    """Tests for thread-safe lazy loading."""
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_concurrent_access_initializes_once(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should initialize embedder only once under concurrent access."""
+        # Track how many times create_embedder is called
+        call_count = [0]
+        lock = threading.Lock()
+
+        def create_embedder_with_delay(*args, **kwargs):
+            """Simulates slow embedder initialization."""
+            with lock:
+                call_count[0] += 1
+            # Simulate loading time
+            time.sleep(0.1)
+            return mock_embedder
+
+        mock_factory.create_embedder.side_effect = create_embedder_with_delay
+
+        # Launch 10 concurrent threads trying to get the embedder
+        threads = []
+        results = []
+
+        def get_embedder_thread():
+            result = embedder_service.get_embedder()
+            results.append(result)
+
+        for _ in range(10):
+            t = threading.Thread(target=get_embedder_thread)
+            threads.append(t)
+            t.start()
+
+        # Wait for all threads
+        for t in threads:
+            t.join()
+
+        # Verify embedder was only created once
+        assert call_count[0] == 1
+        # All threads got the same embedder instance
+        assert all(r == mock_embedder for r in results)
+        assert len(results) == 10
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_fast_path_no_lock_contention(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should use fast path without lock after initialization."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        # Initialize embedder
+        embedder_service.get_embedder()
+
+        # Subsequent calls should use fast path (no lock)
+        # We can't directly verify lock is not acquired, but we can
+        # ensure performance is good by making many calls quickly
+        start = time.time()
+        for _ in range(1000):
+            embedder_service.get_embedder()
+        duration = time.time() - start
+
+        # Should be very fast (< 0.1s for 1000 calls)
+        assert duration < 0.1
+        # Factory called only once
+        mock_factory.create_embedder.assert_called_once()
+
+
+class TestEmbedderServiceCleanup:
+    """Tests for cleanup functionality."""
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_cleanup_without_loading(self, mock_factory, embedder_service):
+        """Should handle cleanup when embedder was never loaded."""
+        # Should not raise
+        embedder_service.cleanup()
+
+        assert embedder_service.is_loaded() is False
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_cleanup_after_loading(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should clean up embedder after loading."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        # Load embedder
+        embedder_service.get_embedder()
+        assert embedder_service.is_loaded() is True
+
+        # Cleanup
+        embedder_service.cleanup()
+
+        assert embedder_service.is_loaded() is False
+        mock_embedder.cleanup.assert_called_once()
+        assert embedder_service._embedder is None
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_cleanup_handles_embedder_error(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should handle errors during embedder cleanup gracefully."""
+        mock_factory.create_embedder.return_value = mock_embedder
+        mock_embedder.cleanup.side_effect = RuntimeError("Cleanup failed")
+
+        # Load embedder
+        embedder_service.get_embedder()
+
+        # Cleanup should not raise, but log warning
+        embedder_service.cleanup()
+
+        # Should still reset state
+        assert embedder_service.is_loaded() is False
+        assert embedder_service._embedder is None
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_can_reload_after_cleanup(
+        self, mock_factory, embedder_service, mock_embedder
+    ):
+        """Should be able to reload embedder after cleanup."""
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        # Load, cleanup, load again
+        embedder_service.get_embedder()
+        embedder_service.cleanup()
+        result = embedder_service.get_embedder()
+
+        assert result == mock_embedder
+        assert embedder_service.is_loaded() is True
+        # Should be called twice (initial load + reload)
+        assert mock_factory.create_embedder.call_count == 2
+
+
+class TestEmbedderServiceConfiguration:
+    """Tests for configuration handling."""
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_passes_config_to_factory(self, mock_factory, mock_embedder):
+        """Should pass all config parameters to factory."""
+        config = Mock()
+        config.get_embedding_config.return_value = {
+            "provider": "custom_provider",
+            "model": "custom_model",
+            "batch_size": 32,
+            "max_length": 512,
+            "device": "cuda",
+        }
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        service = EmbedderService(config)
+        service.get_embedder()
+
+        mock_factory.create_embedder.assert_called_once_with(
+            provider="custom_provider",
+            model_name="custom_model",
+            batch_size=32,
+            max_length=512,
+            device="cuda",
+        )
+
+    @patch("pycontextify.embedder_factory.EmbedderFactory")
+    def test_filters_out_provider_and_model_from_kwargs(
+        self, mock_factory, mock_embedder
+    ):
+        """Should not pass provider and model as kwargs."""
+        config = Mock()
+        config.get_embedding_config.return_value = {
+            "provider": "test_provider",
+            "model": "test_model",
+            "custom_param": "value",
+        }
+        mock_factory.create_embedder.return_value = mock_embedder
+
+        service = EmbedderService(config)
+        service.get_embedder()
+
+        # Verify call
+        call_args = mock_factory.create_embedder.call_args
+        assert call_args[1]["provider"] == "test_provider"
+        assert call_args[1]["model_name"] == "test_model"
+        assert call_args[1]["custom_param"] == "value"
+        # Should not have 'model' in kwargs (only as model_name)
+        assert "model" not in call_args[1]
