@@ -127,8 +127,24 @@ class ChunkMetadata:
         # Handle datetime parsing
         created_at = datetime.fromisoformat(data["created_at"])
 
-        # Handle enum parsing
-        source_type = SourceType(data["source_type"])
+        # Handle enum parsing with backward compatibility
+        try:
+            source_type = SourceType(data["source_type"])
+        except ValueError as e:
+            # Handle unknown SourceType values from older versions
+            unknown_type = data["source_type"]
+            if unknown_type == "webpage":
+                # Map deprecated 'webpage' to 'document'
+                source_type = SourceType.DOCUMENT
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Converting deprecated SourceType 'webpage' to 'document' for chunk {data.get('chunk_id', 'unknown')}")
+            else:
+                # For other unknown types, default to document and log
+                source_type = SourceType.DOCUMENT
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Unknown SourceType '{unknown_type}' converted to 'document' for chunk {data.get('chunk_id', 'unknown')}")
 
         return cls(
             chunk_id=data["chunk_id"],
