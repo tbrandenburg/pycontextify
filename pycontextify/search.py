@@ -191,9 +191,7 @@ class SearchService:
                     results.append(result)
         return results
 
-    def _convert_hybrid_results(
-        self, hybrid_results
-    ) -> List[SearchResult]:
+    def _convert_hybrid_results(self, hybrid_results) -> List[SearchResult]:
         """Convert HybridSearchEngine results to search_models.SearchResult."""
         converted = []
         for hr in hybrid_results:

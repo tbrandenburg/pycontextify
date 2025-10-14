@@ -13,19 +13,19 @@ from typing import Any, Dict, List, Optional
 
 import psutil
 
-from .config import Config
-from .embedder import EmbedderService
 from .bootstrap import BootstrapService
-from .search import SearchService
-from .crawler import FileCrawler
-from .loader import FileLoaderFactory
 from .chunker import ChunkerFactory
+from .config import Config
+from .crawler import FileCrawler
+from .embedder import EmbedderService
+from .loader import FileLoaderFactory
 from .postprocess import postprocess_file, postprocess_filebase
-from .types import SourceType
+from .search import SearchService
+from .search_hybrid import HybridSearchEngine
+from .search_models import SearchPerformanceLogger, SearchResponse
 from .storage_metadata import ChunkMetadata, MetadataStore
 from .storage_vector import VectorStore
-from .search_hybrid import HybridSearchEngine
-from .search_models import SearchResponse, SearchPerformanceLogger
+from .types import SourceType
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +118,7 @@ class IndexingPipeline:
                 return self._finalize_stats(stats, start_time)
 
             # Step 2-5: Load, Chunk, Postprocess
-            all_chunks = self._process_files(
-                file_paths, base_path_obj, topic, stats
-            )
+            all_chunks = self._process_files(file_paths, base_path_obj, topic, stats)
 
             if not all_chunks:
                 return self._finalize_stats(stats, start_time)
@@ -190,9 +188,7 @@ class IndexingPipeline:
         for idx, file_path in enumerate(file_paths):
             try:
                 # Step 2: Load
-                logger.debug(
-                    f"Loading {idx + 1}/{len(file_paths)}: {file_path}"
-                )
+                logger.debug(f"Loading {idx + 1}/{len(file_paths)}: {file_path}")
                 normalized_docs = loader.load(
                     path=file_path,
                     topic=topic,
@@ -279,9 +275,7 @@ class IndexingPipeline:
             stats["errors"] += 1
             stats["error_samples"].append({"stage": "store", "error": str(e)})
 
-    def _create_chunk_metadata(
-        self, chunk_dict: Dict[str, Any]
-    ) -> ChunkMetadata:
+    def _create_chunk_metadata(self, chunk_dict: Dict[str, Any]) -> ChunkMetadata:
         """Convert normalized chunk to ChunkMetadata."""
         metadata = chunk_dict["metadata"]
         file_ext = metadata.get("file_extension", "")
@@ -307,9 +301,7 @@ class IndexingPipeline:
             "rb",
             "php",
         }
-        source_type = (
-            SourceType.CODE if file_ext in code_exts else SourceType.DOCUMENT
-        )
+        source_type = SourceType.CODE if file_ext in code_exts else SourceType.DOCUMENT
 
         return ChunkMetadata(
             source_path=metadata.get("full_path", ""),
@@ -352,7 +344,7 @@ class IndexingPipeline:
 
 class IndexManager:
     """Central coordinator for indexing and search operations.
-    
+
     This refactored version delegates to specialized services rather than
     implementing everything directly. This improves testability, maintainability,
     and separation of concerns.
@@ -402,9 +394,7 @@ class IndexManager:
     def _auto_load(self) -> None:
         """Auto-load existing index or bootstrap if needed."""
         paths = self.config.get_index_paths()
-        essential_paths = {
-            k: v for k, v in paths.items() if k in ["metadata", "index"]
-        }
+        essential_paths = {k: v for k, v in paths.items() if k in ["metadata", "index"]}
         missing = {k: v for k, v in essential_paths.items() if not v.exists()}
 
         if not missing:
@@ -426,7 +416,7 @@ class IndexManager:
 
     def _load_existing_index(self, paths: Dict) -> None:
         """Load index artifacts into memory.
-        
+
         Args:
             paths: Dictionary of artifact paths
         """
@@ -500,14 +490,14 @@ class IndexManager:
         exclude_dirs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Index a filebase (directory).
-        
+
         Args:
             base_path: Root directory to index
             topic: Topic name (required)
             include: Patterns to include
             exclude: Patterns to exclude
             exclude_dirs: Directory patterns to exclude
-            
+
         Returns:
             Pipeline statistics dictionary
         """
@@ -522,26 +512,26 @@ class IndexManager:
         self, query: str, top_k: int = 5, display_format: str = "readable"
     ) -> SearchResponse:
         """Perform search with optional hybrid enhancement.
-        
+
         Args:
             query: Search query text
             top_k: Number of results to return
             display_format: Output format ('readable', 'structured', 'summary')
-            
+
         Returns:
             SearchResponse with results and metadata
         """
         self._ensure_services()
         response = self.search_service.search(query, top_k, display_format)
-        
+
         # Log performance
         self.performance_logger.log_search_performance(response)
-        
+
         return response
 
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive system status.
-        
+
         Returns:
             System status and statistics
         """
@@ -609,7 +599,7 @@ class IndexManager:
                 "total_vectors": vector_stats.get("total_vectors", 0),
                 "source_types": metadata_stats.get("source_types", {}),
             }
-            
+
             return {
                 "status": "healthy",
                 "metadata": metadata_stats,  # Keep original key for compatibility
@@ -636,10 +626,10 @@ class IndexManager:
 
     def clear_index(self, remove_files: bool = False) -> Dict[str, Any]:
         """Clear all indexed data.
-        
+
         Args:
             remove_files: Whether to remove saved files
-            
+
         Returns:
             Operation result
         """
@@ -667,7 +657,7 @@ class IndexManager:
 
     def save_index(self) -> Dict[str, Any]:
         """Manually save index to disk.
-        
+
         Returns:
             Save operation result
         """
@@ -708,7 +698,7 @@ class IndexManager:
         if self.embedder_service.is_loaded():
             return self.embedder_service.get_embedder()
         return None
-    
+
     def ensure_embedder_loaded(self) -> None:
         """Ensure the embedder is ready (legacy compatibility)."""
         self.embedder_service.get_embedder()

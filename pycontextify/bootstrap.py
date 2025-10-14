@@ -47,9 +47,7 @@ class BootstrapService:
         essential_paths = {
             k: v for k, v in index_paths.items() if k in ["metadata", "index"]
         }
-        missing_paths = {
-            k: v for k, v in essential_paths.items() if not v.exists()
-        }
+        missing_paths = {k: v for k, v in essential_paths.items() if not v.exists()}
 
         if not missing_paths:
             logger.info("All index artifacts exist, no bootstrap needed")
@@ -92,9 +90,7 @@ class BootstrapService:
             logger.error(f"Bootstrap failed: {exc}")
             return False
 
-    def _download_archive(
-        self, url: str, dest_dir: Path, max_retries: int = 3
-    ) -> Path:
+    def _download_archive(self, url: str, dest_dir: Path, max_retries: int = 3) -> Path:
         """Download archive with retry logic.
 
         Args:
@@ -111,13 +107,28 @@ class BootstrapService:
             Exception: After max retries exhausted for transient errors
         """
         parsed = urlparse(url)
-        filename = Path(unquote(parsed.path or "")).name or "bootstrap_archive"
+        filename = (
+            Path(unquote(parsed.path or "")).name or "bootstrap_archive"
+        )
         dest_dir.mkdir(parents=True, exist_ok=True)
         target_path = dest_dir / filename
 
         # Handle file:// URLs (no retry needed)
         if parsed.scheme == "file":
-            local_path = url2pathname(parsed.path)
+            # Handle Windows paths properly - handle both correct and malformed file URLs
+            if parsed.netloc and not parsed.path:
+                # Malformed URL like file://C:\path - netloc has the path
+                local_path = parsed.netloc
+            elif parsed.path:
+                # Correct URL like file:///C:\path - path has the path
+                local_path = url2pathname(parsed.path)
+            else:
+                # Fallback - try to extract from URL directly
+                local_path = url.replace("file://", "", 1)
+                if local_path.startswith("/") and len(local_path) > 1 and local_path[2] == ":":
+                    # Remove leading slash from /C: style paths
+                    local_path = local_path[1:]
+            
             source_path = Path(local_path)
             if not source_path.exists():
                 raise FileNotFoundError(
@@ -233,7 +244,20 @@ class BootstrapService:
 
         # Handle file:// URLs
         if parsed.scheme == "file":
-            local_path = url2pathname(parsed.path)
+            # Handle Windows paths properly - handle both correct and malformed file URLs
+            if parsed.netloc and not parsed.path:
+                # Malformed URL like file://C:\path - netloc has the path
+                local_path = parsed.netloc
+            elif parsed.path:
+                # Correct URL like file:///C:\path - path has the path
+                local_path = url2pathname(parsed.path)
+            else:
+                # Fallback - try to extract from URL directly
+                local_path = url.replace("file://", "", 1)
+                if local_path.startswith("/") and len(local_path) > 1 and local_path[2] == ":":
+                    # Remove leading slash from /C: style paths
+                    local_path = local_path[1:]
+            
             checksum_path = Path(local_path)
             if not checksum_path.exists():
                 raise FileNotFoundError(
@@ -370,9 +394,7 @@ class BootstrapService:
 
         raise ValueError(f"Unsupported bootstrap archive format: {archive_path}")
 
-    def _move_artifacts(
-        self, extract_dir: Path, index_paths: Dict[str, Path]
-    ) -> None:
+    def _move_artifacts(self, extract_dir: Path, index_paths: Dict[str, Path]) -> None:
         """Move extracted files into their final locations if missing.
 
         Args:

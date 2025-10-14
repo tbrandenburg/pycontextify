@@ -227,8 +227,14 @@ class TestMCPServerFunctions:
         assert result["topic"] == "test_code"
         mock_manager.index_filebase.assert_called_once()
 
-    def test_index_filebase_nonexistent_path(self):
+    @patch("pycontextify.mcp.IndexManager")
+    def test_index_filebase_nonexistent_path(self, mock_manager_class):
         """Test indexing nonexistent path."""
+        # Configure mock to raise FileNotFoundError
+        mock_manager = Mock()
+        mock_manager.index_filebase.side_effect = FileNotFoundError("Base path does not exist: /nonexistent/path")
+        mock_manager_class.return_value = mock_manager
+        
         index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
         result = index_filebase_fn(
             base_path="/nonexistent/path",

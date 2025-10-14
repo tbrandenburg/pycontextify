@@ -209,7 +209,7 @@ class EmbedderService:
         self.config = config
         self._embedder: Optional[BaseEmbedder] = None
         self._initialized = False
-        self._lock = __import__('threading').Lock()
+        self._lock = __import__("threading").Lock()
 
     def get_embedder(self) -> BaseEmbedder:
         """Get embedder, loading lazily if needed (thread-safe).
@@ -234,7 +234,7 @@ class EmbedderService:
                 return self._embedder
 
             try:
-                logger = __import__('logging').getLogger(__name__)
+                logger = __import__("logging").getLogger(__name__)
                 logger.info("Lazy loading embedder...")
                 embedding_config = self.config.get_embedding_config()
 
@@ -244,7 +244,7 @@ class EmbedderService:
                 )
 
                 from .embedder_factory import EmbedderFactory
-                
+
                 self._embedder = EmbedderFactory.create_embedder(
                     provider=embedding_config["provider"],
                     model_name=embedding_config["model"],
@@ -265,7 +265,7 @@ class EmbedderService:
                 return self._embedder
 
             except Exception as e:
-                logger = __import__('logging').getLogger(__name__)
+                logger = __import__("logging").getLogger(__name__)
                 logger.error(f"Failed to initialize embedder: {e}")
                 raise
 
@@ -319,11 +319,11 @@ class EmbedderService:
         with self._lock:
             if self._embedder:
                 try:
-                    logger = __import__('logging').getLogger(__name__)
+                    logger = __import__("logging").getLogger(__name__)
                     logger.info("Cleaning up embedder resources")
                     self._embedder.cleanup()
                 except Exception as e:
-                    logger = __import__('logging').getLogger(__name__)
+                    logger = __import__("logging").getLogger(__name__)
                     logger.warning(f"Error during embedder cleanup: {e}")
                 finally:
                     self._embedder = None
