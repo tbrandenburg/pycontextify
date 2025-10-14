@@ -33,8 +33,10 @@ Content about testing persistence.
 More content to ensure we have multiple chunks.
 """
 
-            # Create test file
-            test_file = temp_path / "test_doc.md"
+            # Create test directory with file
+            test_dir = temp_path / "docs"
+            test_dir.mkdir()
+            test_file = test_dir / "test_doc.md"
             test_file.write_text(test_content)
 
             # Phase 1: Index and save
@@ -48,12 +50,14 @@ More content to ensure we have multiple chunks.
             config1 = Config(config_overrides=config_overrides)
             manager1 = IndexManager(config1)
 
-            # Index the document
-            result = manager1.index_document(str(test_file))
+            # Index the document using unified API
+            result = manager1.index_filebase(
+                base_path=str(test_dir),
+                topic="test_docs"
+            )
 
             # Verify indexing succeeded
-            assert result["chunks_added"] > 0
-            assert result["source_type"] == "document"
+            assert result["chunks_created"] > 0
 
             # Get stats before "shutdown"
             stats_before = manager1.get_status()
@@ -120,9 +124,19 @@ More content to ensure we have multiple chunks.
 
             config1 = Config(config_overrides=config_overrides1)
             manager1 = IndexManager(config1)
-            result = manager1.index_document(str(test_file))
+            
+            # Create dir for file
+            test_dir = temp_path / "docs"
+            test_dir.mkdir()
+            doc_file = test_dir / "test.md"
+            doc_file.write_text(test_content)
+            
+            result = manager1.index_filebase(
+                base_path=str(test_dir),
+                topic="test_docs"
+            )
 
-            assert result["chunks_added"] > 0
+            assert result["chunks_created"] > 0
             stats1 = manager1.get_status()
             original_chunks = stats1["index_stats"]["total_chunks"]
 
@@ -166,7 +180,17 @@ More content to ensure we have multiple chunks.
 
             config1 = Config(config_overrides=config_overrides1)
             manager1 = IndexManager(config1)
-            manager1.index_document(str(test_file))
+            
+            # Create dir for file
+            test_dir = temp_path / "docs"
+            test_dir.mkdir()
+            doc_file = test_dir / "test.md"
+            doc_file.write_text(test_content)
+            
+            manager1.index_filebase(
+                base_path=str(test_dir),
+                topic="test_docs"
+            )
 
             # Verify files exist
             assert (test_index_dir / "test_index.faiss").exists()
@@ -208,7 +232,17 @@ More content to ensure we have multiple chunks.
 
             config1 = Config(config_overrides=config_overrides)
             manager1 = IndexManager(config1)
-            manager1.index_document(str(test_file))
+            
+            # Create dir for file
+            test_dir = temp_path / "docs"
+            test_dir.mkdir()
+            doc_file = test_dir / "test.md"
+            doc_file.write_text(test_content)
+            
+            manager1.index_filebase(
+                base_path=str(test_dir),
+                topic="test_docs"
+            )
 
             # Remove one file (relationships file no longer exists in simplified version)
             # Remove the metadata file instead
@@ -261,11 +295,19 @@ Content section C for document {i}.
             config1 = Config(config_overrides=config_overrides)
             manager1 = IndexManager(config1)
 
-            # Index all documents
-            total_chunks = 0
+            # Index all documents using unified API
+            test_docs_dir = temp_path / "docs"
+            test_docs_dir.mkdir()
             for doc_file in docs:
-                result = manager1.index_document(str(doc_file))
-                total_chunks += result["chunks_added"]
+                # Move files to docs dir
+                new_path = test_docs_dir / doc_file.name
+                doc_file.rename(new_path)
+            
+            result = manager1.index_filebase(
+                base_path=str(test_docs_dir),
+                topic="test_docs"
+            )
+            total_chunks = result["chunks_created"]
 
             assert total_chunks >= 20  # Should have many chunks
 

@@ -276,52 +276,72 @@ module.exports = ApiClient;
             # ================================================================
             print("\n📄 STEP 2: Indexing document...")
             
-            doc_result = manager.index_document(str(env["doc_path"]))
+            # Create temp dir for doc
+            doc_dir = env["temp_path"] / "docs"
+            doc_dir.mkdir()
+            doc_file = doc_dir / "sample_document.md"
+            doc_file.write_text(env["doc_path"].read_text(encoding="utf-8"), encoding="utf-8")
             
-            # Verify document indexing
+            doc_result = manager.index_filebase(
+                base_path=str(doc_dir),
+                topic="api_documentation"
+            )
+            
+            # Verify document indexing with new stats
             assert "error" not in doc_result, f"Document indexing failed: {doc_result}"
-            assert doc_result["chunks_added"] > 0, "Should have added chunks from document"
-            assert doc_result["source_type"] == "document", "Source type should be 'document'"
+            assert doc_result["files_loaded"] > 0, "Should have loaded files"
+            assert doc_result["chunks_created"] > 0, "Should have added chunks from document"
             
             print(f"✅ Document indexed successfully:")
-            print(f"   - File: {env['doc_path'].name}")
-            print(f"   - Chunks added: {doc_result['chunks_added']}")
-            print(f"   - Source type: {doc_result['source_type']}")
+            print(f"   - Files loaded: {doc_result['files_loaded']}")
+            print(f"   - Chunks created: {doc_result['chunks_created']}")
+            print(f"   - Topic: {doc_result['topic']}")
 
             # ================================================================
             # STEP 3: Index supplemental guide content (simulated with markdown)
             # ================================================================
             print("\n📘 STEP 3: Indexing supplemental guide content...")
 
-            guide_result = manager.index_document(str(env["guide_path"]))
+            # Create temp dir for guide
+            guide_dir = env["temp_path"] / "guides"
+            guide_dir.mkdir()
+            guide_file = guide_dir / "reference_guide.md"
+            guide_file.write_text(env["guide_path"].read_text(encoding="utf-8"), encoding="utf-8")
+
+            guide_result = manager.index_filebase(
+                base_path=str(guide_dir),
+                topic="best_practices_guides"
+            )
 
             # Verify guide indexing
             assert "error" not in guide_result, f"Guide indexing failed: {guide_result}"
-            assert guide_result["chunks_added"] > 0, "Should have added chunks from the guide"
+            assert guide_result["chunks_created"] > 0, "Should have added chunks from the guide"
 
             print(f"✅ Guide content indexed successfully:")
-            print(f"   - File: {env['guide_path'].name}")
-            print(f"   - Chunks added: {guide_result['chunks_added']}")
-            print(f"   - Source type: {guide_result['source_type']}")
+            print(f"   - Files loaded: {guide_result['files_loaded']}")
+            print(f"   - Chunks created: {guide_result['chunks_created']}")
+            print(f"   - Topic: {guide_result['topic']}")
 
             # ================================================================
             # STEP 4: Index codebase
             # ================================================================
             print("\n💻 STEP 4: Indexing codebase...")
             
-            code_result = manager.index_codebase(str(env["code_dir"]))
+            code_result = manager.index_filebase(
+                base_path=str(env["code_dir"]),
+                topic="codebase"
+            )
             
             # Verify codebase indexing
             assert "error" not in code_result, f"Codebase indexing failed: {code_result}"
-            assert code_result["files_processed"] > 0, "Should have processed code files"
-            assert code_result["chunks_added"] > 0, "Should have added chunks from code"
-            assert code_result["source_type"] == "code", "Source type should be 'code'"
+            assert code_result["files_loaded"] > 0, "Should have processed code files"
+            assert code_result["chunks_created"] > 0, "Should have added chunks from code"
             
             print(f"✅ Codebase indexed successfully:")
             print(f"   - Directory: {env['code_dir'].name}")
-            print(f"   - Files processed: {code_result['files_processed']}")
-            print(f"   - Chunks added: {code_result['chunks_added']}")
-            print(f"   - Source type: {code_result['source_type']}")
+            print(f"   - Files loaded: {code_result['files_loaded']}")
+            print(f"   - Chunks created: {code_result['chunks_created']}")
+            print(f"   - Topic: {code_result['topic']}")
 
             # ================================================================
             # STEP 5: Get status after indexing
@@ -332,9 +352,9 @@ module.exports = ApiClient;
             
             # Calculate expected totals
             total_chunks_expected = (
-                doc_result["chunks_added"] +
-                guide_result["chunks_added"] +
-                code_result["chunks_added"]
+                doc_result["chunks_created"] +
+                guide_result["chunks_created"] +
+                code_result["chunks_created"]
             )
             
             # Verify status after indexing

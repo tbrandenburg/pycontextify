@@ -56,26 +56,26 @@ def measure_startup_performance():
         status_time = time.time() - start_time
         print(f"   ⏱️ Status query: {status_time:.2f}s")
 
-        # Simple document indexing
-        print("\n5️⃣ Document indexing performance...")
+        # Simple document indexing using unified filebase pipeline
+        print("\n5️⃣ Filebase indexing performance (single document)...")
         test_content = "This is a test document for performance measurement."
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write(test_content)
-            temp_file = f.name
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            doc_path = temp_path / "startup_test.txt"
+            doc_path.write_text(test_content, encoding="utf-8")
 
-        try:
-            start_time = time.time()
-            result = manager.index_document(temp_file)
-            indexing_time = time.time() - start_time
-            print(f"   ⏱️ Document indexing: {indexing_time:.2f}s")
-            print(f"   📄 Chunks added: {result.get('chunks_added', 0)}")
-        except Exception as e:
-            print(f"   ❌ Indexing failed: {e}")
-        finally:
             try:
-                Path(temp_file).unlink()
-            except:
-                pass
+                start_time = time.time()
+                result = manager.index_filebase(
+                    base_path=str(temp_path), topic="startup_benchmark"
+                )
+                indexing_time = time.time() - start_time
+                print(f"   ⏱️ Filebase indexing: {indexing_time:.2f}s")
+                print(f"   📄 Files processed: {result.get('files_loaded', 0)}")
+                print(f"   📚 Chunks created: {result.get('chunks_created', 0)}")
+                print(f"   🔢 Vectors embedded: {result.get('vectors_embedded', 0)}")
+            except Exception as e:
+                print(f"   ❌ Indexing failed: {e}")
 
         # Search operation
         print("\n6️⃣ Search operation performance...")
@@ -108,7 +108,7 @@ def measure_startup_performance():
         print(f"Total startup time:        {config_time + init_time:.2f}s")
     print(f"Status query:              {status_time:.2f}s")
     try:
-        print(f"Document indexing:         {indexing_time:.2f}s")
+        print(f"Filebase indexing:         {indexing_time:.2f}s")
         print(f"Search operation:          {search_time:.2f}s")
     except:
         pass

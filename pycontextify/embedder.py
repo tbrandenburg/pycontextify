@@ -1,11 +1,12 @@
 """Base classes for embedding providers in PyContextify.
 
 This module defines the abstract base class that all embedding providers
-must implement, along with common utilities and error handling.
+must implement, along with common utilities and error handling. Also includes
+the EmbedderService for lazy loading and lifecycle management.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -191,9 +192,148 @@ class BaseEmbedder(ABC):
         self.cleanup()
 
 
+class EmbedderService:
+    """Manages embedder lifecycle with lazy loading and thread-safety.
+
+    This service uses double-checked locking to ensure thread-safe
+    lazy initialization of the embedder, minimizing startup time and
+    memory usage when the embedder is not immediately needed.
+    """
+
+    def __init__(self, config):
+        """Initialize embedder service with configuration.
+
+        Args:
+            config: Configuration object with embedding settings
+        """
+        self.config = config
+        self._embedder: Optional[BaseEmbedder] = None
+        self._initialized = False
+        self._lock = __import__('threading').Lock()
+
+    def get_embedder(self) -> BaseEmbedder:
+        """Get embedder, loading lazily if needed (thread-safe).
+
+        Uses double-checked locking pattern to ensure the embedder
+        is only initialized once even under concurrent access.
+
+        Returns:
+            Initialized embedder instance
+
+        Raises:
+            Exception: If embedder initialization fails
+        """
+        # Fast path: already initialized (no lock needed)
+        if self._initialized:
+            return self._embedder
+
+        # Slow path: need to initialize (acquire lock)
+        with self._lock:
+            # Double-check after acquiring lock
+            if self._initialized:
+                return self._embedder
+
+            try:
+                logger = __import__('logging').getLogger(__name__)
+                logger.info("Lazy loading embedder...")
+                embedding_config = self.config.get_embedding_config()
+
+                logger.info(
+                    f"Initializing embedder: {embedding_config['provider']} "
+                    f"with model {embedding_config['model']}"
+                )
+
+                from .embedder_factory import EmbedderFactory
+                
+                self._embedder = EmbedderFactory.create_embedder(
+                    provider=embedding_config["provider"],
+                    model_name=embedding_config["model"],
+                    **{
+                        k: v
+                        for k, v in embedding_config.items()
+                        if k not in ["provider", "model"]
+                    },
+                )
+
+                self._initialized = True
+
+                logger.info(
+                    f"Successfully loaded embedder: "
+                    f"{self._embedder.get_provider_name()}"
+                )
+
+                return self._embedder
+
+            except Exception as e:
+                logger = __import__('logging').getLogger(__name__)
+                logger.error(f"Failed to initialize embedder: {e}")
+                raise
+
+    def is_loaded(self) -> bool:
+        """Check if embedder is loaded.
+
+        Returns:
+            True if embedder has been initialized, False otherwise
+        """
+        return self._initialized
+
+    def get_dimension(self) -> Optional[int]:
+        """Get embedding dimension (loads embedder if needed).
+
+        Returns:
+            Embedding dimension, or None if not loaded
+
+        Raises:
+            Exception: If embedder loading fails
+        """
+        return self.get_embedder().get_dimension()
+
+    def get_provider_name(self) -> str:
+        """Get embedder provider name (loads if needed).
+
+        Returns:
+            Provider name
+
+        Raises:
+            Exception: If embedder loading fails
+        """
+        return self.get_embedder().get_provider_name()
+
+    def get_model_name(self) -> str:
+        """Get embedder model name (loads if needed).
+
+        Returns:
+            Model name
+
+        Raises:
+            Exception: If embedder loading fails
+        """
+        return self.get_embedder().get_model_name()
+
+    def cleanup(self) -> None:
+        """Clean up embedder resources.
+
+        This method should be called when the embedder is no longer needed
+        to free up resources (model memory, caches, etc.).
+        """
+        with self._lock:
+            if self._embedder:
+                try:
+                    logger = __import__('logging').getLogger(__name__)
+                    logger.info("Cleaning up embedder resources")
+                    self._embedder.cleanup()
+                except Exception as e:
+                    logger = __import__('logging').getLogger(__name__)
+                    logger.warning(f"Error during embedder cleanup: {e}")
+                finally:
+                    self._embedder = None
+                    self._initialized = False
+
+
 __all__ = [
     "BaseEmbedder",
     "EmbeddingError",
+    "EmbedderService",
     "ModelNotFoundError",
     "ProviderNotAvailableError",
 ]

@@ -546,3 +546,117 @@ class ChunkerFactory:
         else:
             # Default to simple chunker
             return SimpleChunker(config)
+
+    @staticmethod
+    def chunk_normalized_docs(
+        normalized_docs: List[Dict[str, Any]],
+        config: Config,
+    ) -> List[Dict[str, Any]]:
+        """Chunk normalized documents from loader into normalized chunks.
+
+        This is the new adapter for the filebase pipeline that works with
+        normalized dict format instead of Chunk dataclass.
+
+        Args:
+            normalized_docs: List of normalized docs from loader
+                Format: [{"text": str, "metadata": dict}, ...]
+            config: Configuration object
+
+        Returns:
+            List of normalized chunks with chunk-specific metadata added
+                Format: [{"text": str, "metadata": dict}, ...]
+        """
+        all_chunks = []
+
+        for doc_index, doc in enumerate(normalized_docs):
+            text = doc["text"]
+            base_metadata = doc["metadata"].copy()
+
+            # Determine source type from file extension
+            file_ext = base_metadata.get("file_extension", "")
+            source_type = ChunkerFactory._infer_source_type(file_ext)
+
+            # Get appropriate chunker
+            chunker = ChunkerFactory.get_chunker(source_type, config)
+
+            # Get embedding info from metadata (should be set by loader)
+            embedding_provider = base_metadata.get(
+                "embedding_provider", "sentence_transformers"
+            )
+            embedding_model = base_metadata.get("embedding_model", "all-mpnet-base-v2")
+            source_path = base_metadata.get("full_path", "")
+
+            # Chunk using existing chunker (returns Chunk objects)
+            chunk_objects = chunker.chunk_text(
+                text=text,
+                source_path=source_path,
+                embedding_provider=embedding_provider,
+                embedding_model=embedding_model,
+            )
+
+            # Convert Chunk objects to normalized dict format
+            for chunk_idx, chunk_obj in enumerate(chunk_objects):
+                chunk_dict = {
+                    "text": chunk_obj.chunk_text,
+                    "metadata": base_metadata.copy(),
+                }
+
+                # Add chunk-specific metadata
+                chunk_dict["metadata"]["chunk_index"] = chunk_idx
+                chunk_dict["metadata"]["chunk_name"] = chunk_obj.parent_section
+                chunk_dict["metadata"]["language"] = base_metadata.get("language")
+                chunk_dict["metadata"]["start_char"] = chunk_obj.start_char
+                chunk_dict["metadata"]["end_char"] = chunk_obj.end_char
+
+                # Preserve links from base metadata or chunk
+                if base_metadata.get("links"):
+                    chunk_dict["metadata"]["links"] = base_metadata["links"]
+
+                # Add relationship metadata if relationships are enabled
+                if config.enable_relationships:
+                    if chunk_obj.tags:
+                        chunk_dict["metadata"]["tags"] = chunk_obj.tags
+                    if chunk_obj.references:
+                        chunk_dict["metadata"]["references"] = chunk_obj.references
+                    if chunk_obj.code_symbols:
+                        chunk_dict["metadata"]["code_symbols"] = chunk_obj.code_symbols
+
+                all_chunks.append(chunk_dict)
+
+        return all_chunks
+
+    @staticmethod
+    def _infer_source_type(file_extension: str) -> SourceType:
+        """Infer source type from file extension.
+
+        Args:
+            file_extension: File extension (without dot)
+
+        Returns:
+            SourceType enum value
+        """
+        code_extensions = {
+            "py",
+            "js",
+            "ts",
+            "jsx",
+            "tsx",
+            "java",
+            "cpp",
+            "c",
+            "h",
+            "hpp",
+            "cs",
+            "go",
+            "rs",
+            "swift",
+            "kt",
+            "scala",
+            "rb",
+            "php",
+        }
+
+        if file_extension in code_extensions:
+            return SourceType.CODE
+        else:
+            return SourceType.DOCUMENT

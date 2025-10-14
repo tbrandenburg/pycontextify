@@ -230,13 +230,13 @@ class TestMCPServerSystem:
             print("\n📋 STEP 1: Checking available MCP tools...")
             
             tools = list(mcp.mcp._tool_manager._tools.keys())
-            expected_tools = ["status", "index_document", "index_code", "search", "reset_index"]
+            expected_tools = ["status", "index_filebase", "discover", "search", "reset_index"]
             
             for tool in expected_tools:
                 assert tool in tools, f"Tool '{tool}' not found"
                 print(f"  ✅ {tool}")
             
-            print(f"✅ All {len(expected_tools)} expected tools available")
+            print(f"✅ All {len(expected_tools)} expected tools available (unified API)")
             
             # ================================================================
             # STEP 2: Get initial status
@@ -251,29 +251,40 @@ class TestMCPServerSystem:
             print("✅ Initial status: empty index")
             
             # ================================================================
-            # STEP 3: Index document via MCP
+            # STEP 3: Index document via MCP using unified API
             # ================================================================
             print("\n📄 STEP 3: Indexing document via MCP...")
             
-            index_doc_fn = mcp.mcp._tool_manager._tools["index_document"].fn
-            doc_result = index_doc_fn(str(env["doc_path"]))
+            # Create dir for doc
+            doc_dir = env["temp_path"] / "docs"
+            doc_dir.mkdir()
+            import shutil
+            shutil.copy(env["doc_path"], doc_dir / "test_document.md")
+            
+            index_filebase_fn = mcp.mcp._tool_manager._tools["index_filebase"].fn
+            doc_result = index_filebase_fn(
+                base_path=str(doc_dir),
+                topic="api_docs"
+            )
             
             assert "error" not in doc_result
-            assert doc_result["chunks_added"] > 0
-            print(f"✅ Document indexed: {doc_result['chunks_added']} chunks")
+            assert doc_result["chunks_created"] > 0
+            print(f"✅ Document indexed: {doc_result['chunks_created']} chunks")
             
             # ================================================================
             # STEP 4: Index codebase via MCP
             # ================================================================
             print("\n💻 STEP 4: Indexing codebase via MCP...")
             
-            index_code_fn = mcp.mcp._tool_manager._tools["index_code"].fn
-            code_result = index_code_fn(str(env["code_dir"]))
+            code_result = index_filebase_fn(
+                base_path=str(env["code_dir"]),
+                topic="codebase"
+            )
             
             assert "error" not in code_result
-            assert code_result["files_processed"] > 0
-            assert code_result["chunks_added"] > 0
-            print(f"✅ Codebase indexed: {code_result['files_processed']} files, {code_result['chunks_added']} chunks")
+            assert code_result["files_loaded"] > 0
+            assert code_result["chunks_created"] > 0
+            print(f"✅ Codebase indexed: {code_result['files_loaded']} files, {code_result['chunks_created']} chunks")
             
             # ================================================================
             # STEP 5: Check status after indexing
@@ -282,7 +293,7 @@ class TestMCPServerSystem:
             
             status = status_fn()
             
-            total_expected = doc_result["chunks_added"] + code_result["chunks_added"]
+            total_expected = doc_result["chunks_created"] + code_result["chunks_created"]
             assert status["metadata"]["total_chunks"] == total_expected
             assert status["vector_store"]["total_vectors"] == total_expected
             print(f"✅ Status updated: {status['metadata']['total_chunks']} chunks")
@@ -378,16 +389,21 @@ class TestMCPServerSystem:
                 help="Directory path for vector storage and index files",
             )
             parser.add_argument(
-                "--initial-documents",
-                nargs="*",
+                "--initial-filebase",
                 type=str,
-                help="File paths to documents to index at startup",
+                help="Directory path to index at startup",
+            )
+            parser.add_argument(
+                "--topic",
+                type=str,
+                help="Topic label for initial indexing",
             )
             
             help_text = parser.format_help()
             
             assert "PyContextify MCP Server" in help_text
             assert "index-path" in help_text
+            assert "initial-filebase" in help_text
             assert "usage:" in help_text
             
             print("\n✅ MCP server help functionality works")
@@ -411,7 +427,7 @@ class TestMCPServerSystem:
         
         assert len(tools) == 5, f"Expected 5 tools, got {len(tools)}"
 
-        expected = ["status", "index_document", "index_code", "search", "reset_index"]
+        expected = ["status", "index_filebase", "discover", "search", "reset_index"]
         for tool in expected:
             assert tool in tools, f"Tool '{tool}' not found"
         
