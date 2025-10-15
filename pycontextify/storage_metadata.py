@@ -283,16 +283,19 @@ class MetadataStore:
         return symbols
 
     def discover_tags(self) -> List[str]:
-        """Discover all unique tags from indexed chunks.
+        """Discover all unique user-provided tags from indexed chunks.
+
+        This method returns the tags that were originally provided by users
+        during indexing (via index_filebase), not inferred/extracted content tags.
 
         Returns:
-            Sorted list of unique tags from chunk metadata
+            Sorted list of unique user-provided tags
         """
         tags = set()
         for chunk in self._id_to_metadata.values():
-            chunk_tags = chunk.metadata.get("tags", [])
-            if isinstance(chunk_tags, list):
-                for tag in chunk_tags:
+            # Use chunk.tags (user-provided tags) instead of chunk.metadata["tags"] (inferred tags)
+            if isinstance(chunk.tags, list):
+                for tag in chunk.tags:
                     if isinstance(tag, str) and tag.strip():
                         tags.add(tag.strip())
 
