@@ -8,7 +8,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, Union, Optional
 
 from .config import Config
 from .types import Chunk, SourceType
@@ -61,7 +61,7 @@ class BaseChunker(ABC):
         end_char: int,
         embedding_provider: str,
         embedding_model: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> Chunk:
         """Create chunk with embedding provider information.
 
@@ -112,7 +112,7 @@ class BaseChunker(ABC):
             if len(word) > 2:  # Skip short words
                 chunk.add_reference(word)
 
-    def _split_by_tokens(self, text: str, chunk_size: int, overlap: int) -> List[tuple]:
+    def _split_by_tokens(self, text: str, chunk_size: int, overlap: int) -> List[Tuple[str, int, int]]:
         """Split text by approximate token count.
 
         Args:
@@ -206,7 +206,7 @@ class SimpleChunker(BaseChunker):
 
 
 class CodeChunker(SimpleChunker):
-    """Code-aware chunker that respects code structure and extracts code relationships."""
+    """Code-aware chunker that respects code structure and extracts relationships."""
 
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
@@ -263,7 +263,7 @@ class CodeChunker(SimpleChunker):
 
         return chunks
 
-    def _split_by_code_boundaries(self, text: str) -> List[tuple]:
+    def _split_by_code_boundaries(self, text: str) -> List[Tuple[str, int, int]]:
         """Split code by function/class boundaries when possible.
 
         Args:
@@ -275,7 +275,7 @@ class CodeChunker(SimpleChunker):
         # Simple approach: split by double newlines and function/class definitions
         lines = text.split("\n")
         chunks = []
-        current_chunk_lines = []
+        current_chunk_lines: List[str] = []
         current_start_char = 0
         char_position = 0
 
@@ -359,12 +359,15 @@ class CodeChunker(SimpleChunker):
 
 
 class DocumentChunker(SimpleChunker):
-    """Document-aware chunker that preserves document structure and extracts document relationships."""
+    """Document-aware chunker using LangChain's RecursiveCharacterTextSplitter."""
 
     def chunk_text(
         self, text: str, source_path: str, embedding_provider: str, embedding_model: str
     ) -> List[Chunk]:
         """Chunk document text with awareness of document structure.
+
+        Uses LangChain's RecursiveCharacterTextSplitter for intelligent boundaries,
+        preventing mid-sentence breaks and preserving semantic structure.
 
         Args:
             text: Document text to chunk
@@ -378,27 +381,27 @@ class DocumentChunker(SimpleChunker):
         if not text.strip():
             return []
 
-        # Try to split by document structure first
+        # First try to split by document structure (headers)
         doc_chunks = self._split_by_document_structure(text)
 
-        # Process chunks and split further if needed
+        # Process chunks with LangChain RecursiveCharacterTextSplitter
         final_chunks = []
         for chunk_text, start_char, end_char, section in doc_chunks:
-            # Check if chunk is too large
-            estimated_tokens = len(chunk_text.split()) * 1.3
-            if estimated_tokens <= self.chunk_size:
+            # Convert token-based chunk size to character estimate
+            # Average token ≈ 4 characters for English text
+            char_chunk_size = self.chunk_size * 4
+            char_overlap = self.chunk_overlap * 4
+
+            if len(chunk_text) <= char_chunk_size:
+                # Chunk is small enough, use as-is
                 final_chunks.append((chunk_text, start_char, end_char, section))
             else:
-                # Split large chunks further
-                sub_chunks = self._split_by_tokens(
-                    chunk_text, self.chunk_size, self.chunk_overlap
+                # Use LangChain RecursiveCharacterTextSplitter for large chunks
+                sub_chunks = self._split_with_langchain(
+                    chunk_text, char_chunk_size, char_overlap, start_char
                 )
                 for sub_text, sub_start, sub_end in sub_chunks:
-                    adjusted_start = start_char + sub_start
-                    adjusted_end = start_char + sub_end
-                    final_chunks.append(
-                        (sub_text, adjusted_start, adjusted_end, section)
-                    )
+                    final_chunks.append((sub_text, sub_start, sub_end, section))
 
         # Create metadata objects
         chunks = []
@@ -417,7 +420,144 @@ class DocumentChunker(SimpleChunker):
 
         return chunks
 
-    def _split_by_document_structure(self, text: str) -> List[tuple]:
+    def _split_with_langchain(
+        self, text: str, chunk_size: int, chunk_overlap: int, base_start_char: int
+    ) -> List[Tuple[str, int, int]]:
+        """Split text using LangChain's RecursiveCharacterTextSplitter.
+
+        Args:
+            text: Text to split
+            chunk_size: Target chunk size in characters
+            chunk_overlap: Overlap size in characters
+            base_start_char: Base character offset for position calculation
+
+        Returns:
+            List of (chunk_text, start_char, end_char) tuples
+        """
+        try:
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+        except ImportError as e:
+            logger.warning(
+                "LangChain text splitters not available (%s). Using fallback.",
+                e,
+            )
+            return self._split_by_tokens(
+                text, self.chunk_size, self.chunk_overlap, base_start_char
+            )
+
+        # Initialize RecursiveCharacterTextSplitter with document-friendly separators
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            separators=[
+                "\n\n",  # Paragraphs (highest priority)
+                "\n",  # Lines
+                ". ",  # Sentences
+                "? ",  # Questions
+                "! ",  # Exclamations
+                "; ",  # Semicolons
+                ", ",  # Commas
+                " ",  # Spaces
+                "",  # Characters (fallback)
+            ],
+            is_separator_regex=False,
+            add_start_index=True,
+        )
+
+        try:
+            # Split text into chunks
+            langchain_chunks = text_splitter.split_text(text)
+
+            # Convert to our format with proper character positions
+            chunks = []
+            current_pos = 0
+
+            for chunk_text in langchain_chunks:
+                # Find the actual position of this chunk in the original text
+                chunk_start = text.find(chunk_text, current_pos)
+                if chunk_start == -1:
+                    # Fallback: use sequential position
+                    chunk_start = current_pos
+
+                chunk_end = chunk_start + len(chunk_text)
+
+                # Adjust positions relative to the document
+                absolute_start = base_start_char + chunk_start
+                absolute_end = base_start_char + chunk_end
+
+                chunks.append((chunk_text, absolute_start, absolute_end))
+                current_pos = chunk_start + len(chunk_text)
+
+            return chunks
+
+        except Exception as exc:
+            logger.error(
+                "LangChain RecursiveCharacterTextSplitter failed: %s. Using fallback.",
+                exc,
+            )
+            return self._split_by_tokens(
+                text, self.chunk_size, self.chunk_overlap, base_start_char
+            )
+
+    def _split_by_tokens(
+        self, text: str, chunk_size: int, overlap: int, base_start_char: int = 0
+    ) -> List[Tuple[str, int, int]]:
+        """Fallback method: Split text by approximate token count.
+
+        Args:
+            text: Text to split
+            chunk_size: Target chunk size in tokens
+            overlap: Overlap size in tokens
+            base_start_char: Base character offset for position calculation
+
+        Returns:
+            List of (chunk_text, start_char, end_char) tuples
+        """
+        words = text.split()
+        if not words:
+            return []
+
+        # Approximate tokens as words * 1.3 (rough estimate for English)
+        words_per_chunk = int(chunk_size / 1.3)
+        words_overlap = int(overlap / 1.3)
+
+        chunks = []
+        start_idx = 0
+
+        while start_idx < len(words):
+            # Get chunk words
+            end_idx = min(start_idx + words_per_chunk, len(words))
+            chunk_words = words[start_idx:end_idx]
+
+            if not chunk_words:
+                break
+
+            # Find character positions
+            if start_idx == 0:
+                start_char = base_start_char
+            else:
+                # Find start position by joining previous words
+                start_char = (
+                    base_start_char
+                    + len(" ".join(words[:start_idx]))
+                    + (1 if start_idx > 0 else 0)
+                )
+
+            end_char = base_start_char + len(" ".join(words[:end_idx]))
+
+            chunk_text = " ".join(chunk_words)
+            chunks.append((chunk_text, start_char, end_char))
+
+            # Move start position for next chunk (with overlap)
+            if end_idx >= len(words):
+                break
+
+            start_idx = max(end_idx - words_overlap, start_idx + 1)
+
+        return chunks
+
+    def _split_by_document_structure(self, text: str) -> List[Tuple[str, int, int, Optional[str]]]:
         """Split document by headers and sections.
 
         Args:
@@ -427,8 +567,8 @@ class DocumentChunker(SimpleChunker):
             List of (chunk_text, start_char, end_char, section_name) tuples
         """
         lines = text.split("\n")
-        chunks = []
-        current_chunk_lines = []
+        chunks: List[Tuple[str, int, int, Optional[str]]] = []
+        current_chunk_lines: List[str] = []
         current_section = None
         current_start_char = 0
         char_position = 0
@@ -462,15 +602,9 @@ class DocumentChunker(SimpleChunker):
             chunk_text = "\n".join(current_chunk_lines)
             chunks.append((chunk_text, current_start_char, len(text), current_section))
 
-        # If no structure found, fall back to simple splitting
+        # If no structure found, treat entire text as one chunk
         if len(chunks) <= 1:
-            simple_chunks = self._split_by_tokens(
-                text, self.chunk_size, self.chunk_overlap
-            )
-            return [
-                (chunk_text, start_char, end_char, None)
-                for chunk_text, start_char, end_char in simple_chunks
-            ]
+            return [(text, 0, len(text), None)]
 
         return chunks
 
