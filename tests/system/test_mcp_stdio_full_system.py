@@ -65,14 +65,14 @@ def _build_arguments(
     schema: Dict[str, Any],
     *,
     base_path: Path,
-    topic: str,
+    tags: str,
 ) -> Dict[str, Any]:
     """Create representative arguments for a tool based on its schema."""
 
     if tool_name == "index_filebase":
         return {
             "base_path": str(base_path),
-            "topic": topic,
+            "tags": tags,
             "include": ["*.txt"],
         }
 
@@ -119,7 +119,7 @@ async def _run_stdio_system_flow() -> None:
         "PyContextify system test document. This content verifies end-to-end MCP tooling."
     )
 
-    topic_name = "system-test-topic"
+    tag_name = "system-test-tag"
 
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -216,7 +216,7 @@ async def _run_stdio_system_flow() -> None:
                     tool.name,
                     tool.inputSchema or {},
                     base_path=sample_dir,
-                    topic=topic_name,
+                    tags=tag_name,
                 )
                 print(f"Calling tool '{tool.name}' with arguments: {json.dumps(args)}")
                 result = await client.call_tool(tool.name, args)
@@ -262,10 +262,11 @@ async def _run_stdio_system_flow() -> None:
                     assert isinstance(normalized, dict), "Status payload must be a dict"
                     assert normalized.get("mcp_server", {}).get("name") == "PyContextify"
                 elif tool.name == "index_filebase":
-                    assert normalized.get("topic") == topic_name
+                    assert normalized.get("tags_input") == tag_name
+                    assert normalized.get("tags") == [tag_name]
                     assert normalized.get("files_loaded", 0) >= 1
                 elif tool.name == "discover":
-                    assert topic_name in normalized.get("topics", [])
+                    assert tag_name in normalized.get("tags", [])
                     assert normalized.get("count", 0) >= 1
                 elif tool.name == "search":
                     assert isinstance(normalized, list)

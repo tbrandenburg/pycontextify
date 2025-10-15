@@ -106,8 +106,8 @@ uv run pycontextify
 
 # Index content (via MCP client/AI assistant)
 # The server exposes 5 MCP functions:
-# - index_filebase(path, topic) - Unified indexing for code & docs
-# - discover() - List indexed topics
+# - index_filebase(path, tags) - Unified indexing for code & docs
+# - discover() - List indexed tags
 # - search(query, top_k=5) - Semantic search
 # - reset_index(remove_files=True, confirm=False) - Clear index data
 # - status() - Get system status and statistics
@@ -118,8 +118,8 @@ Expected output:
 ```
 Starting PyContextify MCP Server...
 Server provides 5 essential MCP functions:
-  - index_filebase(path, topic): Unified filebase indexing
-  - discover(): List indexed topics
+  - index_filebase(path, tags): Unified filebase indexing
+  - discover(): List indexed tags
   - search(query, top_k): Basic semantic search
   - reset_index(confirm=True): Clear all indexed content
   - status(): Get system status and statistics
@@ -189,8 +189,8 @@ Copy `.env.example` to `.env` and customize as needed.
 
 PyContextify exposes 5 MCP (Model Context Protocol) functions for semantic search and indexing:
 
-1. **`index_filebase(path, topic)`** - Unified indexing for codebases and documents with relationship extraction
-2. **`discover()`** - List indexed topics for browsing and filtering
+1. **`index_filebase(path, tags)`** - Unified indexing for codebases and documents with relationship extraction
+2. **`discover()`** - List indexed tags for browsing and filtering
 3. **`search(query, top_k=5)`** - Hybrid semantic + keyword search
 4. **`reset_index(remove_files=True, confirm=False)`** - Clear index data
 5. **`status()`** - Get system statistics and health

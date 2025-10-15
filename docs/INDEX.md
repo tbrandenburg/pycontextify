@@ -25,7 +25,7 @@ Complete documentation guide for PyContextify MCP server.
 
 **Common Tasks:**
 - [Index a filebase](MCP_SERVER.md#tool-examples)
-- [Discover indexed topics](MCP_SERVER.md#mcp-tools)
+- [Discover indexed tags](MCP_SERVER.md#mcp-tools)
 - [Configure the server](MCP_SERVER.md#command-line-options)
 
 ### For Developers
@@ -151,7 +151,7 @@ uv run pytest tests/ --cov=pycontextify
 
 ### Documentation
 1. Check the relevant guide above
-2. Search for your topic in the specific document
+2. Search for your tag in the specific document
 3. Look for examples and troubleshooting sections
 
 ### Testing

@@ -75,8 +75,8 @@ python scripts/build_package.py   # Build wheel/sdist + twine check
 ## MCP Interface
 
 5 essential functions:
-1. `index_filebase(path, topic)` - Unified code/document indexing with relationship extraction
-2. `discover()` - List indexed topics to aid navigation
+1. `index_filebase(path, tags)` - Unified code/document indexing with relationship extraction
+2. `discover()` - List indexed tags to aid navigation
 3. `search(query, top_k=5)` - Hybrid semantic + keyword search
 4. `reset_index(remove_files=True, confirm=False)` - Clear index data
 5. `status()` - System statistics

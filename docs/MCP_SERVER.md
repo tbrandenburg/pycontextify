@@ -18,7 +18,7 @@ uv run pycontextify --index-path ./my_index
 ```bash
 uv run pycontextify \
   --initial-filebase ./src \
-  --topic my-project
+  --tags my-project
 ```
 
 ---
@@ -30,8 +30,8 @@ The server exposes 5 tools for semantic search and indexing:
 | Tool | Purpose | Parameters |
 |------|---------|------------|
 | `status` | Get index statistics | None |
-| `index_filebase` | Index a filebase (code + docs) | `base_path` (required), `topic` (required), `include`, `exclude`, `exclude_dirs` |
-| `discover` | List indexed topics | None |
+| `index_filebase` | Index a filebase (code + docs) | `base_path` (required), `tags` (required), `include`, `exclude`, `exclude_dirs` |
+| `discover` | List indexed tags | None |
 | `search` | Semantic search | `query` (required), `top_k`, `display_format` |
 | `reset_index` | Clear the index | `remove_files`, `confirm` (required) |
 
@@ -51,14 +51,15 @@ The server exposes 5 tools for semantic search and indexing:
   "tool": "index_filebase",
   "arguments": {
     "base_path": "/path/to/repository",
-    "topic": "documentation",
+    "tags_input": "documentation",
+    "tags": ["documentation"],
     "include": ["*.py", "*.md"],
     "exclude_dirs": [".git", "node_modules"]
   }
 }
 ```
 
-**Discover Topics:**
+**Discover Tags:**
 ```json
 {
   "tool": "discover",
@@ -104,7 +105,7 @@ The server exposes 5 tools for semantic search and indexing:
 | Option | Description |
 |--------|-------------|
 | `--initial-filebase DIR` | Directory tree to index at startup |
-| `--topic NAME` | Topic label for the initial indexing run (required with `--initial-filebase`) |
+| `--tags NAME` | Tag label for the initial indexing run (required with `--initial-filebase`) |
 ### Embedding Configuration
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -193,7 +194,7 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
         "C:\\path\\to\\index",
         "--initial-filebase",
         "C:\\path\\to\\project",
-        "--topic",
+        "--tags",
         "project-docs"
       ]
     }
@@ -210,7 +211,7 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 uv run pycontextify \
   --index-path ./docs_index \
   --initial-filebase ./docs \
-  --topic documentation \
+  --tags documentation \
   --quiet
 ```
 
@@ -220,7 +221,7 @@ uv run pycontextify \
   --index-path ./project_index \
   --index-name my_project \
   --initial-filebase ./project \
-  --topic project-docs \
+  --tags project-docs \
   --quiet
 ```
 
@@ -229,7 +230,7 @@ uv run pycontextify \
 uv run pycontextify \
   --index-path ./knowledge_base \
   --initial-filebase ./knowledge_base_sources \
-  --topic unified-knowledge \
+  --tags unified-knowledge \
   --quiet
 ```
 
@@ -338,7 +339,7 @@ print(status)
 
 # Index a filebase (code or docs)
 index_filebase = mcp.mcp._tool_manager._tools["index_filebase"].fn
-result = index_filebase(base_path="./docs", topic="documentation")
+result = index_filebase(base_path="./docs", tags="documentation")
 print(result)
 
 # Search

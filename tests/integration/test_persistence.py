@@ -51,7 +51,7 @@ More content to ensure we have multiple chunks.
             manager1 = IndexManager(config1)
 
             # Index the document using unified API
-            result = manager1.index_filebase(base_path=str(test_dir), topic="test_docs")
+            result = manager1.index_filebase(base_path=str(test_dir), tags="test_docs")
 
             # Verify indexing succeeded
             assert result["chunks_created"] > 0
@@ -128,7 +128,7 @@ More content to ensure we have multiple chunks.
             doc_file = test_dir / "test.md"
             doc_file.write_text(test_content)
 
-            result = manager1.index_filebase(base_path=str(test_dir), topic="test_docs")
+            result = manager1.index_filebase(base_path=str(test_dir), tags="test_docs")
 
             assert result["chunks_created"] > 0
             stats1 = manager1.get_status()
@@ -181,7 +181,7 @@ More content to ensure we have multiple chunks.
             doc_file = test_dir / "test.md"
             doc_file.write_text(test_content)
 
-            manager1.index_filebase(base_path=str(test_dir), topic="test_docs")
+            manager1.index_filebase(base_path=str(test_dir), tags="test_docs")
 
             # Verify files exist
             assert (test_index_dir / "test_index.faiss").exists()
@@ -230,7 +230,7 @@ More content to ensure we have multiple chunks.
             doc_file = test_dir / "test.md"
             doc_file.write_text(test_content)
 
-            manager1.index_filebase(base_path=str(test_dir), topic="test_docs")
+            manager1.index_filebase(base_path=str(test_dir), tags="test_docs")
 
             # Remove one file (relationships file no longer exists in simplified version)
             # Remove the metadata file instead
@@ -292,7 +292,7 @@ Content section C for document {i}.
                 doc_file.rename(new_path)
 
             result = manager1.index_filebase(
-                base_path=str(test_docs_dir), topic="test_docs"
+                base_path=str(test_docs_dir), tags="test_docs"
             )
             total_chunks = result["chunks_created"]
 

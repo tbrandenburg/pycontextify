@@ -16,7 +16,7 @@ class TestPostprocessIdentity:
 
     def test_postprocess_file_single_chunk(self):
         """Test postprocess_file with single chunk."""
-        chunk = {"text": "test content", "metadata": {"topic": "test"}}
+        chunk = {"text": "test content", "metadata": {"tags": ["test"]}}
         result = postprocess_file([chunk])
 
         assert result == [chunk]
@@ -26,9 +26,9 @@ class TestPostprocessIdentity:
     def test_postprocess_file_multiple_chunks(self):
         """Test postprocess_file with multiple chunks."""
         chunks = [
-            {"text": "chunk1", "metadata": {"topic": "test"}},
-            {"text": "chunk2", "metadata": {"topic": "test"}},
-            {"text": "chunk3", "metadata": {"topic": "test"}},
+            {"text": "chunk1", "metadata": {"tags": ["test"]}},
+            {"text": "chunk2", "metadata": {"tags": ["test"]}},
+            {"text": "chunk3", "metadata": {"tags": ["test"]}},
         ]
         result = postprocess_file(chunks)
 
@@ -43,7 +43,7 @@ class TestPostprocessIdentity:
         chunk = {
             "text": "content",
             "metadata": {
-                "topic": "test",
+                "tags": ["test"],
                 "full_path": "/path/to/file.txt",
                 "chunk_index": 0,
                 "language": "python",
@@ -52,7 +52,7 @@ class TestPostprocessIdentity:
         result = postprocess_file([chunk])
 
         assert result[0]["metadata"] == chunk["metadata"]
-        assert result[0]["metadata"]["topic"] == "test"
+        assert result[0]["metadata"]["tags"] == ["test"]
         assert result[0]["metadata"]["chunk_index"] == 0
 
     def test_postprocess_filebase_empty_list(self):
@@ -63,7 +63,7 @@ class TestPostprocessIdentity:
 
     def test_postprocess_filebase_single_chunk(self):
         """Test postprocess_filebase with single chunk."""
-        chunk = {"text": "test content", "metadata": {"topic": "test"}}
+        chunk = {"text": "test content", "metadata": {"tags": ["test"]}}
         result = postprocess_filebase([chunk])
 
         assert result == [chunk]
@@ -73,9 +73,9 @@ class TestPostprocessIdentity:
     def test_postprocess_filebase_multiple_chunks(self):
         """Test postprocess_filebase with multiple chunks."""
         chunks = [
-            {"text": "chunk1", "metadata": {"topic": "topic1"}},
-            {"text": "chunk2", "metadata": {"topic": "topic2"}},
-            {"text": "chunk3", "metadata": {"topic": "topic1"}},
+            {"text": "chunk1", "metadata": {"tags": ["alpha"]}},
+            {"text": "chunk2", "metadata": {"tags": ["beta"]}},
+            {"text": "chunk3", "metadata": {"tags": ["alpha"]}},
         ]
         result = postprocess_filebase(chunks)
 
@@ -99,7 +99,7 @@ class TestPostprocessIdentity:
         chunk = {
             "text": "content",
             "metadata": {
-                "topic": "test",
+                "tags": ["test"],
                 "links": {"imports": ["module1", "module2"], "exports": ["func1"]},
                 "language": "python",
                 "chunk_name": "function_name",
@@ -110,26 +110,26 @@ class TestPostprocessIdentity:
         assert result[0]["metadata"]["links"] == chunk["metadata"]["links"]
         assert result[0]["metadata"]["language"] == "python"
 
-    def test_postprocess_filebase_with_mixed_topics(self):
-        """Test postprocess_filebase with chunks from different topics."""
+    def test_postprocess_filebase_with_mixed_tags(self):
+        """Test postprocess_filebase with chunks from different tags."""
         chunks = [
-            {"text": "code chunk", "metadata": {"topic": "code"}},
-            {"text": "doc chunk", "metadata": {"topic": "docs"}},
-            {"text": "data chunk", "metadata": {"topic": "data"}},
+            {"text": "code chunk", "metadata": {"tags": ["code"]}},
+            {"text": "doc chunk", "metadata": {"tags": ["docs"]}},
+            {"text": "data chunk", "metadata": {"tags": ["data"]}},
         ]
         result = postprocess_filebase(chunks)
 
         # Should preserve all chunks unchanged
         assert len(result) == 3
-        assert result[0]["metadata"]["topic"] == "code"
-        assert result[1]["metadata"]["topic"] == "docs"
-        assert result[2]["metadata"]["topic"] == "data"
+        assert result[0]["metadata"]["tags"] == ["code"]
+        assert result[1]["metadata"]["tags"] == ["docs"]
+        assert result[2]["metadata"]["tags"] == ["data"]
 
     def test_both_functions_are_identity(self):
         """Test that both functions act as identity functions."""
         chunks = [
-            {"text": "chunk1", "metadata": {"topic": "test"}},
-            {"text": "chunk2", "metadata": {"topic": "test"}},
+            {"text": "chunk1", "metadata": {"tags": ["test"]}},
+            {"text": "chunk2", "metadata": {"tags": ["test"]}},
         ]
 
         # Both should return the same result
@@ -142,8 +142,8 @@ class TestPostprocessIdentity:
     def test_postprocess_file_does_not_modify_input(self):
         """Test that postprocess_file doesn't modify the input list."""
         original_chunks = [
-            {"text": "chunk1", "metadata": {"topic": "test"}},
-            {"text": "chunk2", "metadata": {"topic": "test"}},
+            {"text": "chunk1", "metadata": {"tags": ["test"]}},
+            {"text": "chunk2", "metadata": {"tags": ["test"]}},
         ]
         # Make a copy to compare later
         chunks_copy = [chunk.copy() for chunk in original_chunks]
@@ -158,8 +158,8 @@ class TestPostprocessIdentity:
     def test_postprocess_filebase_does_not_modify_input(self):
         """Test that postprocess_filebase doesn't modify the input list."""
         original_chunks = [
-            {"text": "chunk1", "metadata": {"topic": "test"}},
-            {"text": "chunk2", "metadata": {"topic": "test"}},
+            {"text": "chunk1", "metadata": {"tags": ["test"]}},
+            {"text": "chunk2", "metadata": {"tags": ["test"]}},
         ]
         chunks_copy = [chunk.copy() for chunk in original_chunks]
 

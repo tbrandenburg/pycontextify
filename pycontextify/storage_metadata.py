@@ -282,20 +282,21 @@ class MetadataStore:
             symbols.update(chunk.code_symbols)
         return symbols
 
-    def discover_topics(self) -> List[str]:
-        """Discover all unique topics from indexed chunks.
+    def discover_tags(self) -> List[str]:
+        """Discover all unique tags from indexed chunks.
 
         Returns:
-            Sorted list of unique topic names from chunk metadata
+            Sorted list of unique tags from chunk metadata
         """
-        topics = set()
+        tags = set()
         for chunk in self._id_to_metadata.values():
-            # Topic should be stored in chunk.metadata["topic"]
-            topic = chunk.metadata.get("topic")
-            if topic and isinstance(topic, str):
-                topics.add(topic)
+            chunk_tags = chunk.metadata.get("tags", [])
+            if isinstance(chunk_tags, list):
+                for tag in chunk_tags:
+                    if isinstance(tag, str) and tag.strip():
+                        tags.add(tag.strip())
 
-        return sorted(topics)
+        return sorted(tags)
 
     def validate_embedding_compatibility(self, provider: str, model: str) -> bool:
         """Check if existing chunks are compatible with current embedding settings."""

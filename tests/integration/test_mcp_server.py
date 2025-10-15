@@ -212,7 +212,8 @@ class TestMCPServerFunctions:
         # Mock IndexManager
         mock_manager = Mock()
         mock_manager.index_filebase.return_value = {
-            "topic": "test_code",
+            "tags_input": "test_code",
+            "tags": ["test_code"],
             "base_path": str(test_dir),
             "files_crawled": 1,
             "files_loaded": 1,
@@ -224,12 +225,13 @@ class TestMCPServerFunctions:
 
         # Access the actual function through FastMCP
         index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
-        result = index_filebase_fn(base_path=str(test_dir), topic="test_code")
+        result = index_filebase_fn(base_path=str(test_dir), tags="test_code")
 
         assert "error" not in result
         assert result["files_loaded"] == 1
         assert result["chunks_created"] == 5
-        assert result["topic"] == "test_code"
+        assert result["tags_input"] == "test_code"
+        assert result["tags"] == ["test_code"]
         mock_manager.index_filebase.assert_called_once()
 
     @patch("pycontextify.mcp.IndexManager")
@@ -243,28 +245,28 @@ class TestMCPServerFunctions:
         mock_manager_class.return_value = mock_manager
 
         index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
-        result = index_filebase_fn(base_path="/nonexistent/path", topic="test")
+        result = index_filebase_fn(base_path="/nonexistent/path", tags="test")
         assert "error" in result
         assert "does not exist" in result["error"].lower()
 
-    def test_index_filebase_missing_topic(self):
-        """Test indexing without required topic."""
+    def test_index_filebase_missing_tags(self):
+        """Test indexing without required tags."""
         test_dir = self.test_dir / "test_files"
         test_dir.mkdir()
 
         index_filebase_fn = mcp_module.mcp._tool_manager._tools["index_filebase"].fn
-        result = index_filebase_fn(base_path=str(test_dir), topic="")  # Empty topic
+        result = index_filebase_fn(base_path=str(test_dir), tags="")  # Empty tags
         assert "error" in result
-        assert "topic" in result["error"].lower()
+        assert "tags" in result["error"].lower()
 
     @patch("pycontextify.mcp.IndexManager")
-    def test_discover_topics(self, mock_manager_class):
-        """Test discover function returns indexed topics."""
+    def test_discover_tags(self, mock_manager_class):
+        """Test discover function returns indexed tags."""
         mock_manager = Mock()
 
-        # Mock storage with discover_topics method
+        # Mock storage with discover_tags method
         mock_storage = Mock()
-        mock_storage.discover_topics.return_value = ["code", "docs", "guides"]
+        mock_storage.discover_tags.return_value = ["code", "docs", "guides"]
         mock_manager.metadata_store = mock_storage
         mock_manager_class.return_value = mock_manager
 
@@ -272,11 +274,11 @@ class TestMCPServerFunctions:
         discover_fn = mcp_module.mcp._tool_manager._tools["discover"].fn
         result = discover_fn()
 
-        assert "topics" in result
-        assert len(result["topics"]) == 3
-        assert "code" in result["topics"]
-        assert "docs" in result["topics"]
-        assert "guides" in result["topics"]
+        assert "tags" in result
+        assert len(result["tags"]) == 3
+        assert "code" in result["tags"]
+        assert "docs" in result["tags"]
+        assert "guides" in result["tags"]
 
     @patch("pycontextify.mcp.IndexManager")
     def test_search_success(self, mock_manager_class):
@@ -441,7 +443,7 @@ Use Bearer tokens in the Authorization header.
 
             try:
                 result = mcp_isolated.index_filebase.fn(
-                    base_path=str(doc_dir), topic="api_docs"
+                    base_path=str(doc_dir), tags="api_docs"
                 )
                 assert "error" not in result
                 assert result["chunks_created"] > 0
@@ -472,18 +474,18 @@ Use Bearer tokens in the Authorization header.
         """Test MCP function error handling."""
         # Test non-existent directory
         result = mcp_isolated.index_filebase.fn(
-            base_path="/non/existent/directory", topic="test"
+            base_path="/non/existent/directory", tags="test"
         )
         assert "error" in result
         print("✅ Error handling for missing directories")
 
-        # Test empty topic
+        # Test empty tags
         with tempfile.TemporaryDirectory() as temp_dir:
             result = mcp_isolated.index_filebase.fn(
-                base_path=temp_dir, topic=""  # Empty topic should fail
+                base_path=temp_dir, tags=""  # Empty tags should fail
             )
             assert "error" in result
-            print("✅ Error handling for empty topic")
+            print("✅ Error handling for empty tags")
 
         # Test invalid search
         results = mcp_isolated.search.fn("", top_k=5)
@@ -529,18 +531,18 @@ class TestMCPUtilityFunctions:
         # Create mock args for new API
         args = argparse.Namespace()
         args.initial_filebase = None
-        args.topic = None
+        args.tags = None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             (Path(temp_dir) / "test.py").write_text("print('hello')")
 
             # Set up args for filebase indexing
             args.initial_filebase = temp_dir
-            args.topic = "test_code"
+            args.tags = "test_code"
 
             await perform_initial_indexing(args, mock_manager)
 
             # Should have called index_filebase
             assert mock_manager.index_filebase.called
             call_args = mock_manager.index_filebase.call_args
-            assert call_args[1]["topic"] == "test_code"
+            assert call_args[1]["tags"] == "test_code"

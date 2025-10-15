@@ -218,7 +218,7 @@ Tests the same workflow via actual MCP tools:
 1. ✅ Check tool availability
 2. ✅ Get status via `status` tool
 3. ✅ Index document directory via `index_filebase` tool
-4. ✅ Index code via `index_filebase` tool (separate topic)
+4. ✅ Index code via `index_filebase` tool (separate tags)
 5. ✅ Search via `search` tool
 6. ✅ Reset via `reset_index` tool
 

@@ -18,7 +18,7 @@ class TestFileLoaderFactory:
         test_file.write_text(test_content, encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test_topic")
+        docs = loader.load(str(test_file), tags="test_tag")
 
         assert len(docs) == 1
         assert docs[0]["text"] == test_content
@@ -26,7 +26,7 @@ class TestFileLoaderFactory:
 
         # Check required metadata fields
         meta = docs[0]["metadata"]
-        assert meta["topic"] == "test_topic"
+        assert meta["tags"] == ["test_tag"]
         assert meta["full_path"] == str(test_file.resolve())
         assert meta["filename_stem"] == "test"
         assert meta["file_extension"] == "txt"
@@ -41,12 +41,12 @@ class TestFileLoaderFactory:
         test_file.write_text(test_content, encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="code")
+        docs = loader.load(str(test_file), tags="code")
 
         assert len(docs) == 1
         assert docs[0]["text"] == test_content
         assert docs[0]["metadata"]["file_extension"] == "py"
-        assert docs[0]["metadata"]["topic"] == "code"
+        assert docs[0]["metadata"]["tags"] == ["code"]
 
     def test_load_markdown_file(self, tmp_path):
         """Test loading a Markdown file."""
@@ -55,7 +55,7 @@ class TestFileLoaderFactory:
         test_file.write_text(test_content, encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="docs")
+        docs = loader.load(str(test_file), tags="docs")
 
         assert len(docs) == 1
         assert docs[0]["text"] == test_content
@@ -67,7 +67,7 @@ class TestFileLoaderFactory:
         test_file.write_text('{"key": "value"}', encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="data")
+        docs = loader.load(str(test_file), tags="data")
 
         assert len(docs) == 1
         meta = docs[0]["metadata"]
@@ -80,7 +80,7 @@ class TestFileLoaderFactory:
             "file_extension",
             "loading_time_ms",
             "date_loaded",
-            "topic",
+            "tags",
         ]
 
         for field in required_fields:
@@ -93,7 +93,7 @@ class TestFileLoaderFactory:
         txt_file.write_text("text", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(txt_file), topic="test")
+        docs = loader.load(str(txt_file), tags="test")
         assert (
             "text" in docs[0]["metadata"]["mime_type"]
             or docs[0]["metadata"]["mime_type"] is None
@@ -103,7 +103,7 @@ class TestFileLoaderFactory:
         py_file = tmp_path / "file.py"
         py_file.write_text("print('hi')", encoding="utf-8")
 
-        docs = loader.load(str(py_file), topic="test")
+        docs = loader.load(str(py_file), tags="test")
         # MIME type might be text/x-python or similar
         mime = docs[0]["metadata"]["mime_type"]
         assert mime is None or "text" in mime or "python" in mime
@@ -114,7 +114,7 @@ class TestFileLoaderFactory:
         test_file.write_text("content", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         date_str = docs[0]["metadata"]["date_loaded"]
         # Should be parseable as ISO 8601
@@ -130,7 +130,7 @@ class TestFileLoaderFactory:
         test_file.write_text("content", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         loading_time = docs[0]["metadata"]["loading_time_ms"]
         assert loading_time >= 0
@@ -141,7 +141,7 @@ class TestFileLoaderFactory:
         loader = FileLoaderFactory()
 
         with pytest.raises((FileNotFoundError, OSError)):
-            loader.load("/nonexistent/file.txt", topic="test")
+            loader.load("/nonexistent/file.txt", tags="test")
 
     def test_load_empty_file(self, tmp_path):
         """Test loading an empty file."""
@@ -149,12 +149,12 @@ class TestFileLoaderFactory:
         test_file.write_text("", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         # Should still return a doc with empty text
         assert len(docs) == 1
         assert docs[0]["text"] == ""
-        assert docs[0]["metadata"]["topic"] == "test"
+        assert docs[0]["metadata"]["tags"] == ["test"]
 
     def test_skip_binary_file(self, tmp_path):
         """Test that binary files are skipped."""
@@ -163,7 +163,7 @@ class TestFileLoaderFactory:
         test_file.write_bytes(b"\x00\x01\x02\x03\x04\x05")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         # Binary files should be skipped (return empty list)
         assert len(docs) == 0
@@ -175,7 +175,7 @@ class TestFileLoaderFactory:
         test_file.write_text(test_content, encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         assert len(docs) == 1
         assert docs[0]["text"] == test_content
@@ -189,7 +189,7 @@ class TestFileLoaderFactory:
         test_file.write_text(test_content, encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         assert len(docs) == 1
         assert docs[0]["text"] == test_content
@@ -202,7 +202,7 @@ class TestFileLoaderFactory:
         test_file.write_text(test_content, encoding="utf-8")
 
         loader = FileLoaderFactory(default_encoding="utf-8")
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         assert len(docs) == 1
         assert docs[0]["text"] == test_content
@@ -214,7 +214,7 @@ class TestFileLoaderFactory:
         test_file.write_text("content", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         full_path = docs[0]["metadata"]["full_path"]
         assert Path(full_path).is_absolute()
@@ -225,7 +225,7 @@ class TestFileLoaderFactory:
         test_file.write_text("content", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         # Path.stem returns everything before the last dot
         assert docs[0]["metadata"]["filename_stem"] == "my_file.test"
@@ -240,7 +240,7 @@ class TestFileLoaderFactory:
         test_file.write_text("readme content", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         # File without extension might be skipped or loaded depending on MIME detection
         # If loaded, verify metadata
@@ -249,19 +249,19 @@ class TestFileLoaderFactory:
             assert docs[0]["metadata"]["filename_stem"] == "README"
         # If not loaded (empty list), that's also acceptable
 
-    def test_topic_propagation(self, tmp_path):
-        """Test that topic is correctly propagated to metadata."""
+    def test_tag_propagation(self, tmp_path):
+        """Test that tags are correctly propagated to metadata."""
         test_file = tmp_path / "file.txt"
         test_file.write_text("content", encoding="utf-8")
 
         loader = FileLoaderFactory()
 
-        # Test different topics
-        docs1 = loader.load(str(test_file), topic="topic1")
-        assert docs1[0]["metadata"]["topic"] == "topic1"
+        # Test different tags
+        docs1 = loader.load(str(test_file), tags="tag1")
+        assert docs1[0]["metadata"]["tags"] == ["tag1"]
 
-        docs2 = loader.load(str(test_file), topic="topic2")
-        assert docs2[0]["metadata"]["topic"] == "topic2"
+        docs2 = loader.load(str(test_file), tags="tag2")
+        assert docs2[0]["metadata"]["tags"] == ["tag2"]
 
     def test_multiple_files_same_loader(self, tmp_path):
         """Test loading multiple files with the same loader instance."""
@@ -273,8 +273,8 @@ class TestFileLoaderFactory:
 
         loader = FileLoaderFactory()
 
-        docs1 = loader.load(str(file1), topic="test")
-        docs2 = loader.load(str(file2), topic="test")
+        docs1 = loader.load(str(file1), tags="test")
+        docs2 = loader.load(str(file2), tags="test")
 
         assert len(docs1) == 1
         assert len(docs2) == 1
@@ -287,7 +287,7 @@ class TestFileLoaderFactory:
         test_file.write_text("   \n\n\t\t\n   ", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         # Should still load the whitespace content
         assert len(docs) == 1
@@ -301,7 +301,7 @@ class TestFileLoaderFactory:
         test_file.write_text("content", encoding="utf-8")
 
         loader = FileLoaderFactory()
-        docs = loader.load(str(test_file), topic="test")
+        docs = loader.load(str(test_file), tags="test")
 
         assert len(docs) == 1
         assert docs[0]["text"] == "content"

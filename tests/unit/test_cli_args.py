@@ -45,9 +45,9 @@ def parse_args_with_custom_argv(argv):
         help="Directory path to index at startup using unified pipeline",
     )
     parser.add_argument(
-        "--topic",
+        "--tags",
         type=str,
-        help="Topic label for initial indexing (required when --initial-filebase is used)",
+        help="Comma-separated tags for initial indexing (required when --initial-filebase is used)",
     )
 
     # Server configuration
@@ -126,7 +126,7 @@ class TestCLIArguments(unittest.TestCase):
         self.assertIsNone(args.index_path)
         self.assertIsNone(args.index_name)
         self.assertIsNone(args.initial_filebase)
-        self.assertIsNone(args.topic)
+        self.assertIsNone(args.tags)
         self.assertFalse(args.no_auto_persist)
         self.assertFalse(args.no_auto_load)
         self.assertFalse(args.verbose)
@@ -144,10 +144,10 @@ class TestCLIArguments(unittest.TestCase):
     def test_initial_filebase_arguments(self):
         """Test initial filebase arguments."""
         args = parse_args_with_custom_argv(
-            ["--initial-filebase", "./repo", "--topic", "docs"]
+            ["--initial-filebase", "./repo", "--tags", "docs"]
         )
         self.assertEqual(args.initial_filebase, "./repo")
-        self.assertEqual(args.topic, "docs")
+        self.assertEqual(args.tags, "docs")
         self.assertIsNone(args.index_bootstrap_archive_url)
 
     def test_server_configuration(self):
@@ -198,7 +198,7 @@ class TestCLIArguments(unittest.TestCase):
                 "https://example.com/bootstrap.tar.gz",
                 "--initial-filebase",
                 "./repo",
-                "--topic",
+                "--tags",
                 "docs",
                 "--no-auto-persist",
                 "--embedding-provider",
@@ -215,7 +215,7 @@ class TestCLIArguments(unittest.TestCase):
             args.index_bootstrap_archive_url, "https://example.com/bootstrap.tar.gz"
         )
         self.assertEqual(args.initial_filebase, "./repo")
-        self.assertEqual(args.topic, "docs")
+        self.assertEqual(args.tags, "docs")
         self.assertTrue(args.no_auto_persist)
         self.assertEqual(args.embedding_provider, "ollama")
         self.assertEqual(args.embedding_model, "nomic-embed-text")

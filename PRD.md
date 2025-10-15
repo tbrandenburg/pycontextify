@@ -49,11 +49,11 @@ The solution targets software developers, technical writers, and researchers who
 ### 5. Resource Discovery
 **As a** learner exploring a technical domain,  
 **I want to** discover related resources across different formats,  
-**So that** I can build a comprehensive understanding of the topic.
+**So that** I can build a comprehensive understanding of the tags applied to content.
 
 **Acceptance Criteria:**
-- Given an indexed knowledge base, when searching for an introductory topic, then results include related advanced topics
-- Given complex documentation, when searching with relationship context, then results show the conceptual hierarchy of topics
+- Given an indexed knowledge base, when searching for an introductory tag, then results include related advanced tags
+- Given complex documentation, when searching with relationship context, then results show the conceptual hierarchy of tags
 
 ### 6. Project Setup
 **As a** system administrator,  
