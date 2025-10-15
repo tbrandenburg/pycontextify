@@ -44,6 +44,9 @@ venv.bak/
 # Temp
 .temp/
 
+# Debug reports
+.debug/
+
 # OS
 .DS_Store
 .DS_Store?

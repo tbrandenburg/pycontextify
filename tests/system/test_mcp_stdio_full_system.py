@@ -275,15 +275,11 @@ async def _run_stdio_system_flow() -> None:
                     expected_tags = ["ASPICE", "engineering", "process"]
                     assert normalized.get("tags") == expected_tags
                     assert normalized.get("files_crawled", 0) >= 1
-                    assert (
-                        normalized.get("files_loaded", 0) >= 1
-                    ), (
+                    assert normalized.get("files_loaded", 0) >= 1, (
                         f"Expected files_loaded >= 1, "
                         f"got {normalized.get('files_loaded', 0)}"
                     )
-                    assert (
-                        normalized.get("chunks_created", 0) > 0
-                    ), (
+                    assert normalized.get("chunks_created", 0) > 0, (
                         f"Expected chunks_created > 0, "
                         f"got {normalized.get('chunks_created', 0)}. "
                         f"PDF content should be processed into chunks."
@@ -293,9 +289,7 @@ async def _run_stdio_system_flow() -> None:
                     # Check that all our expected tags are present
                     expected_tags = ["ASPICE", "engineering", "process"]
                     for expected_tag in expected_tags:
-                        assert (
-                            expected_tag in discovered_tags
-                        ), (
+                        assert expected_tag in discovered_tags, (
                             f"Expected tag '{expected_tag}' not found in "
                             f"discovered tags: {discovered_tags}"
                         )

@@ -53,7 +53,9 @@ def main() -> None:
 
     built_files = sorted(DIST_DIR.glob("*"))
     if not built_files:
-        raise SystemExit("No files were produced in dist/. Ensure the build step completed successfully.")
+        raise SystemExit(
+            "No files were produced in dist/. Ensure the build step completed successfully."
+        )
 
     print("\nRunning twine check...\n")
     _run([sys.executable, "-m", "twine", "check", *(str(path) for path in built_files)])
