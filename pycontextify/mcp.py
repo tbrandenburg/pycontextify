@@ -1068,13 +1068,20 @@ def main():
         # Initialize manager with CLI overrides
         mgr = initialize_manager(config_overrides)
         
-        # Pre-load embedder to avoid first-request hangs
+        # Pre-load embedder and vector store to avoid first-request hangs
         try:
             if hasattr(mgr, 'embedder_service') and mgr.embedder_service:
-                mgr.embedder_service.get_embedder().embed_single("test")
+                # Pre-load embedder
+                embedder = mgr.embedder_service.get_embedder()
+                embedder.embed_single("test")
                 logger.info("Embedder pre-loaded successfully")
-        except Exception:
-            logger.info("Embedder will initialize on first use")
+                
+                # Pre-load vector store to trigger FAISS initialization
+                mgr._ensure_vector_store()
+                if mgr.vector_store:
+                    logger.info(f"Vector store pre-loaded successfully (dimension: {mgr.vector_store.get_embedding_dimension()})")
+        except Exception as e:
+            logger.warning(f"Pre-loading failed, components will initialize on first use: {e}")
 
         # Perform initial indexing if specified
         if getattr(args, "initial_filebase", None):

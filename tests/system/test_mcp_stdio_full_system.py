@@ -142,7 +142,6 @@ async def _run_stdio_system_flow() -> None:
             "PYCONTEXTIFY_AUTO_LOAD": "false",
             "PYCONTEXTIFY_ENABLE_RELATIONSHIPS": "false",
             "PYCONTEXTIFY_USE_HYBRID_SEARCH": "false",
-            "PYCONTEXTIFY_LOG_LEVEL": "WARNING",
             "UV_NO_SYNC": "1",
             "UV_PYTHON_DOWNLOADS": "never",
         }
@@ -169,6 +168,7 @@ async def _run_stdio_system_flow() -> None:
         args=[
             "run",
             "pycontextify",
+            "--verbose",  # Enable DEBUG logging
         ],
         env=env,
         cwd=str(repo_root),
