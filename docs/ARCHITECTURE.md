@@ -40,67 +40,39 @@ PyContextify follows a modular MCP server architecture built in Python, providin
 ### High Level Project Diagram
 
 ```mermaid
-graph TB
-    subgraph "Client Applications"
-        AI[AI Assistants]
-        IDE[IDE Extensions]
-        CLI[CLI Tools]
-    end
+graph TD
+    A[AI Assistants] --> M[MCP Interface]
+    B[IDE Extensions] --> M
+    C[CLI Tools] --> M
     
-    subgraph "PyContextify MCP Server"
-        MCP[MCP Interface<br/>5 Functions]
-        IM[IndexManager<br/>Central Coordinator]
-        
-        subgraph "Indexing Pipeline"
-            FC[FileCrawler]
-            FL[FileLoader]
-            CH[Chunker Factory]
-            PP[Postprocessor]
-        end
-        
-        subgraph "Search Engine"
-            SS[SearchService]
-            HS[HybridSearch]
-            ES[EmbedderService]
-        end
-        
-        subgraph "Storage Layer"
-            VS[VectorStore<br/>FAISS]
-            MS[MetadataStore<br/>Pickle]
-            FS[File System<br/>Persistence]
-        end
-    end
+    M --> I[IndexManager]
     
-    subgraph "External Dependencies"
-        ST[sentence-transformers]
-        FAISS[FAISS Library]
-        PDF[PDF Processors]
-    end
+    I --> IP[IndexingPipeline]
+    I --> SS[SearchService]
     
-    AI --> MCP
-    IDE --> MCP
-    CLI --> MCP
+    IP --> FC[FileCrawler]
+    IP --> FL[FileLoader]
+    IP --> CH[ChunkerFactory]
+    IP --> ES[EmbedderService]
     
-    MCP --> IM
-    IM --> FC
-    IM --> SS
+    SS --> HS[HybridSearchEngine]
+    SS --> VS[VectorStore]
+    SS --> MS[MetadataStore]
     
-    FC --> FL
-    FL --> CH
-    CH --> PP
-    PP --> ES
     ES --> VS
-    
-    SS --> HS
-    HS --> VS
-    HS --> MS
-    
-    VS --> FS
+    VS --> FS[(File System)]
     MS --> FS
     
-    ES --> ST
-    VS --> FAISS
-    FL --> PDF
+    ES --> ST[sentence-transformers]
+    VS --> FI[FAISS Library]
+    FL --> PD[PDF Processors]
+    
+    style M fill:#e1f5fe
+    style I fill:#f3e5f5
+    style IP fill:#e8f5e8
+    style SS fill:#fff3e0
+    style VS fill:#fce4ec
+    style MS fill:#fce4ec
 ```
 
 ### Architectural and Design Patterns
@@ -264,54 +236,39 @@ graph TB
 ### Component Diagrams
 
 ```mermaid
-graph TD
-    subgraph "Core Components"
-        IM[IndexManager<br/>Central Coordinator]
-        IP[IndexingPipeline<br/>8-Step Process]
-        SS[SearchService<br/>Hybrid Search]
-    end
+flowchart TD
+    IM[IndexManager] --> IP[IndexingPipeline]
+    IM --> SS[SearchService]
+    IM --> ES[EmbedderService]
     
-    subgraph "Content Processing"
-        CF[ChunkerFactory]
-        CC[CodeChunker]
-        DC[DocumentChunker]
-        SC[SimpleChunker]
-        FL[FileLoaderFactory]
-    end
+    IP --> CF[ChunkerFactory]
+    IP --> FL[FileLoaderFactory]
+    IP --> VS[VectorStore]
+    IP --> MS[MetadataStore]
     
-    subgraph "Storage & Persistence"
-        VS[VectorStore<br/>FAISS]
-        MS[MetadataStore<br/>Pickle/JSON]
-        FS[File System]
-    end
+    CF --> CC[CodeChunker]
+    CF --> DC[DocumentChunker]
+    CF --> SC[SimpleChunker]
     
-    subgraph "External Services"
-        ES[EmbedderService<br/>sentence-transformers]
-        HS[HybridSearchEngine<br/>Vector + Keyword]
-    end
-    
-    IM --> IP
-    IM --> SS
-    IM --> ES
-    
-    IP --> CF
-    IP --> FL
-    IP --> VS
-    IP --> MS
-    
-    CF --> CC
-    CF --> DC
-    CF --> SC
-    
-    SS --> HS
+    SS --> HS[HybridSearchEngine]
     SS --> VS
     SS --> MS
     
-    VS --> FS
+    VS --> FS[(File System)]
     MS --> FS
     
     ES --> VS
     HS --> ES
+    
+    classDef coreComponent fill:#e3f2fd
+    classDef processing fill:#f3e5f5  
+    classDef storage fill:#e8f5e8
+    classDef service fill:#fff3e0
+    
+    class IM,IP,SS coreComponent
+    class CF,CC,DC,SC,FL processing
+    class VS,MS,FS storage
+    class ES,HS service
 ```
 
 ## External APIs
