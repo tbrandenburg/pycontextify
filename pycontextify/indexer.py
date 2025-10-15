@@ -98,9 +98,7 @@ class IndexingPipeline:
             crawl_target = base_path_obj
             loader_base_path = base_path_obj.parent
         else:
-            raise ValueError(
-                f"Base path must be a file or directory: {base_path}"
-            )
+            raise ValueError(f"Base path must be a file or directory: {base_path}")
 
         tags = tags.strip()
         tag_summary = ", ".join(parsed_tags)
@@ -215,9 +213,7 @@ class IndexingPipeline:
             file_path_obj = Path(file_path)
             try:
                 # Step 2: Load
-                logger.debug(
-                    f"Loading {idx + 1}/{len(file_paths)}: {file_path_obj}"
-                )
+                logger.debug(f"Loading {idx + 1}/{len(file_paths)}: {file_path_obj}")
                 normalized_docs = loader.load(
                     path=str(file_path_obj),
                     tags=tags_input,

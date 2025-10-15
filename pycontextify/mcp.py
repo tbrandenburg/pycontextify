@@ -135,44 +135,47 @@ def handle_mcp_errors(operation_name: str, func_impl, *args):
     Returns:
         Result from function or structured error dict
     """
-    import time
     import signal
+    import time
     from contextlib import contextmanager
-    
+
     @contextmanager
     def timeout(seconds):
         """Context manager for timeout protection."""
+
         def timeout_handler(signum, frame):
             raise TimeoutError(f"Operation timed out after {seconds} seconds")
-        
+
         # Set up signal handler (Unix/Windows compatible)
         old_handler = None
         try:
-            if hasattr(signal, 'SIGALRM'):  # Unix-like systems
+            if hasattr(signal, "SIGALRM"):  # Unix-like systems
                 old_handler = signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(seconds)
             yield
         finally:
-            if hasattr(signal, 'SIGALRM'):  # Unix-like systems
+            if hasattr(signal, "SIGALRM"):  # Unix-like systems
                 signal.alarm(0)
                 if old_handler is not None:
                     signal.signal(signal.SIGALRM, old_handler)
-    
+
     start_time = time.time()
-    
+
     try:
         logger.info(f"{operation_name} started")
-        
+
         # Apply timeout for long-running operations
         # Use longer timeout for indexing operations which may need to download models
-        timeout_seconds = 300 if "indexing" in operation_name.lower() else 120  # 5min for indexing, 2min for others
-        
+        timeout_seconds = (
+            300 if "indexing" in operation_name.lower() else 120
+        )  # 5min for indexing, 2min for others
+
         try:
             # For Windows compatibility, we'll use a simpler approach without SIGALRM
             # The timeout is mainly for documentation and logging purposes
             # FastMCP should handle the actual request timeouts
             result = func_impl(*args)
-            
+
         except Exception as e:
             elapsed = time.time() - start_time
             if elapsed > timeout_seconds:
@@ -183,33 +186,35 @@ def handle_mcp_errors(operation_name: str, func_impl, *args):
                     "operation": operation_name,
                     "elapsed_seconds": elapsed,
                     "timeout_limit_seconds": timeout_seconds,
-                    "suggestion": "This may be due to model download or network issues. Try again or check your internet connection."
+                    "suggestion": "This may be due to model download or network issues. Try again or check your internet connection.",
                 }
             else:
                 raise  # Re-raise if not a timeout
-        
+
         elapsed = time.time() - start_time
         logger.info(f"{operation_name} completed successfully in {elapsed:.2f}s")
-        
+
         # Add timing information to successful results
         if isinstance(result, dict) and "error" not in result:
             result["operation_timing"] = {
                 "operation": operation_name,
                 "elapsed_seconds": elapsed,
-                "timeout_limit_seconds": timeout_seconds
+                "timeout_limit_seconds": timeout_seconds,
             }
-        
+
         return result
-        
+
     except ValueError as e:
         # Validation errors - return structured error
         elapsed = time.time() - start_time
         error_msg = str(e)
-        logger.warning(f"{operation_name} validation error after {elapsed:.2f}s: {error_msg}")
+        logger.warning(
+            f"{operation_name} validation error after {elapsed:.2f}s: {error_msg}"
+        )
         return {
             "error": error_msg,
             "operation": operation_name,
-            "elapsed_seconds": elapsed
+            "elapsed_seconds": elapsed,
         }
     except TimeoutError as e:
         # Timeout errors - return structured error
@@ -221,7 +226,7 @@ def handle_mcp_errors(operation_name: str, func_impl, *args):
             "operation": operation_name,
             "elapsed_seconds": elapsed,
             "timeout": True,
-            "suggestion": "This operation took too long. It may be due to model downloading or network issues."
+            "suggestion": "This operation took too long. It may be due to model downloading or network issues.",
         }
     except Exception as e:
         # Unexpected errors - log and return structured error
@@ -231,7 +236,7 @@ def handle_mcp_errors(operation_name: str, func_impl, *args):
         return {
             "error": error_msg,
             "operation": operation_name,
-            "elapsed_seconds": elapsed
+            "elapsed_seconds": elapsed,
         }
 
 
@@ -525,9 +530,7 @@ def _index_filebase_impl(
         exclude_dirs=exclude_dirs,
     )
 
-    logger.info(
-        f"Filebase indexing completed for {base_path} (tags: {tags}): {result}"
-    )
+    logger.info(f"Filebase indexing completed for {base_path} (tags: {tags}): {result}")
     return result
 
 
@@ -1044,11 +1047,12 @@ def main():
 
         # Setup logging based on CLI args
         setup_logging(args)
-        
+
         # Fix subprocess FAISS hanging on Windows
         import os
-        if not os.environ.get('FAISS_OPT_LEVEL'):
-            os.environ['FAISS_OPT_LEVEL'] = '0'
+
+        if not os.environ.get("FAISS_OPT_LEVEL"):
+            os.environ["FAISS_OPT_LEVEL"] = "0"
 
         logger.info("Starting PyContextify MCP Server...")
         logger.info("Server provides 5 essential MCP functions:")
@@ -1067,21 +1071,25 @@ def main():
 
         # Initialize manager with CLI overrides
         mgr = initialize_manager(config_overrides)
-        
+
         # Pre-load embedder and vector store to avoid first-request hangs
         try:
-            if hasattr(mgr, 'embedder_service') and mgr.embedder_service:
+            if hasattr(mgr, "embedder_service") and mgr.embedder_service:
                 # Pre-load embedder
                 embedder = mgr.embedder_service.get_embedder()
                 embedder.embed_single("test")
                 logger.info("Embedder pre-loaded successfully")
-                
+
                 # Pre-load vector store to trigger FAISS initialization
                 mgr._ensure_vector_store()
                 if mgr.vector_store:
-                    logger.info(f"Vector store pre-loaded successfully (dimension: {mgr.vector_store.get_embedding_dimension()})")
+                    logger.info(
+                        f"Vector store pre-loaded successfully (dimension: {mgr.vector_store.get_embedding_dimension()})"
+                    )
         except Exception as e:
-            logger.warning(f"Pre-loading failed, components will initialize on first use: {e}")
+            logger.warning(
+                f"Pre-loading failed, components will initialize on first use: {e}"
+            )
 
         # Perform initial indexing if specified
         if getattr(args, "initial_filebase", None):

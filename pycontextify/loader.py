@@ -288,7 +288,9 @@ class FileLoaderFactory:
             with pymupdf.open(str(file_path)) as pdf_doc:  # type: ignore[attr-defined]
                 total_pages = pdf_doc.page_count
         except Exception as exc:
-            logger.debug("Unable to determine PDF page count for %s: %s", file_path, exc)
+            logger.debug(
+                "Unable to determine PDF page count for %s: %s", file_path, exc
+            )
 
         metadata = base_metadata.copy()
         metadata["pdf_loader"] = "pymupdf4llm"

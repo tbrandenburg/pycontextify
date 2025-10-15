@@ -81,33 +81,39 @@ class SentenceTransformersEmbedder(BaseEmbedder):
                 "sentence-transformers not installed. Install with: pip install sentence-transformers"
             )
 
-        import time
         import os
+        import time
+
         start_time = time.time()
-        
+
         try:
             logger.info(f"Loading sentence-transformers model: {self.model_name}")
             logger.info("📥 This may take time for first-time model download...")
-            
-            
+
             # Check if model is likely cached
             try:
                 import os
+
                 from sentence_transformers import util
+
                 cache_folder = util.torch_utils.get_cache_folder()
-                model_path = os.path.join(cache_folder, self.model_name.replace("/", "_"))
+                model_path = os.path.join(
+                    cache_folder, self.model_name.replace("/", "_")
+                )
                 if os.path.exists(model_path):
                     logger.info("📁 Using cached model")
                 else:
-                    logger.info("🌐 First-time download - this may take several minutes")
+                    logger.info(
+                        "🌐 First-time download - this may take several minutes"
+                    )
                     logger.info("💡 Subsequent loads will be much faster")
             except Exception:
                 pass  # Cache check is not critical
-            
+
             self._model = sentence_transformers.SentenceTransformer(
                 self.model_name, device=self.device
             )
-            
+
             load_time = time.time() - start_time
             logger.info(f"⏱️  Model loading took {load_time:.2f}s")
 
@@ -121,10 +127,14 @@ class SentenceTransformersEmbedder(BaseEmbedder):
             logger.info(
                 f"✅ Model loaded successfully in {total_time:.2f}s. Embedding dimension: {self._embedding_dimension}"
             )
-            
+
             if total_time > 60:
-                logger.warning(f"⚠️  Model loading took {total_time:.2f}s, which is quite long")
-                logger.info("💡 This usually indicates first-time download or network issues")
+                logger.warning(
+                    f"⚠️  Model loading took {total_time:.2f}s, which is quite long"
+                )
+                logger.info(
+                    "💡 This usually indicates first-time download or network issues"
+                )
                 logger.info("💡 Future loads should be much faster (~2-5s)")
 
         except Exception as e:

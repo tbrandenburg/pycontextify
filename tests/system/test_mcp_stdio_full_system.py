@@ -73,12 +73,12 @@ def _build_arguments(
         return {
             "base_path": str(base_path),
             "tags": tags,
-            "include": ["*.txt"],
+            # Remove include filter to allow PDF files
         }
 
     if tool_name == "search":
         return {
-            "query": "system test document",
+            "query": "ASPICE process automotive spice",
             "top_k": 3,
             "display_format": "structured",
         }
@@ -98,6 +98,7 @@ def _build_arguments(
 
     return {}
 
+
 @pytest.mark.system
 def test_mcp_server_end_to_end_stdio() -> None:
     """Launch the MCP server via uv and exercise every available tool."""
@@ -108,20 +109,19 @@ def test_mcp_server_end_to_end_stdio() -> None:
 async def _run_stdio_system_flow() -> None:
     """Execute the asynchronous MCP tool discovery and validation flow."""
 
-    # Prepare working directories and sample content for indexing
+    # Prepare working directories and use real PDF resource for indexing
     runtime_dir = Path(tempfile.mkdtemp(prefix="mcp_stdio_system_test_"))
     index_dir = runtime_dir / "index"
     index_dir.mkdir(parents=True, exist_ok=True)
 
-    sample_dir = runtime_dir / "sample"
-    sample_dir.mkdir(parents=True, exist_ok=True)
-    (sample_dir / "doc.txt").write_text(
-        "PyContextify system test document. This content verifies end-to-end MCP tooling."
-    )
-
-    tag_name = "system-test-tag"
-
+    # Use the real PDF resource file instead of creating temporary content
     repo_root = Path(__file__).resolve().parents[2]
+    pdf_file_path = repo_root / "tests" / "resources" / "Automotive_SPICE_PAM_30.pdf"
+
+    if not pdf_file_path.exists():
+        raise FileNotFoundError(f"Test PDF resource not found: {pdf_file_path}")
+
+    tag_name = "ASPICE,engineering,process"  # Use descriptive tags for the PDF content
 
     cli_script = runtime_dir / "pycontextify"
     cli_script.write_text(
@@ -215,7 +215,7 @@ async def _run_stdio_system_flow() -> None:
                 args = _build_arguments(
                     tool.name,
                     tool.inputSchema or {},
-                    base_path=sample_dir,
+                    base_path=pdf_file_path,
                     tags=tag_name,
                 )
                 print(f"Calling tool '{tool.name}' with arguments: {json.dumps(args)}")
@@ -223,12 +223,14 @@ async def _run_stdio_system_flow() -> None:
                 payload = (
                     result.data
                     if result.data is not None
-                    else result.structured_content
-                    if result.structured_content is not None
-                    else [
-                        getattr(block, "text", str(block))
-                        for block in (result.content or [])
-                    ]
+                    else (
+                        result.structured_content
+                        if result.structured_content is not None
+                        else [
+                            getattr(block, "text", str(block))
+                            for block in (result.content or [])
+                        ]
+                    )
                 )
                 normalized = _normalize_payload(payload)
 
@@ -240,9 +242,13 @@ async def _run_stdio_system_flow() -> None:
                 elif isinstance(normalized, dict):
                     error_message = str(normalized.get("error", ""))
 
-                if "Failed to load model" in error_message or "403 Forbidden" in error_message:
+                if (
+                    "Failed to load model" in error_message
+                    or "403 Forbidden" in error_message
+                ):
                     pytest.skip(
-                        "Default sentence-transformers model is unavailable in this environment"
+                        "Default sentence-transformers model is unavailable "
+                        "in this environment"
                     )
 
                 call_log.append(
@@ -253,21 +259,47 @@ async def _run_stdio_system_flow() -> None:
                     }
                 )
                 print(
-                    f"Tool '{tool.name}' returned payload: {json.dumps(normalized, default=str)}"
+                    f"Tool '{tool.name}' returned payload: "
+                    f"{json.dumps(normalized, default=str)}"
                 )
 
                 assert not result.is_error, f"Tool {tool.name} reported an error"
 
                 if tool.name == "status":
                     assert isinstance(normalized, dict), "Status payload must be a dict"
-                    assert normalized.get("mcp_server", {}).get("name") == "PyContextify"
+                    assert (
+                        normalized.get("mcp_server", {}).get("name") == "PyContextify"
+                    )
                 elif tool.name == "index_filebase":
                     assert normalized.get("tags_input") == tag_name
-                    assert normalized.get("tags") == [tag_name]
-                    assert normalized.get("files_loaded", 0) >= 1
+                    expected_tags = ["ASPICE", "engineering", "process"]
+                    assert normalized.get("tags") == expected_tags
+                    assert normalized.get("files_crawled", 0) >= 1
+                    assert (
+                        normalized.get("files_loaded", 0) >= 1
+                    ), (
+                        f"Expected files_loaded >= 1, "
+                        f"got {normalized.get('files_loaded', 0)}"
+                    )
+                    assert (
+                        normalized.get("chunks_created", 0) > 0
+                    ), (
+                        f"Expected chunks_created > 0, "
+                        f"got {normalized.get('chunks_created', 0)}. "
+                        f"PDF content should be processed into chunks."
+                    )
                 elif tool.name == "discover":
-                    assert tag_name in normalized.get("tags", [])
-                    assert normalized.get("count", 0) >= 1
+                    discovered_tags = normalized.get("tags", [])
+                    # Check that all our expected tags are present
+                    expected_tags = ["ASPICE", "engineering", "process"]
+                    for expected_tag in expected_tags:
+                        assert (
+                            expected_tag in discovered_tags
+                        ), (
+                            f"Expected tag '{expected_tag}' not found in "
+                            f"discovered tags: {discovered_tags}"
+                        )
+                    assert normalized.get("count", 0) >= 3
                 elif tool.name == "search":
                     assert isinstance(normalized, list)
                     assert normalized, "Search should return at least one result"
