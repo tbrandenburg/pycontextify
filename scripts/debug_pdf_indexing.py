@@ -323,16 +323,21 @@ class PDFIndexingDebugger:
         }
 
     def _generate_report(self) -> None:
-        """Generate comprehensive HTML debug report."""
+        """Generate comprehensive HTML debug report and markdown chunk analysis."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         report_time = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"pdf_indexing_debug_{report_time}.html"
+        markdown_file = self.output_dir / f"pdf_chunks_analysis_{report_time}.md"
 
         html_content = self._generate_html_report()
+        markdown_content = self._generate_markdown_chunks_analysis()
 
         with open(report_file, "w", encoding="utf-8") as f:
             f.write(html_content)
+            
+        with open(markdown_file, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
 
         # Also generate a JSON file with raw data
         json_file = self.output_dir / f"pdf_indexing_debug_{report_time}.json"
@@ -340,7 +345,135 @@ class PDFIndexingDebugger:
             json.dump(self.debug_data, f, indent=2, default=str)
 
         print(f"📄 Generated HTML report: {report_file}")
+        print(f"📄 Generated Markdown chunk analysis: {markdown_file}")
         print(f"📄 Generated JSON data: {json_file}")
+
+    def _generate_markdown_chunks_analysis(self) -> str:
+        """Generate markdown file with chunk analysis for LLM review."""
+        pdf_info = self.debug_data.get("pdf_info", {})
+        loading = self.debug_data.get("loading", {})
+        chunking = self.debug_data.get("chunking", {})
+        timing = self.debug_data.get("timing", {})
+        
+        markdown = f"""# PyContextify PDF Chunk Analysis Report
+
+**PDF File:** {pdf_info.get('filename', 'Unknown')}
+**File Size:** {pdf_info.get('file_size_mb', '?')} MB ({pdf_info.get('file_size_bytes', 0):,} bytes)
+**Total Pages:** {pdf_info.get('total_pages', '?')}
+**Analysis Date:** {timing.get('end_time', '?')}
+
+## Executive Summary
+
+- **Loading Status:** {'✅ Success' if loading.get('success') else '❌ Failed'}
+- **Chunking Status:** {'✅ Success' if chunking.get('success') else '❌ Failed'}
+- **Total Processing Time:** {timing.get('total_duration_seconds', '?')}s
+- **Documents Created:** {loading.get('documents_created', 0)}
+- **Total Chunks Generated:** {chunking.get('output_chunks', 0)}
+
+## Configuration Used
+
+- **Chunk Size:** {chunking.get('config', {}).get('chunk_size', '?')} tokens
+- **Chunk Overlap:** {chunking.get('config', {}).get('chunk_overlap', '?')} tokens
+- **Relationships Enabled:** {chunking.get('config', {}).get('enable_relationships', False)}
+- **Conversion Method:** {loading.get('conversion_method', 'Unknown')}
+
+## Chunk Statistics
+
+"""
+        
+        if chunking.get('success'):
+            stats = chunking.get('statistics', {})
+            markdown += f"""- **Total Chunk Characters:** {stats.get('total_chunk_characters', 0):,}
+- **Average Chunk Size:** {stats.get('average_chunk_size', 0)} characters
+- **Chunk Size Range:** {stats.get('min_chunk_size', 0)} - {stats.get('max_chunk_size', 0)} characters
+- **Chunks per Document:** {stats.get('chunks_per_document', 0)}
+
+## Original Document Content
+
+"""
+            
+            # Add original document content if available
+            for i, doc in enumerate(loading.get('documents', [])):
+                markdown += f"""### Document {i+1}
+
+**Statistics:**
+- Characters: {doc.get('character_count', 0):,}
+- Words: {doc.get('word_count', 0):,}
+- Lines: {doc.get('line_count', 0):,}
+- Markdown Detected: {'Yes' if doc.get('appears_to_be_markdown') else 'No'}
+
+**Full Content:**
+```markdown
+{doc.get('text_full', 'No content available')}
+```
+
+---
+
+"""
+            
+            markdown += """## Detailed Chunk Analysis
+
+> **Purpose:** This section shows every chunk with clear boundaries for analyzing chunking quality.
+> Look for:
+> - Chunks that break in the middle of sentences
+> - Chunks that split logical sections awkwardly
+> - Missing context at chunk boundaries
+> - Appropriate overlap between adjacent chunks
+
+"""
+            
+            # Add all chunks with clear separation
+            chunks = chunking.get('chunks', [])
+            for i, chunk in enumerate(chunks):
+                chunk_num = i + 1
+                markdown += f"""### Chunk {chunk_num}
+
+**Metadata:**
+- **Index:** {chunk.get('chunk_index', i)}
+- **Characters:** {chunk.get('character_count', 0):,}
+- **Words:** {chunk.get('word_count', 0):,}
+- **Estimated Tokens:** {chunk.get('estimated_tokens', 0)}
+- **Character Range:** {chunk.get('start_char', '?')} - {chunk.get('end_char', '?')}
+- **Source:** {chunk.get('source_path', 'Unknown')}
+
+**Content:**
+```
+{chunk.get('text_full', chunk.get('text_preview', 'No content available'))}
+```
+
+---
+
+"""
+        else:
+            markdown += f"""**❌ Chunking Failed:** {chunking.get('error', 'Unknown error')}
+**Failure Time:** {chunking.get('chunking_time_seconds', '?')}s
+
+"""
+        
+        markdown += f"""## Analysis Notes
+
+**What to look for when reviewing chunks:**
+
+1. **Boundary Quality**: Do chunks break at natural boundaries (paragraphs, sections) or do they cut through sentences?
+
+2. **Context Preservation**: Does each chunk contain enough context to be meaningful on its own?
+
+3. **Overlap Effectiveness**: Do adjacent chunks have appropriate overlap to maintain continuity?
+
+4. **Content Completeness**: Are there any gaps or missing content between chunks?
+
+5. **Semantic Coherence**: Do chunks represent coherent topics or do they mix unrelated content?
+
+**Performance Metrics:**
+- PDF Loading: {loading.get('loading_time_seconds', '?')}s
+- Chunking: {chunking.get('chunking_time_seconds', '?')}s
+- Total: {timing.get('total_duration_seconds', '?')}s
+
+---
+*Report generated by PyContextify Debug Tool*
+"""
+        
+        return markdown
 
     def _generate_html_report(self) -> str:
         """Generate HTML report content."""
