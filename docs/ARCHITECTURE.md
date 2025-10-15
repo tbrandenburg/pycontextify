@@ -66,13 +66,6 @@ graph TD
     ES --> ST[sentence-transformers]
     VS --> FI[FAISS Library]
     FL --> PD[PDF Processors]
-    
-    style M fill:#e1f5fe
-    style I fill:#f3e5f5
-    style IP fill:#e8f5e8
-    style SS fill:#fff3e0
-    style VS fill:#fce4ec
-    style MS fill:#fce4ec
 ```
 
 ### Architectural and Design Patterns
@@ -259,16 +252,6 @@ flowchart TD
     
     ES --> VS
     HS --> ES
-    
-    classDef coreComponent fill:#e3f2fd
-    classDef processing fill:#f3e5f5  
-    classDef storage fill:#e8f5e8
-    classDef service fill:#fff3e0
-    
-    class IM,IP,SS coreComponent
-    class CF,CC,DC,SC,FL processing
-    class VS,MS,FS storage
-    class ES,HS service
 ```
 
 ## External APIs
