@@ -55,25 +55,36 @@ class FileCrawler:
         )
 
     def crawl(self, base_path: str) -> List[str]:
-        """Crawl directory tree and return matching file paths.
+        """Crawl a directory tree or process a single file path.
 
         Args:
-            base_path: Root directory to start crawling from
+            base_path: Root directory (or single file) to start crawling from
 
         Returns:
             Sorted list of absolute file paths matching the filters
 
         Raises:
             FileNotFoundError: If base_path does not exist
-            NotADirectoryError: If base_path is not a directory
+            NotADirectoryError: If base_path is neither a file nor a directory
         """
         base = Path(base_path).resolve()
 
         if not base.exists():
             raise FileNotFoundError(f"Base path does not exist: {base_path}")
 
+        if base.is_file():
+            logger.info(f"Processing single file: {base}")
+            rel_path = base.name
+            if self._should_include_file(rel_path):
+                return [str(base)]
+
+            logger.info(f"Single file excluded by filters: {base}")
+            return []
+
         if not base.is_dir():
-            raise NotADirectoryError(f"Base path is not a directory: {base_path}")
+            raise NotADirectoryError(
+                f"Base path is neither a directory nor a file: {base_path}"
+            )
 
         logger.info(f"Starting crawl of: {base}")
 

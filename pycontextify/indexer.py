@@ -66,7 +66,7 @@ class IndexingPipeline:
         """Execute complete indexing pipeline.
 
         Args:
-            base_path: Root directory to index
+            base_path: Root directory or single file to index
             topic: Topic name (required, used for organization)
             include: List of fnmatch patterns to include
             exclude: List of fnmatch patterns to exclude
@@ -86,8 +86,17 @@ class IndexingPipeline:
         base_path_obj = Path(base_path).resolve()
         if not base_path_obj.exists():
             raise FileNotFoundError(f"Base path does not exist: {base_path}")
-        if not base_path_obj.is_dir():
-            raise ValueError(f"Base path is not a directory: {base_path}")
+
+        if base_path_obj.is_dir():
+            crawl_target = base_path_obj
+            loader_base_path = base_path_obj
+        elif base_path_obj.is_file():
+            crawl_target = base_path_obj
+            loader_base_path = base_path_obj.parent
+        else:
+            raise ValueError(
+                f"Base path must be a file or directory: {base_path}"
+            )
 
         topic = topic.strip()
         start_time = time.time()
@@ -111,14 +120,16 @@ class IndexingPipeline:
         try:
             # Step 1: Crawl
             file_paths = self._crawl_files(
-                base_path_obj, include, exclude, exclude_dirs, stats
+                crawl_target, include, exclude, exclude_dirs, stats
             )
 
             if not file_paths:
                 return self._finalize_stats(stats, start_time)
 
             # Step 2-5: Load, Chunk, Postprocess
-            all_chunks = self._process_files(file_paths, base_path_obj, topic, stats)
+            all_chunks = self._process_files(
+                file_paths, loader_base_path, topic, stats
+            )
 
             if not all_chunks:
                 return self._finalize_stats(stats, start_time)
@@ -171,11 +182,18 @@ class IndexingPipeline:
     def _process_files(
         self,
         file_paths: List[Path],
-        base_path: Path,
+        base_dir: Path,
         topic: str,
         stats: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
-        """Steps 2-5: Load, Chunk, Postprocess (per-file)."""
+        """Steps 2-5: Load, chunk, and postprocess files.
+
+        Args:
+            file_paths: Iterable of file paths to process
+            base_dir: Directory used for relative path calculations
+            topic: Topic name for indexing
+            stats: Mutable statistics dictionary
+        """
         logger.info("Step 2-5: Loading, chunking, and postprocessing files")
 
         loader = FileLoaderFactory()
@@ -186,13 +204,16 @@ class IndexingPipeline:
         all_chunks = []
 
         for idx, file_path in enumerate(file_paths):
+            file_path_obj = Path(file_path)
             try:
                 # Step 2: Load
-                logger.debug(f"Loading {idx + 1}/{len(file_paths)}: {file_path}")
+                logger.debug(
+                    f"Loading {idx + 1}/{len(file_paths)}: {file_path_obj}"
+                )
                 normalized_docs = loader.load(
-                    path=file_path,
+                    path=str(file_path_obj),
                     topic=topic,
-                    base_path=str(base_path),
+                    base_path=str(base_dir),
                 )
 
                 if not normalized_docs:
@@ -219,13 +240,13 @@ class IndexingPipeline:
                 stats["files_loaded"] += 1
 
             except Exception as e:
-                logger.error(f"Error processing {file_path}: {e}")
+                logger.error(f"Error processing {file_path_obj}: {e}")
                 stats["errors"] += 1
                 if len(stats["error_samples"]) < 10:
                     stats["error_samples"].append(
                         {
                             "stage": "load/chunk",
-                            "file": str(file_path),
+                            "file": str(file_path_obj),
                             "error": str(e),
                         }
                     )
@@ -489,10 +510,10 @@ class IndexManager:
         exclude: Optional[List[str]] = None,
         exclude_dirs: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Index a filebase (directory).
+        """Index a filebase from a directory or a single file.
 
         Args:
-            base_path: Root directory to index
+            base_path: Root directory or file to index
             topic: Topic name (required)
             include: Patterns to include
             exclude: Patterns to exclude

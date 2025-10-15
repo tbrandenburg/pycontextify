@@ -25,6 +25,23 @@ class TestFileCrawler:
         # Should be sorted
         assert files == sorted(files)
 
+    def test_crawler_single_file_path(self, tmp_path):
+        """Test crawling when given a single file path."""
+        file_path = tmp_path / "single.py"
+        file_path.write_text("print('hi')")
+
+        crawler = FileCrawler()
+        files = crawler.crawl(str(file_path))
+
+        assert files == [str(file_path.resolve())]
+
+        # Respect include/exclude filters for single file
+        include_crawler = FileCrawler(include=["*.txt"])
+        assert include_crawler.crawl(str(file_path)) == []
+
+        exclude_crawler = FileCrawler(exclude=["*.py"])
+        assert exclude_crawler.crawl(str(file_path)) == []
+
     def test_crawler_include_pattern(self, tmp_path):
         """Test include pattern filtering."""
         (tmp_path / "file1.py").write_text("python code")
