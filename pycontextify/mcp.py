@@ -537,13 +537,13 @@ def index_filebase(
     exclude: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Index a filebase (directory tree) for semantic search.
+    """Index a filebase (directory tree or single file) for semantic search.
 
     This is the unified indexing function that handles all file types
     (code, documents, PDFs) with a single consistent pipeline.
 
     Args:
-        base_path: Root directory path to index
+        base_path: Root directory path or individual file to index
         topic: Topic name for organizing indexed content (required)
         include: Optional list of fnmatch patterns to include (e.g., ["*.py", "*.md"])
         exclude: Optional list of fnmatch patterns to exclude (e.g., ["*_test.py"])
@@ -552,7 +552,7 @@ def index_filebase(
     Returns:
         Dictionary with indexing statistics including:
         - topic: The topic name
-        - base_path: Root directory indexed
+        - base_path: Root directory or file indexed
         - files_crawled: Total files discovered
         - files_loaded: Files successfully loaded
         - chunks_created: Total chunks created

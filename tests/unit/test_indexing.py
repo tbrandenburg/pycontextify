@@ -77,14 +77,59 @@ class TestIndexingPipelineValidation:
         with pytest.raises(FileNotFoundError):
             pipeline.index_filebase("/nonexistent/path", "test")
 
-    def test_validates_path_is_directory(self, pipeline):
-        """Should raise ValueError if path is not a directory."""
+    @patch("pycontextify.indexer.FileLoaderFactory")
+    @patch("pycontextify.indexer.ChunkerFactory")
+    @patch("pycontextify.indexer.postprocess_file")
+    @patch("pycontextify.indexer.postprocess_filebase")
+    def test_accepts_single_file_path(
+        self,
+        mock_postprocess_fb,
+        mock_postprocess_file,
+        mock_chunker_factory,
+        mock_loader_factory,
+        pipeline,
+    ):
+        """Should successfully index when a single file path is provided."""
         with TemporaryDirectory() as tmpdir:
             file_path = Path(tmpdir) / "file.txt"
-            file_path.write_text("test")
+            file_path.write_text("hello")
 
-            with pytest.raises(ValueError, match="not a directory"):
-                pipeline.index_filebase(str(file_path), "test")
+            mock_loader = Mock()
+            mock_loader.load.return_value = [
+                {
+                    "text": "hello",
+                    "metadata": {
+                        "full_path": str(file_path),
+                        "file_extension": "txt",
+                    },
+                }
+            ]
+            mock_loader_factory.return_value = mock_loader
+
+            mock_chunker_factory.chunk_normalized_docs.return_value = [
+                {
+                    "text": "hello chunk",
+                    "metadata": {
+                        "full_path": str(file_path),
+                        "file_extension": "txt",
+                    },
+                }
+            ]
+
+            mock_postprocess_file.side_effect = lambda x: x
+            mock_postprocess_fb.side_effect = lambda x: x
+
+            # Ensure mock components line up with single chunk expectations
+            embedder = pipeline.embedder_service.get_embedder.return_value
+            embedder.embed_texts.return_value = [[0.1] * 768]
+            pipeline.vector_store.add_vectors.return_value = [0]
+
+            stats = pipeline.index_filebase(str(file_path), "test")
+
+            assert stats["files_crawled"] == 1
+            assert stats["files_loaded"] == 1
+            assert stats["chunks_created"] == 1
+            assert stats["vectors_embedded"] == 1
 
 
 class TestIndexingPipelineExecution:
