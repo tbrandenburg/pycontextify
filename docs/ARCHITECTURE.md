@@ -54,12 +54,13 @@ graph TD
     IP --> FL[FileLoader]
     IP --> CH[ChunkerFactory]
     IP --> ES[EmbedderService]
+    IP --> VS[VectorStore]
+    IP --> MS[MetadataStore]
     
     SS --> HS[HybridSearchEngine]
-    SS --> VS[VectorStore]
-    SS --> MS[MetadataStore]
+    SS --> VS
+    SS --> MS
     
-    ES --> VS
     VS --> FS[(File System)]
     MS --> FS
     
