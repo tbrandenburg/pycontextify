@@ -8,7 +8,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .config import Config
 from .types import Chunk, SourceType
@@ -112,7 +112,9 @@ class BaseChunker(ABC):
             if len(word) > 2:  # Skip short words
                 chunk.add_reference(word)
 
-    def _split_by_tokens(self, text: str, chunk_size: int, overlap: int) -> List[Tuple[str, int, int]]:
+    def _split_by_tokens(
+        self, text: str, chunk_size: int, overlap: int
+    ) -> List[Tuple[str, int, int]]:
         """Split text by approximate token count.
 
         Args:
@@ -358,6 +360,339 @@ class CodeChunker(SimpleChunker):
             chunk.add_code_symbol(var_name)
 
 
+class LanguageAwareChunker(SimpleChunker):
+    """Universal code-aware chunker using LangChain's language-specific splitter.
+
+    Supports all LangChain-supported languages with proper syntax awareness,
+    keeping decorators/annotations with their methods and preserving code structure.
+    """
+
+    def __init__(self, config: Config, language: str):
+        """Initialize language-aware chunker.
+
+        Args:
+            config: Configuration object
+            language: Language identifier (e.g., 'python', 'java', 'js', 'ts')
+        """
+        super().__init__(config)
+        self.language = language
+
+    def chunk_text(
+        self, text: str, source_path: str, embedding_provider: str, embedding_model: str
+    ) -> List[Chunk]:
+        """Chunk code text with awareness of language-specific syntax.
+
+        Uses LangChain's language-specific RecursiveCharacterTextSplitter that
+        understands the target language syntax and preserves code structure.
+
+        Args:
+            text: Code text to chunk
+            source_path: Source file path
+            embedding_provider: Embedding provider name
+            embedding_model: Embedding model name
+
+        Returns:
+            List of Chunk objects with preserved code structure
+        """
+        if not text.strip():
+            return []
+
+        # Convert token-based chunk size to character estimate
+        # Different languages have different verbosity
+        char_multiplier = {
+            "python": 5,  # Python has longer tokens due to indentation
+            "java": 4,  # Java is verbose
+            "js": 4,  # JavaScript moderate verbosity
+            "ts": 4,  # TypeScript similar to JavaScript
+            "cpp": 4,  # C++ moderate verbosity
+            "go": 4,  # Go moderate verbosity
+            "rust": 4,  # Rust moderate verbosity
+            "scala": 4,  # Scala moderate verbosity
+        }.get(
+            self.language, 4
+        )  # Default multiplier
+
+        char_chunk_size = self.chunk_size * char_multiplier
+        char_overlap = self.chunk_overlap * char_multiplier
+
+        # Use language-specific LangChain splitter
+        chunks_tuples = self._split_with_langchain_language(
+            text, char_chunk_size, char_overlap
+        )
+
+        # Create metadata objects
+        chunks = []
+        for chunk_text, start_char, end_char in chunks_tuples:
+            chunk = self._create_chunk(
+                chunk_text=chunk_text,
+                source_path=source_path,
+                source_type=SourceType.CODE,
+                start_char=start_char,
+                end_char=end_char,
+                embedding_provider=embedding_provider,
+                embedding_model=embedding_model,
+            )
+            chunks.append(chunk)
+
+        return chunks
+
+    def _split_with_langchain_language(
+        self, text: str, chunk_size: int, chunk_overlap: int
+    ) -> List[Tuple[str, int, int]]:
+        """Split code using LangChain's language-specific splitter.
+
+        Args:
+            text: Code to split
+            chunk_size: Target chunk size in characters
+            chunk_overlap: Overlap size in characters
+
+        Returns:
+            List of (chunk_text, start_char, end_char) tuples
+        """
+        try:
+            from langchain_text_splitters import (
+                Language,
+                RecursiveCharacterTextSplitter,
+            )
+        except ImportError as e:
+            logger.warning(
+                "LangChain text splitters not available (%s). Using fallback.",
+                e,
+            )
+            return self._split_by_tokens(text, self.chunk_size, self.chunk_overlap)
+
+        # Map file extensions to LangChain Language enum values
+        language_map = {
+            "python": Language.PYTHON,
+            "py": Language.PYTHON,
+            "java": Language.JAVA,
+            "javascript": Language.JS,
+            "js": Language.JS,
+            "jsx": Language.JS,
+            "typescript": Language.TS,
+            "ts": Language.TS,
+            "tsx": Language.TS,
+            "cpp": Language.CPP,
+            "c": Language.C,
+            "go": Language.GO,
+            "rust": Language.RUST,
+            "scala": Language.SCALA,
+            "ruby": Language.RUBY,
+            "php": Language.PHP,
+            "swift": Language.SWIFT,
+            "kotlin": Language.KOTLIN,
+            "csharp": Language.CSHARP,
+            "cs": Language.CSHARP,
+        }
+
+        langchain_language = language_map.get(self.language)
+        if not langchain_language:
+            logger.warning(
+                "Language '%s' not supported by LangChain. Using fallback.",
+                self.language,
+            )
+            return self._split_by_tokens(text, self.chunk_size, self.chunk_overlap)
+
+        try:
+            text_splitter = RecursiveCharacterTextSplitter.from_language(
+                language=langchain_language,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                add_start_index=True,
+            )
+
+            langchain_chunks = text_splitter.split_text(text)
+
+            chunks = []
+            current_pos = 0
+
+            for chunk_text in langchain_chunks:
+                chunk_start = text.find(chunk_text, current_pos)
+                if chunk_start == -1:
+                    chunk_start = current_pos
+
+                chunk_end = chunk_start + len(chunk_text)
+                chunks.append((chunk_text, chunk_start, chunk_end))
+                current_pos = chunk_start + len(chunk_text)
+
+            return chunks
+
+        except Exception as exc:
+            logger.error(
+                "LangChain %s splitter failed: %s. Using fallback.",
+                self.language,
+                exc,
+            )
+            return self._split_by_tokens(text, self.chunk_size, self.chunk_overlap)
+
+    def _extract_relationships(self, chunk: Chunk) -> None:
+        """Extract language-specific relationships based on language.
+
+        Args:
+            chunk: Chunk object to populate with relationships
+        """
+        text = chunk.chunk_text
+
+        # Language-specific relationship extraction
+        if self.language in ["python", "py"]:
+            self._extract_python_relationships(chunk, text)
+        elif self.language == "java":
+            self._extract_java_relationships(chunk, text)
+        elif self.language in ["js", "jsx", "ts", "tsx", "javascript", "typescript"]:
+            self._extract_javascript_relationships(chunk, text)
+        else:
+            # Generic code relationship extraction
+            self._extract_generic_code_relationships(chunk, text)
+
+    def _extract_python_relationships(self, chunk: Chunk, text: str) -> None:
+        """Extract Python-specific relationships."""
+        # Function definitions (including methods with decorators)
+        func_pattern = (
+            r"(?:@\w+\s*\n\s*)*(?:def|async\s+def)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\("
+        )
+        for match in re.finditer(func_pattern, text, re.MULTILINE):
+            func_name = match.group(1)
+            chunk.add_code_symbol(func_name)
+            chunk.add_reference(func_name)
+
+        # Class definitions
+        class_pattern = r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)"
+        for match in re.finditer(class_pattern, text):
+            class_name = match.group(1)
+            chunk.add_code_symbol(class_name)
+            chunk.add_reference(class_name)
+
+        # Python imports
+        import_patterns = [
+            r"import\s+([a-zA-Z_][a-zA-Z0-9_.]*)",
+            r"from\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s+import",
+        ]
+        for pattern in import_patterns:
+            for match in re.finditer(pattern, text):
+                module_name = match.group(1)
+                chunk.add_reference(module_name)
+                chunk.add_tag("import")
+
+        # Decorators
+        decorator_pattern = r"@([a-zA-Z_][a-zA-Z0-9_.]*)"
+        for match in re.finditer(decorator_pattern, text):
+            decorator_name = match.group(1)
+            chunk.add_reference(decorator_name)
+            chunk.add_tag("decorator")
+
+    def _extract_java_relationships(self, chunk: Chunk, text: str) -> None:
+        """Extract Java-specific relationships."""
+        # Method definitions (including those with annotations)
+        method_pattern = r"(?:@\w+\s*\n\s*)*(?:public|private|protected|static)?\s*(?:\w+\s+)*(?:\w+\s+)*([a-zA-Z_][a-zA-Z0-9_]*)\s*\("
+        for match in re.finditer(method_pattern, text, re.MULTILINE):
+            method_name = match.group(1)
+            if method_name not in ["if", "for", "while", "switch", "catch"]:
+                chunk.add_code_symbol(method_name)
+                chunk.add_reference(method_name)
+
+        # Class and interface definitions
+        for pattern, tag in [
+            (
+                r"(?:public|private|protected)?\s*(?:abstract\s+)?(?:final\s+)?class\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+                "class",
+            ),
+            (
+                r"(?:public|private|protected)?\s*interface\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+                "interface",
+            ),
+        ]:
+            for match in re.finditer(pattern, text):
+                name = match.group(1)
+                chunk.add_code_symbol(name)
+                chunk.add_reference(name)
+                chunk.add_tag(tag)
+
+        # Imports and annotations
+        import_pattern = r"import\s+(?:static\s+)?([a-zA-Z_][a-zA-Z0-9_.]*)"
+        for match in re.finditer(import_pattern, text):
+            import_name = match.group(1)
+            chunk.add_reference(import_name)
+            chunk.add_tag("import")
+
+        annotation_pattern = r"@([a-zA-Z_][a-zA-Z0-9_.]*)"
+        for match in re.finditer(annotation_pattern, text):
+            annotation_name = match.group(1)
+            chunk.add_reference(annotation_name)
+            chunk.add_tag("annotation")
+
+    def _extract_javascript_relationships(self, chunk: Chunk, text: str) -> None:
+        """Extract JavaScript/TypeScript-specific relationships."""
+        # Function definitions (various patterns)
+        function_patterns = [
+            r"(?:async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(",
+            r"(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function|\()",
+            r"([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*(?:async\s+)?(?:function|\()",
+            r"([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(.*?\)\s*=>",
+        ]
+        for pattern in function_patterns:
+            for match in re.finditer(pattern, text):
+                func_name = match.group(1)
+                chunk.add_code_symbol(func_name)
+                chunk.add_reference(func_name)
+
+        # Class definitions
+        class_pattern = r"class\s+([a-zA-Z_$][a-zA-Z0-9_$]*)"
+        for match in re.finditer(class_pattern, text):
+            class_name = match.group(1)
+            chunk.add_code_symbol(class_name)
+            chunk.add_reference(class_name)
+
+        # Imports/exports
+        import_patterns = [
+            r"import\s+.*?from\s+['\"]([^'\"]+)['\"]",
+            r"import\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",
+            r"require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)",
+        ]
+        for pattern in import_patterns:
+            for match in re.finditer(pattern, text):
+                module_name = match.group(1)
+                chunk.add_reference(module_name)
+                chunk.add_tag("import")
+
+        # TypeScript-specific patterns
+        if self.language in ["ts", "tsx", "typescript"]:
+            # Interfaces and types
+            for pattern, tag in [
+                (r"interface\s+([a-zA-Z_$][a-zA-Z0-9_$]*)", "interface"),
+                (r"type\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=", "type"),
+            ]:
+                for match in re.finditer(pattern, text):
+                    name = match.group(1)
+                    chunk.add_code_symbol(name)
+                    chunk.add_reference(name)
+                    chunk.add_tag(tag)
+
+    def _extract_generic_code_relationships(self, chunk: Chunk, text: str) -> None:
+        """Extract generic code relationships for unsupported languages."""
+        # Basic function/method patterns
+        func_patterns = [
+            r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # Python, Ruby style
+            r"function\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # JavaScript style
+            r"fn\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # Rust style
+        ]
+        for pattern in func_patterns:
+            for match in re.finditer(pattern, text):
+                func_name = match.group(1)
+                chunk.add_code_symbol(func_name)
+                chunk.add_reference(func_name)
+
+        # Basic class patterns
+        class_patterns = [
+            r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # Most languages
+            r"struct\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # C/C++/Rust/Go style
+        ]
+        for pattern in class_patterns:
+            for match in re.finditer(pattern, text):
+                class_name = match.group(1)
+                chunk.add_code_symbol(class_name)
+                chunk.add_reference(class_name)
+
+
 class DocumentChunker(SimpleChunker):
     """Document-aware chunker using LangChain's RecursiveCharacterTextSplitter."""
 
@@ -557,7 +892,9 @@ class DocumentChunker(SimpleChunker):
 
         return chunks
 
-    def _split_by_document_structure(self, text: str) -> List[Tuple[str, int, int, Optional[str]]]:
+    def _split_by_document_structure(
+        self, text: str
+    ) -> List[Tuple[str, int, int, Optional[str]]]:
         """Split document by headers and sections.
 
         Args:
@@ -663,18 +1000,45 @@ class ChunkerFactory:
     """Factory for selecting appropriate chunker based on content type."""
 
     @staticmethod
-    def get_chunker(source_type: SourceType, config: Config) -> BaseChunker:
+    def get_chunker(
+        source_type: SourceType, config: Config, file_extension: str = ""
+    ) -> BaseChunker:
         """Get appropriate chunker for content type.
 
         Args:
             source_type: Type of content to chunk
             config: Configuration object
+            file_extension: File extension to select language-specific chunker
 
         Returns:
             Appropriate chunker instance
         """
         if source_type == SourceType.CODE:
-            return CodeChunker(config)
+            # Use language-aware chunker for supported languages
+            supported_languages = {
+                "py": "python",
+                "java": "java",
+                "js": "js",
+                "jsx": "js",
+                "ts": "ts",
+                "tsx": "ts",
+                "cpp": "cpp",
+                "c": "c",
+                "go": "go",
+                "rs": "rust",
+                "rb": "ruby",
+                "php": "php",
+                "swift": "swift",
+                "kt": "kotlin",
+                "scala": "scala",
+                "cs": "csharp",
+            }
+
+            if file_extension in supported_languages:
+                language = supported_languages[file_extension]
+                return LanguageAwareChunker(config, language)
+            else:
+                return CodeChunker(config)
         elif source_type == SourceType.DOCUMENT:
             return DocumentChunker(config)
         else:
@@ -710,8 +1074,8 @@ class ChunkerFactory:
             file_ext = base_metadata.get("file_extension", "")
             source_type = ChunkerFactory._infer_source_type(file_ext)
 
-            # Get appropriate chunker
-            chunker = ChunkerFactory.get_chunker(source_type, config)
+            # Get appropriate chunker (pass file extension for language-specific selection)
+            chunker = ChunkerFactory.get_chunker(source_type, config, file_ext)
 
             # Get embedding info from metadata (should be set by loader)
             embedding_provider = base_metadata.get(

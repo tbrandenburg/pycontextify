@@ -2,7 +2,13 @@
 
 import pytest
 
-from pycontextify.chunker import BaseChunker, CodeChunker, SimpleChunker
+from pycontextify.chunker import (
+    BaseChunker,
+    ChunkerFactory,
+    CodeChunker,
+    LanguageAwareChunker,
+    SimpleChunker,
+)
 from pycontextify.config import Config
 from pycontextify.types import Chunk, SourceType
 
@@ -462,3 +468,275 @@ def very_large_function():
         chunks = chunker.chunk_text("", "test.py", "openai", "text-embedding-3-small")
 
         assert len(chunks) == 0
+
+
+class TestLanguageAwareChunker:
+    """Test LanguageAwareChunker functionality."""
+
+    def test_language_aware_chunker_initialization(self):
+        """Test LanguageAwareChunker initialization with different languages."""
+        config = Config()
+
+        # Test Java chunker
+        java_chunker = LanguageAwareChunker(config, "java")
+        assert java_chunker.language == "java"
+        assert java_chunker.config == config
+
+        # Test JavaScript chunker
+        js_chunker = LanguageAwareChunker(config, "js")
+        assert js_chunker.language == "js"
+
+        # Test TypeScript chunker
+        ts_chunker = LanguageAwareChunker(config, "ts")
+        assert ts_chunker.language == "ts"
+
+    def test_java_code_chunking(self):
+        """Test Java-specific code chunking with language-aware splitter."""
+        config = Config()
+        config.chunk_size = 200  # Small enough to force splitting
+
+        chunker = LanguageAwareChunker(config, "java")
+        java_code = """
+package com.example;
+
+import java.util.List;
+
+/**
+ * Calculator class
+ */
+public class Calculator {
+    
+    /**
+     * Add two numbers
+     */
+    public int add(int a, int b) {
+        return a + b;
+    }
+    
+    /**
+     * Multiply two numbers
+     */
+    public int multiply(int a, int b) {
+        return a * b;
+    }
+}
+"""
+
+        chunks = chunker.chunk_text(
+            java_code, "Calculator.java", "openai", "text-embedding-3-small"
+        )
+
+        # Should create multiple chunks due to small chunk size
+        assert len(chunks) >= 1
+
+        # Verify all chunks are CODE type
+        for chunk in chunks:
+            assert chunk.source_type == SourceType.CODE
+            assert chunk.file_extension == ".java"
+            assert isinstance(chunk.chunk_text, str)
+            assert len(chunk.chunk_text.strip()) > 0
+
+    def test_javascript_code_chunking(self):
+        """Test JavaScript-specific code chunking with language-aware splitter."""
+        config = Config()
+        config.chunk_size = 150  # Small enough to force splitting
+
+        chunker = LanguageAwareChunker(config, "js")
+        js_code = """
+// User component
+import React, { useState } from 'react';
+
+/**
+ * User profile component
+ */
+function User(props) {
+    const [user, setUser] = useState(null);
+    
+    const fetchUser = async (id) => {
+        const response = await fetch(`/api/user/${id}`);
+        const userData = await response.json();
+        setUser(userData);
+    };
+    
+    return (
+        <div>
+            <h1>{user ? user.name : 'Loading...'}</h1>
+        </div>
+    );
+}
+
+export default User;
+"""
+
+        chunks = chunker.chunk_text(
+            js_code, "User.js", "openai", "text-embedding-3-small"
+        )
+
+        # Should create multiple chunks due to small chunk size
+        assert len(chunks) >= 1
+
+        # Verify all chunks are CODE type
+        for chunk in chunks:
+            assert chunk.source_type == SourceType.CODE
+            assert chunk.file_extension == ".js"
+            assert isinstance(chunk.chunk_text, str)
+            assert len(chunk.chunk_text.strip()) > 0
+
+    def test_typescript_code_chunking(self):
+        """Test TypeScript-specific code chunking with language-aware splitter."""
+        config = Config()
+        config.chunk_size = 150  # Small enough to force splitting
+
+        chunker = LanguageAwareChunker(config, "ts")
+        ts_code = """
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+class UserService {
+    private baseUrl: string;
+    
+    constructor(baseUrl: string = '/api') {
+        this.baseUrl = baseUrl;
+    }
+    
+    async getUser(id: number): Promise<User | null> {
+        const response = await fetch(`${this.baseUrl}/users/${id}`);
+        return response.json();
+    }
+    
+    async createUser(userData: Omit<User, 'id'>): Promise<User> {
+        const response = await fetch(`${this.baseUrl}/users`, {
+            method: 'POST',
+            body: JSON.stringify(userData)
+        });
+        return response.json();
+    }
+}
+
+export { User, UserService };
+"""
+
+        chunks = chunker.chunk_text(
+            ts_code, "UserService.ts", "openai", "text-embedding-3-small"
+        )
+
+        # Should create multiple chunks due to small chunk size
+        assert len(chunks) >= 1
+
+        # Verify all chunks are CODE type
+        for chunk in chunks:
+            assert chunk.source_type == SourceType.CODE
+            assert chunk.file_extension == ".ts"
+            assert isinstance(chunk.chunk_text, str)
+            assert len(chunk.chunk_text.strip()) > 0
+
+    def test_language_aware_chunker_with_unsupported_language(self):
+        """Test LanguageAwareChunker gracefully handles unsupported languages."""
+        config = Config()
+
+        # Test with unsupported language - should fall back to basic splitting
+        chunker = LanguageAwareChunker(config, "unsupported")
+        assert chunker.language == "unsupported"
+
+        code = "function test() { return 'hello'; }"
+        chunks = chunker.chunk_text(
+            code, "test.xyz", "openai", "text-embedding-3-small"
+        )
+
+        assert len(chunks) >= 1
+        assert chunks[0].source_type == SourceType.CODE
+
+
+class TestChunkerFactory:
+    """Test ChunkerFactory functionality."""
+
+    def test_chunker_factory_get_chunker_java(self):
+        """Test ChunkerFactory returns LanguageAwareChunker for Java files."""
+        config = Config()
+
+        chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "java")
+
+        assert isinstance(chunker, LanguageAwareChunker)
+        assert chunker.language == "java"
+
+    def test_chunker_factory_get_chunker_javascript(self):
+        """Test ChunkerFactory returns LanguageAwareChunker for JavaScript files."""
+        config = Config()
+
+        # Test .js extension
+        js_chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "js")
+        assert isinstance(js_chunker, LanguageAwareChunker)
+        assert js_chunker.language == "js"
+
+        # Test .jsx extension
+        jsx_chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "jsx")
+        assert isinstance(jsx_chunker, LanguageAwareChunker)
+        assert jsx_chunker.language == "js"
+
+    def test_chunker_factory_get_chunker_typescript(self):
+        """Test ChunkerFactory returns LanguageAwareChunker for TypeScript files."""
+        config = Config()
+
+        # Test .ts extension
+        ts_chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "ts")
+        assert isinstance(ts_chunker, LanguageAwareChunker)
+        assert ts_chunker.language == "ts"
+
+        # Test .tsx extension
+        tsx_chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "tsx")
+        assert isinstance(tsx_chunker, LanguageAwareChunker)
+        assert tsx_chunker.language == "ts"
+
+    def test_chunker_factory_get_chunker_python(self):
+        """Test ChunkerFactory returns LanguageAwareChunker for Python files."""
+        config = Config()
+
+        chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "py")
+
+        assert isinstance(chunker, LanguageAwareChunker)
+        assert chunker.language == "python"
+
+    def test_chunker_factory_get_chunker_unsupported_extension(self):
+        """Test ChunkerFactory falls back to CodeChunker for unsupported extensions."""
+        config = Config()
+
+        chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, "xyz")
+
+        assert isinstance(chunker, CodeChunker)
+        assert not isinstance(chunker, LanguageAwareChunker)
+
+    def test_chunker_factory_get_chunker_document_type(self):
+        """Test ChunkerFactory returns DocumentChunker for document source type."""
+        config = Config()
+
+        from pycontextify.chunker import DocumentChunker
+
+        chunker = ChunkerFactory.get_chunker(SourceType.DOCUMENT, config, "txt")
+
+        assert isinstance(chunker, DocumentChunker)
+
+    def test_chunker_factory_get_chunker_other_languages(self):
+        """Test ChunkerFactory supports other programming languages."""
+        config = Config()
+
+        # Test a few other supported languages
+        test_cases = [
+            ("cpp", "cpp"),
+            ("c", "c"),
+            ("go", "go"),
+            ("rs", "rust"),
+            ("rb", "ruby"),
+            ("php", "php"),
+            ("swift", "swift"),
+            ("kt", "kotlin"),
+            ("scala", "scala"),
+            ("cs", "csharp"),
+        ]
+
+        for extension, expected_language in test_cases:
+            chunker = ChunkerFactory.get_chunker(SourceType.CODE, config, extension)
+            assert isinstance(chunker, LanguageAwareChunker)
+            assert chunker.language == expected_language
