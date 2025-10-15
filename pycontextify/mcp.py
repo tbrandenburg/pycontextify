@@ -335,13 +335,13 @@ def parse_args() -> argparse.Namespace:
   pycontextify --index-path ./my_index
 
   # Start with initial filebase indexing
-  pycontextify --initial-filebase ./src --topic my-project
+  pycontextify --initial-filebase ./src --tags tag-one,tag-two
 
-  # Index with custom index path and topic
-  pycontextify --index-path ./project_index --initial-filebase ./src --topic codebase
+  # Index with custom index path and tags
+  pycontextify --index-path ./project_index --initial-filebase ./src --tags codebase
 
-  # Index documentation with topic
-  pycontextify --initial-filebase ./docs --topic documentation
+  # Index documentation with tags
+  pycontextify --initial-filebase ./docs --tags documentation
 
 Configuration priority: CLI arguments > Environment variables > Defaults
 
@@ -382,9 +382,11 @@ Environment variables can still be used for all settings. Use --help for details
         help="Directory path to index at startup using unified filebase pipeline",
     )
     parser.add_argument(
-        "--topic",
+        "--tags",
         type=str,
-        help="Topic name for initial indexing (required with --initial-filebase)",
+        help=(
+            "Comma-separated tags for initial indexing (required with --initial-filebase)"
+        ),
     )
     # Server configuration
     parser.add_argument(
@@ -503,7 +505,7 @@ mcp = FastMCP("PyContextify")
 
 def _index_filebase_impl(
     base_path: str,
-    topic: str,
+    tags: str,
     include: Optional[List[str]] = None,
     exclude: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
@@ -511,20 +513,20 @@ def _index_filebase_impl(
     """Implementation for index_filebase with validation and business logic."""
     # Validate parameters
     base_path = validate_string_param(base_path, "base_path")
-    topic = validate_string_param(topic, "topic")
+    tags = validate_string_param(tags, "tags")
 
     # Initialize manager and index
     mgr = initialize_manager()
     result = mgr.index_filebase(
         base_path=base_path,
-        topic=topic,
+        tags=tags,
         include=include,
         exclude=exclude,
         exclude_dirs=exclude_dirs,
     )
 
     logger.info(
-        f"Filebase indexing completed for {base_path} (topic: {topic}): {result}"
+        f"Filebase indexing completed for {base_path} (tags: {tags}): {result}"
     )
     return result
 
@@ -532,7 +534,7 @@ def _index_filebase_impl(
 @mcp.tool
 def index_filebase(
     base_path: str,
-    topic: str,
+    tags: str,
     include: Optional[List[str]] = None,
     exclude: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
@@ -544,14 +546,15 @@ def index_filebase(
 
     Args:
         base_path: Root directory path or individual file to index
-        topic: Topic name for organizing indexed content (required)
+        tags: Comma-separated tags for organizing indexed content (required)
         include: Optional list of fnmatch patterns to include (e.g., ["*.py", "*.md"])
         exclude: Optional list of fnmatch patterns to exclude (e.g., ["*_test.py"])
         exclude_dirs: Optional list of directory names to exclude (e.g., ["node_modules", ".git"])
 
     Returns:
         Dictionary with indexing statistics including:
-        - topic: The topic name
+        - tags_input: Original tag input string
+        - tags: Parsed list of tags applied to the indexed content
         - base_path: Root directory or file indexed
         - files_crawled: Total files discovered
         - files_loaded: Files successfully loaded
@@ -564,7 +567,7 @@ def index_filebase(
         "Filebase indexing",
         _index_filebase_impl,
         base_path,
-        topic,
+        tags,
         include,
         exclude,
         exclude_dirs,
@@ -573,34 +576,34 @@ def index_filebase(
 
 @mcp.tool
 def discover() -> Dict[str, Any]:
-    """Discover all indexed topics.
+    """Discover all indexed tags.
 
-    Returns a list of unique topic names from all indexed content,
+    Returns a list of unique tag names from all indexed content,
     useful for browsing and filtering indexed material.
 
     Returns:
         Dictionary with:
-        - topics: Sorted list of unique topic names
-        - count: Number of unique topics
+        - tags: Sorted list of unique tag names
+        - count: Number of unique tags
     """
     try:
         mgr = initialize_manager()
-        topics = mgr.metadata_store.discover_topics()
+        tags = mgr.metadata_store.discover_tags()
 
         result = {
-            "topics": topics,
-            "count": len(topics),
+            "tags": tags,
+            "count": len(tags),
         }
 
-        logger.info(f"Discovered {len(topics)} topics")
+        logger.info(f"Discovered {len(tags)} tags")
         return result
 
     except Exception as e:
-        error_msg = f"Failed to discover topics: {str(e)}"
+        error_msg = f"Failed to discover tags: {str(e)}"
         logger.error(error_msg)
         return {
             "error": error_msg,
-            "topics": [],
+            "tags": [],
             "count": 0,
         }
 
@@ -897,24 +900,24 @@ async def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) 
     """
     # Index initial filebase (safe attribute access)
     if getattr(args, "initial_filebase", None):
-        # Validate that topic is provided
-        if not getattr(args, "topic", None):
+        # Validate that tags are provided
+        if not getattr(args, "tags", None):
             logger.error(
-                "ERROR: --topic is required when using --initial-filebase\n"
-                "Example: pycontextify --initial-filebase ./src --topic my-project"
+                "ERROR: --tags is required when using --initial-filebase\n"
+                "Example: pycontextify --initial-filebase ./src --tags backend,docs"
             )
             import sys
 
             sys.exit(1)
 
         logger.info(
-            f"Indexing initial filebase: {args.initial_filebase} (topic: {args.topic})"
+            f"Indexing initial filebase: {args.initial_filebase} (tags: {args.tags})"
         )
 
         try:
             result = mgr.index_filebase(
                 base_path=args.initial_filebase,
-                topic=args.topic,
+                tags=args.tags,
             )
 
             if "error" not in result:
@@ -927,7 +930,7 @@ async def perform_initial_indexing(args: argparse.Namespace, mgr: IndexManager) 
 
                 # Print stats to stdout for user visibility
                 print("\n=== Indexing Complete ===")
-                print(f"Topic: {result.get('topic')}")
+                print(f"Tags: {', '.join(result.get('tags', []))}")
                 print(f"Files crawled: {result.get('files_crawled', 0)}")
                 print(f"Files loaded: {result.get('files_loaded', 0)}")
                 print(f"Chunks created: {result.get('chunks_created', 0)}")
@@ -1049,8 +1052,8 @@ def main():
 
         logger.info("Starting PyContextify MCP Server...")
         logger.info("Server provides 5 essential MCP functions:")
-        logger.info("  - index_filebase(path, topic): Unified filebase indexing")
-        logger.info("  - discover(): List indexed topics")
+        logger.info("  - index_filebase(path, tags): Unified filebase indexing")
+        logger.info("  - discover(): List indexed tags")
         logger.info("  - search(query, top_k): Basic semantic search")
         logger.info("  - reset_index(confirm=True): Clear all indexed content")
         logger.info("  - status(): Get system status and statistics")

@@ -106,7 +106,7 @@ from web development to data science and artificial intelligence.
             try:
                 # Test document indexing with new unified API
                 result = index_manager.index_filebase(
-                    base_path=str(temp_path), topic="documents"
+                    base_path=str(temp_path), tags="documents"
                 )
 
                 # Verify indexing succeeded with new stats structure
@@ -312,7 +312,7 @@ class SearchEngine:
 
             # Index all documents at once using unified API
             result = index_manager.index_filebase(
-                base_path=str(temp_path), topic="mixed_documents"
+                base_path=str(temp_path), tags="mixed_documents"
             )
 
             assert "error" not in result
@@ -452,7 +452,7 @@ print(f'Mean Squared Error: {mse}')
             try:
                 # Test supplemental guide content indexing
                 result = index_manager.index_filebase(
-                    base_path=str(temp_path), topic="guides"
+                    base_path=str(temp_path), tags="guides"
                 )
 
                 # Verify indexing succeeded
@@ -539,7 +539,7 @@ It contains some basic content for indexing and search testing.
 
                 # Index the document using unified API
                 result = manager.index_filebase(
-                    base_path=str(doc_dir), topic="test_documents"
+                    base_path=str(doc_dir), tags="test_documents"
                 )
                 assert "error" not in result
                 assert result["files_loaded"] > 0

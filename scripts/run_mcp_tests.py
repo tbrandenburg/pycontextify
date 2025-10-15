@@ -57,7 +57,7 @@ def run_mcp_tests():
             print(f"\n📋 Test Summary:")
             print(f"   ✅ status() - System status reporting")
             print(f"   ✅ index_filebase() - Unified filebase indexing")
-            print(f"   ✅ discover() - Indexed topic discovery")
+            print(f"   ✅ discover() - Indexed tag discovery")
             print(f"   ✅ search() - Semantic search with scoring")
             print(f"   ✅ reset_index() - Index lifecycle management")
             print(f"   ✅ Error handling - Invalid input testing")

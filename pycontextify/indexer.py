@@ -58,7 +58,7 @@ class IndexingPipeline:
     def index_filebase(
         self,
         base_path: str,
-        topic: str,
+        tags: str,
         include: Optional[List[str]] = None,
         exclude: Optional[List[str]] = None,
         exclude_dirs: Optional[List[str]] = None,
@@ -67,7 +67,7 @@ class IndexingPipeline:
 
         Args:
             base_path: Root directory or single file to index
-            topic: Topic name (required, used for organization)
+            tags: Comma-separated tags (required, used for organization)
             include: List of fnmatch patterns to include
             exclude: List of fnmatch patterns to exclude
             exclude_dirs: List of directory patterns to exclude
@@ -76,12 +76,16 @@ class IndexingPipeline:
             Dictionary with pipeline statistics
 
         Raises:
-            ValueError: If topic is empty or None
+            ValueError: If tags are empty or None
             FileNotFoundError: If base_path does not exist
         """
         # Validate inputs
-        if not topic or not isinstance(topic, str) or not topic.strip():
-            raise ValueError("topic is required and must be a non-empty string")
+        if not tags or not isinstance(tags, str) or not tags.strip():
+            raise ValueError("tags are required and must be a comma-separated string")
+
+        parsed_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+        if not parsed_tags:
+            raise ValueError("tags must include at least one non-empty tag")
 
         base_path_obj = Path(base_path).resolve()
         if not base_path_obj.exists():
@@ -98,15 +102,17 @@ class IndexingPipeline:
                 f"Base path must be a file or directory: {base_path}"
             )
 
-        topic = topic.strip()
+        tags = tags.strip()
+        tag_summary = ", ".join(parsed_tags)
         start_time = time.time()
         started_at = datetime.now(timezone.utc)
 
-        logger.info(f"Starting filebase indexing: {base_path} (topic: {topic})")
+        logger.info(f"Starting filebase indexing: {base_path} (tags: {tag_summary})")
 
         # Initialize stats
         stats = {
-            "topic": topic,
+            "tags_input": tags,
+            "tags": parsed_tags,
             "base_path": str(base_path_obj),
             "started_at": started_at.isoformat(),
             "files_crawled": 0,
@@ -128,7 +134,7 @@ class IndexingPipeline:
 
             # Step 2-5: Load, Chunk, Postprocess
             all_chunks = self._process_files(
-                file_paths, loader_base_path, topic, stats
+                file_paths, loader_base_path, tags, parsed_tags, stats
             )
 
             if not all_chunks:
@@ -183,7 +189,8 @@ class IndexingPipeline:
         self,
         file_paths: List[Path],
         base_dir: Path,
-        topic: str,
+        tags_input: str,
+        tags: List[str],
         stats: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
         """Steps 2-5: Load, chunk, and postprocess files.
@@ -191,7 +198,8 @@ class IndexingPipeline:
         Args:
             file_paths: Iterable of file paths to process
             base_dir: Directory used for relative path calculations
-            topic: Topic name for indexing
+            tags_input: Raw tag string used during indexing
+            tags: Parsed tags for indexing
             stats: Mutable statistics dictionary
         """
         logger.info("Step 2-5: Loading, chunking, and postprocessing files")
@@ -212,9 +220,13 @@ class IndexingPipeline:
                 )
                 normalized_docs = loader.load(
                     path=str(file_path_obj),
-                    topic=topic,
+                    tags=tags_input,
                     base_path=str(base_dir),
                 )
+
+                for doc in normalized_docs:
+                    metadata = doc.get("metadata", {})
+                    metadata["tags"] = list(tags)
 
                 if not normalized_docs:
                     continue
@@ -232,6 +244,10 @@ class IndexingPipeline:
 
                 if not file_chunks:
                     continue
+
+                for chunk in file_chunks:
+                    metadata = chunk.get("metadata", {})
+                    metadata.setdefault("tags", list(tags))
 
                 # Step 4: Postprocess (file-level)
                 file_chunks = postprocess_file(file_chunks)
@@ -357,7 +373,7 @@ class IndexingPipeline:
         logger.info(
             f"Filebase indexing complete: "
             f"{stats['chunks_created']} chunks from {stats['files_loaded']} files "
-            f"in {duration_seconds:.2f}s (topic: {stats['topic']})"
+            f"in {duration_seconds:.2f}s (tags: {', '.join(stats.get('tags', []))})"
         )
 
         return stats
@@ -505,7 +521,7 @@ class IndexManager:
     def index_filebase(
         self,
         base_path: str,
-        topic: str,
+        tags: str,
         include: Optional[List[str]] = None,
         exclude: Optional[List[str]] = None,
         exclude_dirs: Optional[List[str]] = None,
@@ -514,7 +530,7 @@ class IndexManager:
 
         Args:
             base_path: Root directory or file to index
-            topic: Topic name (required)
+            tags: Comma-separated tags (required)
             include: Patterns to include
             exclude: Patterns to exclude
             exclude_dirs: Directory patterns to exclude
@@ -524,7 +540,7 @@ class IndexManager:
         """
         self._ensure_services()
         result = self.indexing_pipeline.index_filebase(
-            base_path, topic, include, exclude, exclude_dirs
+            base_path, tags, include, exclude, exclude_dirs
         )
         self._auto_save()
         return result

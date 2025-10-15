@@ -72,10 +72,10 @@ class FileLoaderFactory:
 
     Examples:
         >>> loader = FileLoaderFactory()
-        >>> docs = loader.load("/path/to/file.pdf", topic="documentation")
+        >>> docs = loader.load("/path/to/file.pdf", tags="documentation")
         >>> # Returns list of normalized docs (one per PDF page)
 
-        >>> docs = loader.load("/path/to/code.py", topic="codebase")
+        >>> docs = loader.load("/path/to/code.py", tags="codebase")
         >>> # Returns single normalized doc with code content
     """
 
@@ -88,14 +88,29 @@ class FileLoaderFactory:
         self.default_encoding = default_encoding
         logger.debug(f"FileLoaderFactory initialized: encoding={default_encoding}")
 
+    def _normalize_tags(self, tags: Any) -> List[str]:
+        """Normalize raw tag input into a list of distinct tags."""
+        if not tags:
+            return []
+
+        if isinstance(tags, str):
+            normalized = [tag.strip() for tag in tags.split(",") if tag.strip()]
+        elif isinstance(tags, (list, tuple, set)):
+            normalized = [str(tag).strip() for tag in tags if str(tag).strip()]
+        else:
+            normalized = []
+
+        # Preserve order while removing duplicates
+        return list(dict.fromkeys(normalized))
+
     def load(
-        self, path: str, topic: str, base_path: Optional[str] = None
+        self, path: str, tags: str, base_path: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Load and normalize a file to standard format.
 
         Args:
             path: Absolute path to file
-            topic: Topic name (required for all files)
+            tags: Comma-separated tags (required for all files)
             base_path: Base directory path for computing relative_path (optional)
 
         Returns:
@@ -103,11 +118,11 @@ class FileLoaderFactory:
             Returns empty list if file cannot be loaded or is binary.
 
         Raises:
-            ValueError: If topic is empty or None
+            ValueError: If tags are empty or None
             FileNotFoundError: If path does not exist
         """
-        if not topic or not isinstance(topic, str) or not topic.strip():
-            raise ValueError("topic is required and must be a non-empty string")
+        if not tags or not isinstance(tags, str) or not tags.strip():
+            raise ValueError("tags are required and must be a non-empty string")
 
         file_path = Path(path).resolve()
 
@@ -129,7 +144,7 @@ class FileLoaderFactory:
             base_metadata = self._build_base_metadata(
                 file_path=file_path,
                 base_path=base_path,
-                topic=topic,
+                tags=tags,
                 mime_type=mime_type,
                 file_extension=file_extension,
             )
@@ -159,7 +174,7 @@ class FileLoaderFactory:
         self,
         file_path: Path,
         base_path: Optional[str],
-        topic: str,
+        tags: str,
         mime_type: Optional[str],
         file_extension: str,
     ) -> Dict[str, Any]:
@@ -168,7 +183,7 @@ class FileLoaderFactory:
         Args:
             file_path: Resolved Path object
             base_path: Optional base directory for relative path calculation
-            topic: Topic name
+            tags: Raw tags string
             mime_type: Detected MIME type
             file_extension: File extension with dot
 
@@ -196,7 +211,7 @@ class FileLoaderFactory:
             "filename_stem": file_path.stem,
             "file_extension": clean_extension,
             "date_loaded": datetime.now(timezone.utc).isoformat(),
-            "topic": topic,
+            "tags": self._normalize_tags(tags),
             "language": None,  # To be filled by chunker if needed
             "links": None,  # To be filled by chunker if detected
         }

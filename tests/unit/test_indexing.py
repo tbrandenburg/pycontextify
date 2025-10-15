@@ -54,22 +54,22 @@ def pipeline(
 class TestIndexingPipelineValidation:
     """Tests for input validation."""
 
-    def test_validates_topic_required(self, pipeline):
-        """Should raise ValueError if topic is None."""
+    def test_validates_tags_required(self, pipeline):
+        """Should raise ValueError if tags is None."""
         with TemporaryDirectory() as tmpdir:
-            with pytest.raises(ValueError, match="topic is required"):
+            with pytest.raises(ValueError, match="tags are required"):
                 pipeline.index_filebase(tmpdir, None)
 
-    def test_validates_topic_not_empty(self, pipeline):
-        """Should raise ValueError if topic is empty."""
+    def test_validates_tags_not_empty(self, pipeline):
+        """Should raise ValueError if tags is empty."""
         with TemporaryDirectory() as tmpdir:
-            with pytest.raises(ValueError, match="topic is required"):
+            with pytest.raises(ValueError, match="tags are required"):
                 pipeline.index_filebase(tmpdir, "")
 
-    def test_validates_topic_not_whitespace(self, pipeline):
-        """Should raise ValueError if topic is only whitespace."""
+    def test_validates_tags_not_whitespace(self, pipeline):
+        """Should raise ValueError if tags is only whitespace."""
         with TemporaryDirectory() as tmpdir:
-            with pytest.raises(ValueError, match="topic is required"):
+            with pytest.raises(ValueError, match="tags are required"):
                 pipeline.index_filebase(tmpdir, "   ")
 
     def test_validates_path_exists(self, pipeline):
@@ -193,10 +193,11 @@ class TestIndexingPipelineExecution:
             mock_postprocess_fb.side_effect = lambda x: x
 
             # Execute
-            stats = pipeline.index_filebase(tmpdir, "test_topic")
+            stats = pipeline.index_filebase(tmpdir, "primary-tag")
 
             # Verify
-            assert stats["topic"] == "test_topic"
+            assert stats["tags_input"] == "primary-tag"
+            assert stats["tags"] == ["primary-tag"]
             assert stats["files_crawled"] == 1
             assert stats["files_loaded"] == 1
             assert stats["chunks_created"] == 2
@@ -209,6 +210,9 @@ class TestIndexingPipelineExecution:
             mock_loader.load.assert_called_once()
             mock_vector_store.add_vectors.assert_called_once()
             assert mock_metadata_store.add_chunk.call_count == 2
+            for call in mock_metadata_store.add_chunk.call_args_list:
+                chunk_meta = call.args[0]
+                assert getattr(chunk_meta, "tags", []) == ["primary-tag"]
 
     @patch("pycontextify.indexer.FileCrawler")
     def test_handles_no_files_found(self, mock_crawler_class, pipeline):
@@ -483,7 +487,8 @@ class TestIndexingPipelineStatsTracking:
     def test_limits_error_samples(self, pipeline):
         """Should limit error samples to 10."""
         stats = {
-            "topic": "test",
+            "tags_input": "test",
+            "tags": ["test"],
             "chunks_created": 0,
             "files_loaded": 0,
             "error_samples": [
