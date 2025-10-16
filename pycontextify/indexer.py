@@ -745,7 +745,7 @@ class IndexManager:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, _exc_val, _exc_tb):
         """Context manager exit with cleanup."""
         # Auto-save if configured and no errors
         if self.config.auto_persist and exc_type is None:

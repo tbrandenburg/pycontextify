@@ -143,7 +143,7 @@ def handle_mcp_errors(operation_name: str, func_impl, *args):
     def timeout(seconds):
         """Context manager for timeout protection."""
 
-        def timeout_handler(signum, frame):
+        def timeout_handler(_signum, _frame):
             raise TimeoutError(f"Operation timed out after {seconds} seconds")
 
         # Set up signal handler (Unix/Windows compatible)
@@ -1004,7 +1004,7 @@ def setup_logging(args: argparse.Namespace) -> None:
     )
 
 
-def cleanup_handler(signum, frame):
+def cleanup_handler(_signum, _frame):
     """Handle graceful shutdown signals with enhanced resource management."""
     import sys
 
