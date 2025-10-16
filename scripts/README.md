@@ -74,6 +74,17 @@ uv run python scripts/debug_pdf_indexing.py
 uv run python scripts/debug_pdf_indexing.py --pdf-path path/to/document.pdf
 ```
 
+### 🧭 **inspect_faiss_index.py** - FAISS Index Explorer
+Loads a `.faiss` index file, prints its schema, and previews stored vectors.
+
+```bash
+# Inspect an index file from the project root
+uv run python scripts/inspect_faiss_index.py path/to/index.faiss
+
+# Show more vectors without printing stored IDs
+uv run python scripts/inspect_faiss_index.py path/to/index.faiss --max-vectors 25 --no-ids
+```
+
 ## Output
 
 Debug reports are generated in `.debug/` folder with timestamped HTML files containing:
