@@ -22,6 +22,20 @@ Builds distribution packages.
 python scripts/build_package.py
 ```
 
+### 🧹 **run_vulture.py**
+Runs the Vulture dead-code scanner with project defaults (`pycontextify/` with `tests/` excluded).
+
+```bash
+# Scan the main package with default settings
+python scripts/run_vulture.py
+
+# Include additional directories and tweak confidence threshold
+python scripts/run_vulture.py pycontextify tests --min-confidence 70
+
+# Forward advanced options directly to Vulture
+python scripts/run_vulture.py -- --ignore-names "test_*"
+```
+
 ### 🔢 **bump_version.py**
 Increments the semantic version in `pyproject.toml` (and syncs the fallback in `pycontextify/__init__.py`).
 

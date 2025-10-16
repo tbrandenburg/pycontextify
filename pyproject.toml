@@ -66,6 +66,7 @@ dev = [
     "mypy>=1.0.0",
     "build>=1.0.3",
     "twine>=4.0.0",
+    "vulture>=2.11",
 ]
 # GPU support
 gpu = ["faiss-gpu>=1.7.0"]
@@ -141,4 +142,5 @@ dev = [
     "pytest-cov>=7.0.0",
     "types-psutil>=7.0.0.20250822",
     "types-requests>=2.32.4.20250913",
+    "vulture>=2.11",
 ]
