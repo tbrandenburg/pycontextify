@@ -220,7 +220,7 @@ Use the dedicated release checklist in [RELEASING.md](./RELEASING.md) when prepa
 
 Quick reference:
 
-1. Bump `version` in `pyproject.toml` (and ensure changelog coverage)
+1. Bump `version` in `pyproject.toml` (use `python scripts/bump_version.py [major|minor|patch]` for automation and ensure changelog coverage)
 2. Run the full test suite or `uv run python scripts/run_mcp_tests.py --smoke`
 3. Build distributables and run metadata checks:
 

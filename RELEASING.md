@@ -6,7 +6,7 @@ This document captures the steps required to publish a new version of PyContexti
 
 1. **Decide on the version number**
    - Follow [Semantic Versioning](https://semver.org/)
-   - Update the `version` field in `pyproject.toml`
+   - Update the `version` field in `pyproject.toml` (run `python scripts/bump_version.py [major|minor|patch]` to bump it safely)
 2. **Update documentation**
    - Ensure `README.md` reflects new features or breaking changes
    - Add or revise release notes in `CHANGELOG.md`

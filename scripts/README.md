@@ -22,6 +22,20 @@ Builds distribution packages.
 python scripts/build_package.py
 ```
 
+### 🔢 **bump_version.py**
+Increments the semantic version in `pyproject.toml` (and syncs the fallback in `pycontextify/__init__.py`).
+
+```bash
+# Bump patch version (default)
+python scripts/bump_version.py
+
+# Bump minor version
+python scripts/bump_version.py minor
+
+# Preview without writing changes
+python scripts/bump_version.py --dry-run
+```
+
 ## Debug Scripts
 
 ### 🔍 **debug_mcp_system.py** - MCP System Testing
