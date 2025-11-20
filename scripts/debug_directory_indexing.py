@@ -79,56 +79,111 @@ class DirectoryIndexingDebugger:
 
         # Common code file extensions
         code_extensions = {
-            '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h',
-            '.hpp', '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt',
-            '.scala', '.r', '.m', '.mm', '.sh', '.bash', '.zsh', '.ps1',
-            '.sql', '.html', '.css', '.scss', '.less', '.vue', '.svelte',
-            '.json', '.yaml', '.yml', '.xml', '.toml', '.ini', '.cfg', '.conf',
-            '.md', '.rst', '.txt', '.tex', '.dockerfile', '.makefile'
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".java",
+            ".cpp",
+            ".c",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".go",
+            ".rs",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".scala",
+            ".r",
+            ".m",
+            ".mm",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".ps1",
+            ".sql",
+            ".html",
+            ".css",
+            ".scss",
+            ".less",
+            ".vue",
+            ".svelte",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".xml",
+            ".toml",
+            ".ini",
+            ".cfg",
+            ".conf",
+            ".md",
+            ".rst",
+            ".txt",
+            ".tex",
+            ".dockerfile",
+            ".makefile",
         }
 
         try:
-            for file_path in self.dir_path.rglob('*'):
+            for file_path in self.dir_path.rglob("*"):
                 if file_path.is_file():
                     total_files += 1
                     file_size = file_path.stat().st_size
                     total_size += file_size
-                    
+
                     extension = file_path.suffix.lower()
                     file_extensions[extension] += 1
-                    
+
                     # Check if it's a supported code file
-                    if extension in code_extensions or file_path.name.lower() in {'dockerfile', 'makefile'}:
-                        supported_files.append({
-                            'path': str(file_path.relative_to(self.dir_path)),
-                            'size': file_size,
-                            'extension': extension,
-                            'last_modified': datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
-                        })
-                        file_stats['supported'] += 1
+                    if extension in code_extensions or file_path.name.lower() in {
+                        "dockerfile",
+                        "makefile",
+                    }:
+                        supported_files.append(
+                            {
+                                "path": str(file_path.relative_to(self.dir_path)),
+                                "size": file_size,
+                                "extension": extension,
+                                "last_modified": datetime.fromtimestamp(
+                                    file_path.stat().st_mtime
+                                ).isoformat(),
+                            }
+                        )
+                        file_stats["supported"] += 1
                     else:
-                        file_stats['unsupported'] += 1
+                        file_stats["unsupported"] += 1
 
         except Exception as e:
             print(f"⚠️  Error analyzing directory: {e}")
             directory_info["error"] = str(e)
             return directory_info
 
-        directory_info.update({
-            "total_files": total_files,
-            "total_size_bytes": total_size,
-            "total_size_mb": round(total_size / (1024 * 1024), 2),
-            "supported_files_count": file_stats['supported'],
-            "unsupported_files_count": file_stats['unsupported'],
-            "file_extensions": dict(file_extensions),
-            "supported_files": supported_files[:50],  # Limit to first 50 for report size
-            "total_supported_files": len(supported_files)
-        })
+        directory_info.update(
+            {
+                "total_files": total_files,
+                "total_size_bytes": total_size,
+                "total_size_mb": round(total_size / (1024 * 1024), 2),
+                "supported_files_count": file_stats["supported"],
+                "unsupported_files_count": file_stats["unsupported"],
+                "file_extensions": dict(file_extensions),
+                "supported_files": supported_files[
+                    :50
+                ],  # Limit to first 50 for report size
+                "total_supported_files": len(supported_files),
+            }
+        )
 
-        print(f"📂 Directory contains {total_files} files ({directory_info['total_size_mb']} MB)")
+        print(
+            f"📂 Directory contains {total_files} files ({directory_info['total_size_mb']} MB)"
+        )
         print(f"📄 Supported code files: {file_stats['supported']}")
         print(f"📄 Unsupported files: {file_stats['unsupported']}")
-        print(f"📈 Top file types: {dict(list(sorted(file_extensions.items(), key=lambda x: x[1], reverse=True))[:10])}")
+        print(
+            f"📈 Top file types: {dict(list(sorted(file_extensions.items(), key=lambda x: x[1], reverse=True))[:10])}"
+        )
 
         return directory_info
 
@@ -145,7 +200,7 @@ class DirectoryIndexingDebugger:
         try:
             # Get all supported files in the directory
             normalized_docs = []
-            
+
             # Process each supported file individually
             for file_info in self.debug_data["directory_info"]["supported_files"]:
                 file_path = self.dir_path / file_info["path"]
@@ -158,10 +213,9 @@ class DirectoryIndexingDebugger:
                         )
                         normalized_docs.extend(docs)
                     except Exception as e:
-                        loading_debug["processing_errors"].append({
-                            "file": str(file_path),
-                            "error": str(e)
-                        })
+                        loading_debug["processing_errors"].append(
+                            {"file": str(file_path), "error": str(e)}
+                        )
                         logger.warning(f"Failed to load {file_path}: {e}")
 
             loading_time = time.time() - loading_start
@@ -173,7 +227,7 @@ class DirectoryIndexingDebugger:
                 "tags_applied": tags.split(","),
                 "documents": [],
                 "file_types": defaultdict(int),
-                "processing_errors": []
+                "processing_errors": [],
             }
 
             print(f"✅ Loaded {len(normalized_docs)} documents in {loading_time:.2f}s")
@@ -183,7 +237,7 @@ class DirectoryIndexingDebugger:
             for i, doc in enumerate(normalized_docs):
                 text = doc["text"]
                 metadata = doc["metadata"]
-                
+
                 # Get file extension for statistics
                 source_path = metadata.get("source_path", "")
                 if source_path:
@@ -205,7 +259,8 @@ class DirectoryIndexingDebugger:
 
                 # Analyze code patterns
                 code_indicators = {
-                    "function_definitions": text.count("def ") + text.count("function "),
+                    "function_definitions": text.count("def ")
+                    + text.count("function "),
                     "class_definitions": text.count("class "),
                     "import_statements": text.count("import ") + text.count("from "),
                     "comments": text.count("#") + text.count("//") + text.count("/*"),
@@ -221,7 +276,9 @@ class DirectoryIndexingDebugger:
                 # Print summary for key files
                 if i < 10 or doc_info["appears_to_be_code"]:
                     file_name = Path(source_path).name if source_path else f"doc_{i}"
-                    print(f"  📄 {file_name}: {len(text):,} chars, {len(text.split()):,} words")
+                    print(
+                        f"  📄 {file_name}: {len(text):,} chars, {len(text.split()):,} words"
+                    )
                     if doc_info["appears_to_be_code"]:
                         print(f"     💻 Code detected: {code_indicators}")
 
@@ -266,7 +323,7 @@ class DirectoryIndexingDebugger:
         try:
             # Get all supported files in the directory
             normalized_docs = []
-            
+
             # Process each supported file individually
             for file_info in self.debug_data["directory_info"]["supported_files"]:
                 file_path = self.dir_path / file_info["path"]
@@ -320,7 +377,7 @@ class DirectoryIndexingDebugger:
             for i, chunk in enumerate(chunks):
                 chunk_text = chunk["text"]
                 chunk_metadata = chunk["metadata"]
-                
+
                 source_path = chunk_metadata.get("source_path", "unknown")
                 if source_path != "unknown":
                     file_name = Path(source_path).name
@@ -334,7 +391,11 @@ class DirectoryIndexingDebugger:
                     "start_char": chunk_metadata.get("start_char"),
                     "end_char": chunk_metadata.get("end_char"),
                     "source_path": source_path,
-                    "file_name": Path(source_path).name if source_path != "unknown" else "unknown",
+                    "file_name": (
+                        Path(source_path).name
+                        if source_path != "unknown"
+                        else "unknown"
+                    ),
                     "file_type": chunk_metadata.get("file_type", "unknown"),
                     "tags": chunk_metadata.get("tags", []),
                     "text_preview": (
@@ -382,14 +443,20 @@ class DirectoryIndexingDebugger:
                 "chunks_per_document": round(len(chunks) / len(normalized_docs), 1),
             }
 
-            chunking_debug["file_chunk_distribution"] = dict(chunking_debug["file_chunk_distribution"])
+            chunking_debug["file_chunk_distribution"] = dict(
+                chunking_debug["file_chunk_distribution"]
+            )
 
             print(f"📊 Chunk statistics:")
             stats = chunking_debug["statistics"]
             print(f"   • Average size: {stats['average_chunk_size']} chars")
-            print(f"   • Size range: {stats['min_chunk_size']} - {stats['max_chunk_size']} chars")
+            print(
+                f"   • Size range: {stats['min_chunk_size']} - {stats['max_chunk_size']} chars"
+            )
             print(f"   • Chunks per document: {stats['chunks_per_document']}")
-            print(f"📈 Top files by chunk count: {dict(list(sorted(chunking_debug['file_chunk_distribution'].items(), key=lambda x: x[1], reverse=True))[:10])}")
+            print(
+                f"📈 Top files by chunk count: {dict(list(sorted(chunking_debug['file_chunk_distribution'].items(), key=lambda x: x[1], reverse=True))[:10])}"
+            )
 
             return chunking_debug
 
@@ -477,7 +544,9 @@ class DirectoryIndexingDebugger:
 
         if directory_info.get("file_extensions"):
             extensions = directory_info["file_extensions"]
-            sorted_extensions = sorted(extensions.items(), key=lambda x: x[1], reverse=True)
+            sorted_extensions = sorted(
+                extensions.items(), key=lambda x: x[1], reverse=True
+            )
             for ext, count in sorted_extensions[:15]:  # Top 15 file types
                 ext_name = ext if ext else "(no extension)"
                 markdown += f"- **{ext_name}**: {count} files\n"
@@ -490,9 +559,11 @@ class DirectoryIndexingDebugger:
         for file_info in directory_info.get("supported_files", [])[:20]:
             file_path = file_info["path"]
             file_size_kb = round(file_info["size"] / 1024, 1)
-            markdown += f"- `{file_path}` ({file_size_kb} KB, {file_info['extension']})\n"
+            markdown += (
+                f"- `{file_path}` ({file_size_kb} KB, {file_info['extension']})\n"
+            )
 
-        if loading.get('success'):
+        if loading.get("success"):
             markdown += f"""
 ## File Processing Results
 
@@ -500,7 +571,9 @@ class DirectoryIndexingDebugger:
 
 """
             file_types = loading.get("file_types", {})
-            for file_type, count in sorted(file_types.items(), key=lambda x: x[1], reverse=True):
+            for file_type, count in sorted(
+                file_types.items(), key=lambda x: x[1], reverse=True
+            ):
                 type_name = file_type if file_type else "(no extension)"
                 markdown += f"- **{type_name}**: {count} documents\n"
 
@@ -509,8 +582,8 @@ class DirectoryIndexingDebugger:
 
 """
 
-        if chunking.get('success'):
-            stats = chunking.get('statistics', {})
+        if chunking.get("success"):
+            stats = chunking.get("statistics", {})
             markdown += f"""- **Total Chunk Characters:** {stats.get('total_chunk_characters', 0):,}
 - **Average Chunk Size:** {stats.get('average_chunk_size', 0)} characters
 - **Chunk Size Range:** {stats.get('min_chunk_size', 0)} - {stats.get('max_chunk_size', 0)} characters
@@ -519,9 +592,11 @@ class DirectoryIndexingDebugger:
 ### Chunk Distribution by File
 
 """
-            
+
             file_distribution = chunking.get("file_chunk_distribution", {})
-            for file_name, chunk_count in sorted(file_distribution.items(), key=lambda x: x[1], reverse=True)[:20]:
+            for file_name, chunk_count in sorted(
+                file_distribution.items(), key=lambda x: x[1], reverse=True
+            )[:20]:
                 markdown += f"- **{file_name}**: {chunk_count} chunks\n"
 
             markdown += """
@@ -530,9 +605,11 @@ class DirectoryIndexingDebugger:
 > **Purpose:** This section shows a sample of processed documents to analyze conversion quality.
 
 """
-            
+
             # Add sample documents
-            for i, doc in enumerate(loading.get('documents', [])[:5]):  # First 5 documents
+            for i, doc in enumerate(
+                loading.get("documents", [])[:5]
+            ):  # First 5 documents
                 markdown += f"""### Document {i+1}: {Path(doc.get('source_path', 'unknown')).name}
 
 **Statistics:**
@@ -565,13 +642,13 @@ class DirectoryIndexingDebugger:
 """
 
             # Add all chunks with clear separation
-            chunks = chunking.get('chunks', [])
+            chunks = chunking.get("chunks", [])
             current_file = None
-            
+
             for i, chunk in enumerate(chunks):
                 chunk_num = i + 1
-                file_name = chunk.get('file_name', 'unknown')
-                
+                file_name = chunk.get("file_name", "unknown")
+
                 # Add file separator when switching files
                 if file_name != current_file:
                     current_file = file_name
@@ -801,7 +878,7 @@ class DirectoryIndexingDebugger:
 
             # Show sample documents
             for doc in loading.get("documents", [])[:5]:  # Show first 5 documents
-                file_name = Path(doc.get('source_path', 'unknown')).name
+                file_name = Path(doc.get("source_path", "unknown")).name
                 html += f"""
             <div class="file-group">
                 <h5>📄 {file_name}</h5>
@@ -898,7 +975,9 @@ class DirectoryIndexingDebugger:
 
             # Add chunk distribution
             file_distribution = chunking.get("file_chunk_distribution", {})
-            for file_name, chunk_count in sorted(file_distribution.items(), key=lambda x: x[1], reverse=True)[:15]:
+            for file_name, chunk_count in sorted(
+                file_distribution.items(), key=lambda x: x[1], reverse=True
+            )[:15]:
                 html += f"<tr><td>{file_name}</td><td>{chunk_count}</td></tr>"
 
             html += f"""
@@ -912,8 +991,8 @@ class DirectoryIndexingDebugger:
 
             # Group chunks by file for better organization
             chunks_by_file = defaultdict(list)
-            for chunk in chunking.get('chunks', []):
-                file_name = chunk.get('file_name', 'unknown')
+            for chunk in chunking.get("chunks", []):
+                file_name = chunk.get("file_name", "unknown")
                 chunks_by_file[file_name].append(chunk)
 
             for file_name, file_chunks in chunks_by_file.items():

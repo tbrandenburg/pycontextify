@@ -70,14 +70,14 @@ def _update_pyproject(content: str, new_version: str) -> str:
     pattern = re.compile(r'^(version\s*=\s*")([^"\n]+)(")', re.MULTILINE)
     if not pattern.search(content):
         raise VersionBumpError("Could not locate version field in pyproject.toml")
-    return pattern.sub(rf'\g<1>{new_version}\3', content, count=1)
+    return pattern.sub(rf"\g<1>{new_version}\3", content, count=1)
 
 
 def _update_init(content: str, new_version: str) -> str:
     pattern = re.compile(r'(__version__\s*=\s*")(?P<version>[^"\n]+)(")')
     if not pattern.search(content):
         return content  # No fallback version present; nothing to update
-    return pattern.sub(rf'\g<1>{new_version}\3', content, count=1)
+    return pattern.sub(rf"\g<1>{new_version}\3", content, count=1)
 
 
 def bump_version(part: str, *, dry_run: bool = False) -> Version:

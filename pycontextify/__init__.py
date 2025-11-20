@@ -1,7 +1,7 @@
 """PyContextify - a relationship-aware semantic search MCP server."""
 
-import warnings
 import os
+import warnings
 from importlib import metadata as _metadata
 
 # Suppress SWIG-related deprecation warnings from FAISS

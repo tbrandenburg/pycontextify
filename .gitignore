@@ -90,3 +90,6 @@ dmypy.json
 
 # pyenv
 .python-version
+
+# pytest
+coverage.xml

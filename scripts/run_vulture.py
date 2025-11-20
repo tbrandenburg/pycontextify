@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-
 DEFAULT_PATHS = ("pycontextify",)
 DEFAULT_EXCLUDES = ("tests",)
 DEFAULT_MIN_CONFIDENCE = 80

@@ -7,6 +7,7 @@ This script is intended to be executed from the project root using:
 It prints summary information about the index (schema) and optionally dumps a
 preview of the stored vectors and their IDs.
 """
+
 from __future__ import annotations
 
 import argparse
