@@ -35,4 +35,4 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run tests
-        run: uv run pytest --cov=pycontextify
+        run: make test
